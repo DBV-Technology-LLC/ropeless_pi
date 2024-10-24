@@ -44,8 +44,16 @@
 #include "mynumdlg.h"
 #include "myokdlg.h"
 
-#include <arpa/inet.h>
-#include <netinet/tcp.h>
+#ifdef __WXMSW__
+    #include <winsock.h>
+    #include <windows.h>
+#else
+    #include <arpa/inet.h>
+    #include <netinet/tcp.h>
+#endif
+
+// #include <arpa/inet.h>
+// #include <netinet/tcp.h>
 
 #ifdef ocpnUSE_GL
 #ifdef __ANDROID__
@@ -810,6 +818,8 @@ bool ropeless_pi::SendReleaseMessage(transponder_state *state, long code)
 {
   bool ret = true;
 
+  //wxLogMessage("Sending Release Message...");
+
   // Create payload
   wxString payload("$RSRLB,");
   wxString pl1;
@@ -823,16 +833,21 @@ bool ropeless_pi::SendReleaseMessage(transponder_state *state, long code)
 
   // Create a UDP transmit socket
   if( !m_tsock ){
+    
     m_tconn_addr.Service(59647);
-    // m_tconn_addr.Hostname("192.168.37.255");  //OK
-    m_tconn_addr.Hostname("255.255.255.255");  //OK
-    //m_tconn_addr.AnyAddress();      // NOPE, produces "0.0.0.0" for address, i.e. for listening
-    wxString a = m_tconn_addr.IPAddress();
-    m_tsock =  new wxDatagramSocket(m_tconn_addr, wxSOCKET_NOWAIT | wxSOCKET_REUSEADDR);
+    m_tconn_addr.BroadcastAddress();
 
-     int broadcastEnable = 1;
-       m_tsock->SetOption(
-           SOL_SOCKET, SO_BROADCAST, &broadcastEnable, sizeof(broadcastEnable));
+    wxString a = m_tconn_addr.IPAddress();
+    m_tsock = new wxDatagramSocket(m_tconn_addr, wxSOCKET_BROADCAST | wxSOCKET_NOBIND | wxSOCKET_NOWAIT | wxSOCKET_REUSEADDR);
+
+    if (m_tsock == NULL)
+    {
+      wxLogMessage("Release UDP Socket returned NULL!");
+      return false;
+    }
+
+    int broadcastEnable = 1;
+    m_tsock->SetOption(SOL_SOCKET, SO_BROADCAST, &broadcastEnable, sizeof(broadcastEnable));
 
   }
 
@@ -840,19 +855,33 @@ bool ropeless_pi::SendReleaseMessage(transponder_state *state, long code)
   udp_socket = dynamic_cast<wxDatagramSocket*>(m_tsock);
 
   if (udp_socket && udp_socket->IsOk()) {
+
+     //wxLogMessage("Socket ok... trying to send");
      udp_socket->SendTo(m_tconn_addr, payload.mb_str(), payload.size());
+
      if (udp_socket->Error()){
-       //wxSocketError err = udp_socket->LastError();
+       wxString emsg;
+       wxSocketError err = udp_socket->LastError();
+       emsg.Printf("Error Sending on UDP Socket: %d", err);
+       wxLogMessage(emsg);
        ret = false;
      }
   }
   else
     ret = false;
 
-  wxLogMessage(payload);
+  if (ret != false) 
+  {
+    wxString ws;
+    ws.Printf("Release Request Sent: %s", payload);
+    wxLogMessage(ws);
+  }
+  else
+    wxLogMessage("Failed to Send Release Request!");
+
   return ret;
 }
-
+    
 void ropeless_pi::startSim()
 {
     // Open the data file
@@ -2228,7 +2257,7 @@ void RopelessDialog::OnManualReleaseButton(wxCommandEvent &event)
   if (result >= 0)
   {
     wxString s1;
-    s1.Printf("Manual Release Req for ID: %d\n", result);
+    s1.Printf("Manual Release Req for ID: %d", result);
     wxLogMessage(s1);
 
     // Create a transponder state just to spoof the release message
