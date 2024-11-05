@@ -1,22 +1,16 @@
 # TODO
-## Colin Vincent 
-## 3/26/24
-## Updated 5/28/24
 
-[x] - Add debug message for RSRFA messages to opencpn.log
-[x] - Add delete option on right click
-[] - Fix scaling
-[] - Fix Close / X buttons not working
-[] - Change Logo on Toolbar to RSI ship
-[x] - Add emergency release option
-[x] - Show Transponder ID on right click
-[x] - Add in Transponder Owned / Not Owned changes from Hayden
-[x] - Change Ident to ID in column list
-[] - Selecting item in list highlights on screen
-[] - Hovering over Transponder shows ID
+Features
+[x] - Get rid of release code prompt on owned units
+[x] - Selecting item in list highlights on screen / changes color
+[x] - Hovering over Transponder shows ID
+[x] - Place transponder option via right-click
 [] - Print Transponder ID on screen under circle
-[] - Place transponder option 
+[] - Flash color change on selection
+[] - Delete option via right-click on screen -- use deleteTransponder() function
 
-Notes:
-- RopelessDialog::OnOKClick and RopelessDialog::OnClose execute but don't close window
-- Logo on toolbar controlled by icons.cpp / h
+
+Bugs
+[] - Sorting while having a transponder selected leaves color change since it's never "deselected"
+[] - Right clicking on release through list causes wrong release id to be picked
+

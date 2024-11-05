@@ -26,10 +26,12 @@
 
 #ifndef  WX_PRECOMP
 #include "wx/wx.h"
-#endif //precompiled headers
+#endif
 #include <typeinfo>
 #include <wx/graphics.h>
-  
+#include <wx/popupwin.h>
+#include <wx/window.h>
+
 #include "config.h"
 #include "ropeless_pi.h"
 #include "icons.h"
@@ -43,17 +45,15 @@
 #include "pugixml.hpp"
 #include "mynumdlg.h"
 #include "myokdlg.h"
+#include "manualPlacementDlgImpl.h"
 
 #ifdef __WXMSW__
-    #include <winsock.h>
-    #include <windows.h>
+#include <winsock.h>
+#include <windows.h>
 #else
-    #include <arpa/inet.h>
-    #include <netinet/tcp.h>
+#include <arpa/inet.h>
+#include <netinet/tcp.h>
 #endif
-
-// #include <arpa/inet.h>
-// #include <netinet/tcp.h>
 
 #ifdef ocpnUSE_GL
 #ifdef __ANDROID__
@@ -65,6 +65,8 @@
 #endif
 
 #include <sstream>
+#include <iostream> 
+#include <string.h> 
 
 #if !defined(NAN)
 static const long long lNaN = 0xfff8000000000000;
@@ -117,6 +119,10 @@ bool                    g_bRopelessTargetList_sortReverse;
 int                     g_RopelessTargetList_sortColumn;
 std::vector<transponder_state *>transponderStatus;
 
+wxPopupWindow* popup;
+wxStaticText* popupText;
+bool popupVis = false;
+
 // Simulation Variables
 int n_tick;
 double countRun;
@@ -129,23 +135,26 @@ wxTextFile msgFile;
 double tstamp_current;
 
 #include <wx/arrimpl.cpp> // this is a magic incantation which must be done!
+
 WX_DEFINE_OBJARRAY(ArrayOf2DPoints);
 
 #include "default_pi.xpm"
 #include "ocpn_plugin.h"
 
-// HR Mod
 wxString colorTableNames[] = {
-  //"MAGENTA",
-  //"CYAN",
-  "LIME GREEN",
-  "ORANGE",
-  //"MEDIUM GOLDENROD"
+  "LIME GREEN",     // looks darker green
+  "ORANGE",         // looks darker red
+  "MAGENTA",
+  "CYAN",
+  "WHEAT"
 };
-#define COLOR_TABLE_COUNT 2
+
+#define COLOR_TABLE_COUNT 5
+#define COLOR_INDEX_GOLDEN 4
+#define COLOR_INDEX_GREEN 0
+#define COLOR_INDEX_RED 1
 
 wxString msgFileName = "/home/dsr/Projects/ropeless_pi/NMEArevC_06072023.txt";
-  //"/home/dsr/RFA01132022.txt"; //"/home/dsr/Projects/ropeless_pi/testset1.txt";
 
 wxDateTime DaysTowDT( double days )
 {
@@ -159,7 +168,6 @@ wxDateTime DaysTowDT( double days )
 }
 
 // the class factories, used to create and destroy instances of the PlugIn
-
 extern "C" DECL_EXP opencpn_plugin* create_pi( void *ppimgr )
 {
     return (opencpn_plugin *) new ropeless_pi( ppimgr );
@@ -316,7 +324,6 @@ ropeless_pi::ropeless_pi( void *ppimgr ) :
 {
     g_ropelessPI = this;
     m_pplugin_icon = new wxBitmap(default_pi);
-
 }
 
 ropeless_pi::~ropeless_pi( void )
@@ -419,10 +426,13 @@ int ropeless_pi::Init( void )
     initialize_images();
     m_pRLDialog = NULL;
 
-
     m_colorIndexNext = 0;
 
     LoadTransponderStatus();    //Load persistant XML file
+
+    wxMenuItem *rptrp = new wxMenuItem(NULL, ID_TPR_PLACE, _("Ropeless: Place Trap Manually") );
+    m_place_trap = AddCanvasContextMenuItem(rptrp, this);
+    SetCanvasContextMenuItemViz(m_place_trap, true);
 
 //    wxMenuItem *sim_item = new wxMenuItem(NULL, ID_PLAY_SIM, _("Start Ropeless Simulation") );
 //    m_start_sim_id = AddCanvasContextMenuItem(sim_item, this );
@@ -432,8 +442,12 @@ int ropeless_pi::Init( void )
 //    m_stop_sim_id = AddCanvasContextMenuItem(sim_stop_item, this );
 //    SetCanvasContextMenuItemViz(m_stop_sim_id, false);
 
-    //    This PlugIn needs a toolbar icon, so request its insertion
+    popup = new wxPopupWindow(m_parent_window);
+    popupText = new wxStaticText(popup, wxID_ANY, "TEST", wxPoint(5, 5), wxSize(100, 20));
+    popup->SetSize(110, 30);
+    bool popupVis = false;
 
+    // This PlugIn needs a toolbar icon, so request its insertion
     wxFileName fn;
     wxString tmp_path;
     tmp_path = GetPluginDataDir("ropeless_pi");
@@ -445,7 +459,7 @@ int ropeless_pi::Init( void )
 
     InsertPlugInToolSVG("Ropeless",
                         tb_icon, tb_icon, tb_icon,
-                        wxITEM_CHECK, "Ropekless", "", NULL,
+                        wxITEM_CHECK, "Ropeless", "", NULL,
                         -1, 0, this);
 
     return (WANTS_OVERLAY_CALLBACK |
@@ -462,7 +476,6 @@ int ropeless_pi::Init( void )
             WANTS_MOUSE_EVENTS        |
             INSTALLS_CONTEXTMENU_ITEMS
             );
-
 }
 
 bool ropeless_pi::DeInit( void )
@@ -487,6 +500,8 @@ bool ropeless_pi::DeInit( void )
         m_dialogSizeWidth = s.x;
         m_dialogSizeHeight =s.y;
     }
+
+    RemoveCanvasContextMenuItem(m_place_trap);
 
     SaveConfig();
 
@@ -586,6 +601,8 @@ void ropeless_pi::OnContextMenuItemCallback(int id)
 
   if (id == m_start_sim_id){
 
+    wxLogMessage("Ropeless: m_start_sim_id");
+
     wxString file;
     int response = PlatformFileSelectorDialog(
         NULL, &file, _("Select an NMEA text file"), *GetpPrivateApplicationDataLocation(), _T(""), _T("*.*"));
@@ -603,12 +620,84 @@ void ropeless_pi::OnContextMenuItemCallback(int id)
     }
   }
   else if (id == m_stop_sim_id){
-    SetCanvasContextMenuItemViz(m_start_sim_id, true);
-    SetCanvasContextMenuItemViz(m_stop_sim_id, false);
 
-    stopSim();
+  wxLogMessage("Ropeless: m_stop_sim_id!");
+
+  SetCanvasContextMenuItemViz(m_start_sim_id, true);
+  SetCanvasContextMenuItemViz(m_stop_sim_id, false);
+
+  stopSim();
   }
+  else if (id == m_place_trap){
 
+    double mp_lat = m_cursor_lat;
+    double mp_lon = m_cursor_lon;
+    
+    wxString latStr = wxString::Format("%.7f", mp_lat);
+    wxString lonStr = wxString::Format("%.7f", mp_lon);
+
+    //wxString latStr = _("Lat Test");
+    //wxString lonStr = _("Lon Test");
+
+    wxDateTime lognow = wxDateTime::Now();
+    lognow.MakeGMT();
+    wxString day = lognow.FormatISODate();
+    wxString utc = lognow.FormatISOTime();
+    double utc_d = atof(day+utc);
+
+    // Manually place 
+    wxLogMessage("Fuckss, Manually Placing Ropeless Trap!");
+    wxLogMessage("Lat/Long of Right Click is : %f,%f",m_cursor_lat,m_cursor_lon);
+    wxLogMessage("Click @ %s",utc);
+
+    // myOkDialog dialog3;
+    // int result;
+    // dialog3.Create(GetOCPNCanvasWindow(),
+    //                          "Test",
+    //                          "Ropeless Plugin Message",
+    //                          0, 0, 100000,
+    //                          wxDefaultPosition);
+    // if (dialog3.ShowModal() == wxID_OK)
+    // {
+    //     result = 1;
+    // }
+
+    //manualPlacementDlgImpl mPlDlg(GetOCPNCanvasWindow());
+    //manualPlacementDlgImpl mPlDlg = new manualPlacementDlgImpl(GetOCPNCanvasWindow());
+    //mPlDlg.ShowModal();
+
+    manualPlacementDlgImpl mPl(GetOCPNCanvasWindow(),wxID_ANY,_("Place Transponder"),wxDefaultPosition,wxSize( -1,-1 ),wxDEFAULT_DIALOG_STYLE,latStr,lonStr,utc);
+    int res = mPl.ShowModal();
+
+    if (res == wxID_OK)
+    {
+        wxLogMessage("Manual Placement res OK!");
+        wxLogMessage("Id: %d, Pair: %d, Owned: %d",mPl.xpdrId, mPl.pairId, mPl.isOwned);
+
+        if (mPl.valid)
+        {
+            placeTransponderManually(mPl.xpdrId, mPl.pairId, mp_lat, mp_lon, utc_d);
+        }
+    }
+    else if (res == wxID_CANCEL)
+    {
+        wxLogMessage("Manual Placement res CANCEL!");
+
+    }
+    else
+    {
+        wxLogMessage("Manual Placement res Error!");
+    }
+
+    //TODO: Manual Placement Option via right-click
+    // Get lat long of mouse when clicked to create new transponder dot
+    // Capture current UTC time / date of placement
+    // Spawn Dialog for manualPlacement 
+    // Capture Ok / Cancel
+    // Process fields if OK
+    // Check Lat/Long/Id/Owned
+
+  }
 
     //startSim();
 }
@@ -628,20 +717,23 @@ void ropeless_pi::OnContextMenuItemCallback(int id)
 
 // }
 
+// Called from wxMenu AND OnTargetRightClick
 void ropeless_pi::PopupMenuHandler( wxCommandEvent& event )
 {
     bool handled = false;
     switch( event.GetId() ) {
 
-        case ID_PLAY_SIM:
-            startSim();
+        //wxLogMessage("PopupMenuHandler!");
 
+        case ID_PLAY_SIM:
+        {
+            startSim();
+            wxLogMessage("Starting Sim!!!");
             handled = true;
             break;
-
+        }
         case ID_EPL_XMIT:
         {
-
             m_NMEA0183.TalkerID = _T("EC");
 
             SENTENCE snt;
@@ -678,29 +770,53 @@ void ropeless_pi::PopupMenuHandler( wxCommandEvent& event )
         {
           wxString msg("Send Release to Transponder: ");
           wxString msg1;
-          msg1.Printf("%d\n", g_ropelessPI->m_foundState->ident);
+          msg1.Printf("%d\n", m_foundState->ident);
           msg += msg1;
 
           long result = -1;
           myNumberEntryDialog dialog;
+          myOkDialog okDialog;
 
+          // If we own the transponder don't prompt for release code
+          if (m_foundState->ident > 0)
+          {
 #ifdef __ANDROID__
-          wxFont *pFont = OCPNGetFont(_T("Dialog"), 0);
-          dialog.SetFont(*pFont);
+              wxFont *pFont = OCPNGetFont(_T("Dialog"), 0);
+              okDialog.SetFont(*pFont);
 #endif
 
-          dialog.Create(GetOCPNCanvasWindow(),
-                                     msg,
-                                     "Enter Release Code",
-                                     "Ropeless Plugin Message",
-                                     0, 0, 100000,
-                                     wxDefaultPosition);
+              okDialog.Create(GetOCPNCanvasWindow(),
+                                         msg,
+                                         "Ropeless Plugin Message",
+                                         0, 0, 100000,
+                                         wxDefaultPosition);
 
-         if (dialog.ShowModal() == wxID_OK)
-            result =dialog.GetValue();
+             if (okDialog.ShowModal() == wxID_OK)
+             {
+                result = 1;
+             }
+          }
+          else
+          {
+#ifdef __ANDROID__
+              wxFont *pFont = OCPNGetFont(_T("Dialog"), 0);
+              dialog.SetFont(*pFont);
+#endif
+
+              dialog.Create(GetOCPNCanvasWindow(),
+                                         msg,
+                                         "Enter Release Code",
+                                         "Ropeless Plugin Message",
+                                         0, 0, 100000,
+                                         wxDefaultPosition);
+
+             if (dialog.ShowModal() == wxID_OK)
+                result = dialog.GetValue();
+          }
+
 
          if (result >= 0)
-            SendReleaseMessage(g_ropelessPI->m_foundState, result);
+            SendReleaseMessage(m_foundState, result);
 
           handled = true;
           break;
@@ -753,6 +869,12 @@ void ropeless_pi::PopupMenuHandler( wxCommandEvent& event )
 
             m_pRLDialog->RefreshTransponderList();          
           }          
+          handled = true;
+          break;
+        }
+        case ID_TPR_PLACE:
+        {
+          wxLogMessage("PopupMenuHandler: ID_TPR_PLACE");
           handled = true;
           break;
         }
@@ -818,9 +940,6 @@ bool ropeless_pi::SendReleaseMessage(transponder_state *state, long code)
 {
   bool ret = true;
 
-  //wxLogMessage("Sending Release Message...");
-
-  // Create payload
   wxString payload("$RSRLB,");
   wxString pl1;
 
@@ -831,7 +950,6 @@ bool ropeless_pi::SendReleaseMessage(transponder_state *state, long code)
   pl1.Printf("*%02X\r\n", cs);
   payload += pl1;
 
-  // Create a UDP transmit socket
   if( !m_tsock ){
     
     m_tconn_addr.Service(59647);
@@ -884,7 +1002,9 @@ bool ropeless_pi::SendReleaseMessage(transponder_state *state, long code)
     
 void ropeless_pi::startSim()
 {
-    // Open the data file
+  wxLogMessage("Start Sim?");
+
+  // Open the data file
   msgFile.Open(msgFileName);
   msgCount = msgFile.GetLineCount();
   inext = 0;
@@ -1102,26 +1222,15 @@ void ropeless_pi::LoadTransponderStatus()
         transponder_state *this_state = new transponder_state;;
         if(parseTransponderNode(element, this_state))
         {
-          // Select a new color for this new transponder
 
-          // HR MOD -- updated Color assignments
-          // Force Red for negative and Green for positive
           if (this_state->ident > 0)
           {
-            this_state->color_index = 0;
+            this_state->color_index = COLOR_INDEX_GREEN;
           }
           else
           {
-            this_state->color_index = 1;
+            this_state->color_index = COLOR_INDEX_RED;
           }
-
-          // this_state->color_index = m_colorIndexNext;
-          // m_colorIndexNext++;
-
-          // if(m_colorIndexNext == COLOR_TABLE_COUNT)
-          // {
-          //   m_colorIndexNext = 0;
-          // }
 
           transponderStatus.push_back( this_state );
         }
@@ -1150,13 +1259,6 @@ void ropeless_pi::RenderTransponder( transponder_state *state)
     m_oDC->SetPen( dpen );
     m_oDC->SetBrush( dbrush );
     m_oDC->DrawCircle( ab.x, ab.y, circle_size);
-
-    // TODO: Enable this?
-    // wxString idStr = "1";
-    // m_oDC->DrawText(idStr,ab.x,ab.y);  
-    // void DrawText(const wxString &text, wxCoord x, wxCoord y);
-    // m_oDC->RenderText(state->ident,*wxNORMAL_FONT,*wxBLACK,ab.x,ab.y,0 )
-    // void RenderText( wxDC *dc, void *pgc, wxString &msg, wxFont *font, wxColour &color, int xp, int yp, double angle)
 
 #if 0
     // Render the history buffer, if present
@@ -1189,6 +1291,15 @@ void ropeless_pi::RenderTransponder( transponder_state *state)
       m_oDC->DrawLine(x1.x, x1.y, x2.x, x2.y, true);
       m_oDC->DrawLine(x3.x, x3.y, x4.x, x4.y, true);
     }
+
+    // // TODO: Display name
+    // wxString idStr = "TEST";
+    // wxFont font(24, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD);
+    // m_oDC->SetFont(font);
+    // m_oDC->SetTextForeground(*wxBLACK);
+    // m_oDC->DrawText(idStr,ab.x,ab.y-50);  
+    // wxLogMessage("Drawing Text!");
+
 }
 
 void ropeless_pi::RenderTrawlConnector( transponder_state *state1, transponder_state *state2 )
@@ -1237,7 +1348,6 @@ void ropeless_pi::RenderTrawls()
   }
 }
 
-
 bool ropeless_pi::RenderOverlay(wxDC &dc, PlugIn_ViewPort *vp)
 {
 #if 0
@@ -1283,7 +1393,6 @@ bool ropeless_pi::RenderGLOverlay(wxGLContext *pcontext, PlugIn_ViewPort *vp)
 
     m_oDC->SetVP(vp);
 
-
 //     g_gdc = NULL;
 //     g_pdc = NULL;
 
@@ -1325,22 +1434,14 @@ void ropeless_pi::ProcessRFACapture( void )
   {
     this_transponder_state = new transponder_state;
 
-    // HR MOD -- Red/Green based on ownership
     if (transponderIdent > 0 )
     {
-      this_transponder_state->color_index = 0;
+      this_transponder_state->color_index = COLOR_INDEX_GREEN;
     }
     else
     {
-      this_transponder_state->color_index = 1;
+      this_transponder_state->color_index = COLOR_INDEX_RED;
     }
-
-    // Select a new color for this new transponder
-    // this_transponder_state->color_index = m_colorIndexNext;
-    // m_colorIndexNext++;
-
-    // if(m_colorIndexNext == COLOR_TABLE_COUNT)
-    //   m_colorIndexNext = 0;
 
     transponderStatus.push_back( this_transponder_state );
   }
@@ -1411,6 +1512,88 @@ void ropeless_pi::ProcessRFACapture( void )
   PushNMEABuffer(rmc_sentence.Sentence);
 }
 
+void ropeless_pi::placeTransponderManually(int xpdrId, int pairId, double lat, double lon, double utc)
+{
+    wxLogMessage("Placing Transponder Manually!");
+
+    transponder_state* this_transponder_state;
+    this_transponder_state = addTransponderPos(xpdrId);
+
+    this_transponder_state->ident = xpdrId;
+    this_transponder_state->ident_partner = pairId;
+
+    this_transponder_state->timeStamp = utc;
+
+    this_transponder_state->predicted_lat = lat;
+    this_transponder_state->predicted_lon = lon;
+
+    this_transponder_state->range = 0;
+    this_transponder_state->bearing = 0;
+    this_transponder_state->depth = 0;
+    this_transponder_state->temp = 0;
+    this_transponder_state->batt_stat = 0;
+}
+
+// Check for transponder state in list. if does not exist add new one
+transponder_state* ropeless_pi::addTransponderPos( int transponderIdent )
+{
+  transponder_state *this_transponder_state = NULL;
+
+  for (unsigned int i = 0 ; i < transponderStatus.size() ; i++)
+  {
+    if (transponderStatus[i]->ident == transponderIdent)
+    {
+      this_transponder_state = transponderStatus[i];
+      return this_transponder_state;
+    }
+  }
+
+  // If not present, create a new record, and add to vector
+  if (this_transponder_state == NULL)
+  {
+    this_transponder_state = new transponder_state;
+
+    if (transponderIdent > 0 )
+    {
+      this_transponder_state->color_index = 0;
+    }
+    else
+    {
+      this_transponder_state->color_index = 1;
+    }
+
+    // Select a new color for this new transponder
+    // this_transponder_state->color_index = m_colorIndexNext;
+    // m_colorIndexNext++;
+
+    // if(m_colorIndexNext == COLOR_TABLE_COUNT)
+    //   m_colorIndexNext = 0;
+
+    transponderStatus.push_back( this_transponder_state );
+  }
+  else 
+  {  
+    // Maintain history buffer
+    transponder_state_history *this_transponder_state_history = new transponder_state_history;
+    this_transponder_state_history->ident = this_transponder_state->ident;
+    this_transponder_state_history->ident_partner = this_transponder_state->ident_partner;
+    this_transponder_state_history->timeStamp = this_transponder_state->timeStamp;
+    this_transponder_state_history->predicted_lat = this_transponder_state->predicted_lat;
+    this_transponder_state_history->predicted_lon = this_transponder_state->predicted_lon;
+    this_transponder_state_history->color_index = this_transponder_state->color_index;
+    this_transponder_state_history->tsh_timer_age = HISTORY_FADE_SECS;
+
+    if (this_transponder_state->historyQ.size() > 10)
+    {
+        this_transponder_state->historyQ.pop_back();
+    }
+
+    this_transponder_state->historyQ.push_front(this_transponder_state_history);
+  }
+
+  return this_transponder_state;
+}
+
 void ropeless_pi::ProcessRLACapture( void )
 {
   if( m_NMEA0183.LastSentenceIDReceived != _T("RLA") )
@@ -1456,7 +1639,6 @@ void ropeless_pi::SetNMEASentence( wxString &sentence )
     printf("%s\n", sentence.ToStdString().c_str());
     m_NMEA0183 << sentence;
 
-    // CTV Log new NMEA sentences for debugging use
     wxLogMessage(sentence);
 
     if( m_NMEA0183.PreParse() ) 
@@ -1471,8 +1653,6 @@ void ropeless_pi::SetNMEASentence( wxString &sentence )
             if( m_NMEA0183.Parse() )
                 ProcessRLACapture();
         }
-
-
     }
 }
 
@@ -1577,65 +1757,124 @@ bool ropeless_pi::MouseEventHook( wxMouseEvent &event )
     wxPoint mp(event.m_x, event.m_y);
     GetCanvasLLPix( &g_ovp, mp, &m_cursor_lat, &m_cursor_lon);
 
-    m_foundState = NULL;
+    wxLogMessage("Mouse Event!");
+
     int transponderFoundID = 0;
+    m_foundState = NULL;
 
-    //  On right button push, find any transponders
-    if( event.RightDown()) {
+    for (unsigned int i = 0 ; i < transponderStatus.size() ; i++){
+      transponder_state *state = transponderStatus[i];
 
-      for (unsigned int i = 0 ; i < transponderStatus.size() ; i++){
-        transponder_state *state = transponderStatus[i];
+      double a = fabs( m_cursor_lat - state->predicted_lat );
+      double b = fabs( m_cursor_lon - state->predicted_lon );
 
-        double a = fabs( m_cursor_lat - state->predicted_lat );
-        double b = fabs( m_cursor_lon - state->predicted_lon );
-
-        if( ( a < m_selectRadius ) && ( b < m_selectRadius ) ){
-          m_foundState = state;
-          transponderFoundID = transponderStatus[i]->ident;
-          break;
+      if( ( a < m_selectRadius ) && ( b < m_selectRadius ) ){
+        m_foundState = state;
+        transponderFoundID = transponderStatus[i]->ident;
+        wxLogMessage("Found Transponder! %d",m_foundState->ident);
+        break;
         }
-      }
     }
+
+    // //  On right button push, find any transponders
+    // if( event.RightDown()) {
+
+    //   m_foundState = NULL;
+    
+    //   wxLogMessage("Looking for Transponder on right click...");
+
+    //   for (unsigned int i = 0 ; i < transponderStatus.size() ; i++){
+    //     transponder_state *state = transponderStatus[i];
+
+    //     double a = fabs( m_cursor_lat - state->predicted_lat );
+    //     double b = fabs( m_cursor_lon - state->predicted_lon );
+
+    //     if( ( a < m_selectRadius ) && ( b < m_selectRadius ) ){
+    //       m_foundState = state;
+    //       transponderFoundID = transponderStatus[i]->ident;
+    //       //wxLogMessage("Found Transponder! %d",m_foundState->ident);
+    //       break;
+    //     }
+    //   }
+    // }
+
+#if 0
+    if (m_foundState && !popupVis)
+    {
+        wxLogMessage("Hovering over Transponder. Showing Message!");
+
+        wxPoint clientPoint(m_mouse_x, m_mouse_y); // your client coordinates
+        wxPoint screenPoint = m_parent_window->ClientToScreen(clientPoint); // Converts to screen coordinates
+
+        popup->Position(screenPoint, wxSize(0, 0));
+        popup->Show();
+
+        popupVis = true;
+    }
+    else if (!m_foundState && popupVis)
+    {
+        wxLogMessage("Hiding!");
+        popup->Hide();
+        popupVis = false;
+    }
+#endif
 
     if( event.RightDown() ) {
 
-        // TODO: Allow user to delete transponder via right click here too?
+        if(m_foundState){
+            wxMenu* contextMenu = new wxMenu;
 
-        if(1){
+            wxLogMessage("Right Clicked on Transponder!");
 
-            if(m_foundState){
-                wxMenu* contextMenu = new wxMenu;
+            wxMenuItem *id_item = 0;
+            wxString transponderIDString;
+            transponderIDString.Printf("ID: %d", transponderFoundID);
+            id_item = new wxMenuItem(contextMenu, ID_TPR_ID, _(transponderIDString) );
 
-                wxMenuItem *release_item = 0;
-                release_item = new wxMenuItem(contextMenu, ID_TPR_RELEASE, _("Release Transponder") );
+            wxMenuItem *release_item = 0;
+            release_item = new wxMenuItem(contextMenu, ID_TPR_RELEASE, _("Release Transponder") );
 
-                wxMenuItem *id_item = 0;
-                wxString transponderIDString;
-                transponderIDString.Printf("ID: %d", transponderFoundID);
-                id_item = new wxMenuItem(contextMenu, ID_TPR_ID, _(transponderIDString) );
+            // wxMenuItem *release_item = 0;
+            // release_item = new wxMenuItem(contextMenu, ID_TPR_QUERY, _("Query Transponder") );
+
+            // wxMenuItem *release_item = 0;
+            // release_item = new wxMenuItem(contextMenu, ID_TPR_MUTE, _("Mute Transponder") );
+
+            // wxMenuItem *release_item = 0;
+            // release_item = new wxMenuItem(contextMenu, ID_TPR_RECOVER, _("Report Recovered") );
+
+            // wxMenuItem *release_item = 0;
+            // release_item = new wxMenuItem(contextMenu, ID_TPR_LOST, _("Report Lost") );
+
+            //wxMenuItem *delete_item = 0;
+            //delete_item = new wxMenuItem(contextMenu, ID_TPR_DELETE, _("Delete Transponder") );
+
+            //wxMenuItem *release_item = 0;
+            //release_item = new wxMenuItem(contextMenu, ID_TPR_RELEASE, _("Info") );
 
 #ifdef __ANDROID__
-                wxFont *pFont = OCPNGetFont(_T("Dialog"), 0);
-                release_item->SetFont(*pFont);
-                id_item->SetFont(*pFont);
+            wxFont *pFont = OCPNGetFont(_T("Dialog"), 0);
+            release_item->SetFont(*pFont);
+            id_item->SetFont(*pFont);
 #endif
 
-                contextMenu->Append(id_item);
-                contextMenu->Append(release_item);
+            contextMenu->Append(id_item);
+            contextMenu->Append(release_item);
 
-                GetOCPNCanvasWindow()->Connect( ID_TPR_RELEASE, wxEVT_COMMAND_MENU_SELECTED,
-                                                wxCommandEventHandler( ropeless_pi::PopupMenuHandler ), NULL, this );
+            GetOCPNCanvasWindow()->Connect( ID_TPR_RELEASE, wxEVT_COMMAND_MENU_SELECTED,
+                                            wxCommandEventHandler( ropeless_pi::PopupMenuHandler ), NULL, this );
+
+            wxLogMessage("Creating popup!");
 
             //   Invoke the drop-down menu
-                GetOCPNCanvasWindow()->PopupMenu( contextMenu, m_mouse_x, m_mouse_y );
+            GetOCPNCanvasWindow()->PopupMenu( contextMenu, m_mouse_x, m_mouse_y );
 
-                if(release_item){
-                    GetOCPNCanvasWindow()->Disconnect( ID_TPR_RELEASE, wxEVT_COMMAND_MENU_SELECTED,
-                                                   wxCommandEventHandler( ropeless_pi::PopupMenuHandler ), NULL, this );
-                }
-
-                bret = true;                // I have eaten this event
+            if(release_item){
+                GetOCPNCanvasWindow()->Disconnect( ID_TPR_RELEASE, wxEVT_COMMAND_MENU_SELECTED,
+                                               wxCommandEventHandler( ropeless_pi::PopupMenuHandler ), NULL, this );
             }
+
+            bret = true;                // I have eaten this event
         }
     }
 
@@ -1699,7 +1938,7 @@ void ropeless_pi::ShowPreferencesDialog( wxWindow* parent )
 #endif
 }
 
-//      Event Handler implementation
+// Event Handler implementation
 BEGIN_EVENT_TABLE ( PI_EventHandler, wxEvtHandler )
 EVT_TIMER ( ROLLOVER_TIMER, PI_EventHandler::OnTimerEvent )
 EVT_TIMER ( HEAD_DOG_TIMER, PI_EventHandler::OnTimerEvent )
@@ -1832,7 +2071,6 @@ void PI_EventHandler::OnEvtOCPN_NMEA( PI_OCPN_DataStreamEvent& event )
 BEGIN_EVENT_TABLE( RopelessDialog, wxDialog )
 EVT_BUTTON( wxID_OK, RopelessDialog::OnOKClick )
 EVT_CLOSE(RopelessDialog::OnClose)
-//EVT_LIST_ITEM_RIGHT_CLICK(wxID_ANY,RopelessDialog::OnTargetRightClick)
 END_EVENT_TABLE()
 
 RopelessDialog::RopelessDialog( wxWindow* parent, ropeless_pi *parent_pi,
@@ -1840,164 +2078,175 @@ RopelessDialog::RopelessDialog( wxWindow* parent, ropeless_pi *parent_pi,
                                 const wxPoint& pos, const wxSize& size, long style )
             : wxDialog( parent, id, title, pos, size, style )
 {
-    pParentPi = parent_pi;
-    wxFont *dFont = OCPNGetFont(_T("Dialog"), 0);
-    SetFont(*dFont);
+  pParentPi = parent_pi;
+  wxFont *dFont = OCPNGetFont(_T("Dialog"), 0);
+  SetFont(*dFont);
 
-    this->SetSizeHints( wxDefaultSize, wxDefaultSize );
+  this->SetSizeHints( wxDefaultSize, wxDefaultSize );
 
-    wxBoxSizer* bSizer2;
-    bSizer2 = new wxBoxSizer( wxVERTICAL );
+  wxBoxSizer* bSizer2;
+  bSizer2 = new wxBoxSizer( wxVERTICAL );
 
-        // The transponder list
-    long flags = wxLC_REPORT | wxLC_SINGLE_SEL | wxLC_HRULES | wxLC_VRULES |
-               wxBORDER_SUNKEN;
+  long flags = wxLC_REPORT | wxLC_SINGLE_SEL | wxLC_HRULES | wxLC_VRULES |
+         wxBORDER_SUNKEN;
 
-    m_pListCtrlTranponders = new OCPNListCtrl(this, ID_TRANSPONDER_LIST, wxDefaultPosition, wxDefaultSize, flags);
-        bSizer2->Add(m_pListCtrlTranponders, 1, wxEXPAND | wxALL, 0);
+  //long flags = wxLC_REPORT | wxLC_HRULES | wxLC_VRULES | wxBORDER_SUNKEN;
 
-#ifdef __ANDROID__
-    wxFont *pFont = OCPNGetFont(_T("Dialog"), 0);
-    int char_size = pFont->GetPointSize();
+  m_pListCtrlTranponders = new OCPNListCtrl(this, ID_TRANSPONDER_LIST, wxDefaultPosition, wxDefaultSize, flags);
+  bSizer2->Add(m_pListCtrlTranponders, 1, wxEXPAND | wxALL, 0);
 
-    char font_style_sheet[200];
-    sprintf(font_style_sheet, "QHeaderView::section {  font-size:%dpt; }", char_size);
+  #ifdef __ANDROID__
+  wxFont *pFont = OCPNGetFont(_T("Dialog"), 0);
+  int char_size = pFont->GetPointSize();
 
-    char item_font_style_sheet[200];
-    sprintf(item_font_style_sheet, "QTreeWidget {  font-size:%dpt; }", char_size);
+  char font_style_sheet[200];
+  sprintf(font_style_sheet, "QHeaderView::section {  font-size:%dpt; }", char_size);
 
-    std::ostringstream ss;
-    ss << qtRLStyleSheet << font_style_sheet << item_font_style_sheet;
-    m_pListCtrlTranponders->GetHandle()->setStyleSheet(ss.str().c_str());
+  char item_font_style_sheet[200];
+  sprintf(item_font_style_sheet, "QTreeWidget {  font-size:%dpt; }", char_size);
 
-#endif
+  std::ostringstream ss;
+  ss << qtRLStyleSheet << font_style_sheet << item_font_style_sheet;
+  m_pListCtrlTranponders->GetHandle()->setStyleSheet(ss.str().c_str());
+
+  #endif
+
+  m_pListCtrlTranponders->Connect(
+        wxEVT_COMMAND_LIST_ITEM_RIGHT_CLICK,
+        wxListEventHandler(RopelessDialog::OnTargetRightClick), NULL, this);
+
+  m_pListCtrlTranponders->Connect(
+      wxEVT_COMMAND_LIST_COL_CLICK,
+      wxListEventHandler(RopelessDialog::OnTargetListColumnClicked), NULL,
+      this);
 
     m_pListCtrlTranponders->Connect(
-              wxEVT_COMMAND_LIST_ITEM_RIGHT_CLICK,
-              wxListEventHandler(RopelessDialog::OnTargetRightClick), NULL, this);
+      wxEVT_LIST_ITEM_SELECTED,
+      wxListEventHandler(RopelessDialog::OnTargetListSelected), NULL,
+      this);
 
-        m_pListCtrlTranponders->Connect(
-            wxEVT_COMMAND_LIST_COL_CLICK,
-            wxListEventHandler(RopelessDialog::OnTargetListColumnClicked), NULL,
-            this);
+    m_pListCtrlTranponders->Connect(
+      wxEVT_LIST_ITEM_DESELECTED,
+      wxListEventHandler(RopelessDialog::OnTargetListDeselected), NULL,
+      this);
 
-        int dx = GetCharWidth();
+  int dx = GetCharWidth();
 
-        wxSize txs = GetTextExtent("Color");
-        m_pListCtrlTranponders->InsertColumn(tlICON, _("Color"), wxLIST_FORMAT_CENTER,  txs.x + dx*2);
+  wxSize txs = GetTextExtent("Color");
+  m_pListCtrlTranponders->InsertColumn(tlICON, _("Color"), wxLIST_FORMAT_CENTER,  txs.x + dx*2);
 
-        txs = GetTextExtent("ID");
-        m_pListCtrlTranponders->InsertColumn(tlIDENT, _("ID"), wxLIST_FORMAT_CENTER,  txs.x + dx*2);
+  txs = GetTextExtent("ID");
+  m_pListCtrlTranponders->InsertColumn(tlIDENT, _("ID"), wxLIST_FORMAT_CENTER,  txs.x + dx*2);
 
-        txs = GetTextExtent("Release Status");
-        m_pListCtrlTranponders->InsertColumn(tlRELEASE_STATUS, _("Release Status"), wxLIST_FORMAT_CENTER, txs.x + dx*2);
+  txs = GetTextExtent("Release Status");
+  m_pListCtrlTranponders->InsertColumn(tlRELEASE_STATUS, _("Release Status"), wxLIST_FORMAT_CENTER, txs.x + dx*2);
 
-        txs = GetTextExtent("LastReportTime (UTC)");
-        m_pListCtrlTranponders->InsertColumn(tlTIMESTAMP, _("LastReportTime (UTC)"), wxLIST_FORMAT_CENTER, txs.x + dx*2);
+  txs = GetTextExtent("LastReportTime (UTC)");
+  m_pListCtrlTranponders->InsertColumn(tlTIMESTAMP, _("LastReportTime (UTC)"), wxLIST_FORMAT_CENTER, txs.x + dx*2);
 
-        txs = GetTextExtent("Distance, M");
-        m_pListCtrlTranponders->InsertColumn(tlDISTANCE, _("Distance, M"), wxLIST_FORMAT_CENTER, txs.x + dx*2);
+  txs = GetTextExtent("Distance, M");
+  m_pListCtrlTranponders->InsertColumn(tlDISTANCE, _("Distance, M"), wxLIST_FORMAT_CENTER, txs.x + dx*2);
 
-        txs = GetTextExtent("Depth, M");
-        m_pListCtrlTranponders->InsertColumn(tlDEPTH, _("Depth, M"), wxLIST_FORMAT_CENTER, txs.x + dx*2);
+  txs = GetTextExtent("Depth, M");
+  m_pListCtrlTranponders->InsertColumn(tlDEPTH, _("Depth, M"), wxLIST_FORMAT_CENTER, txs.x + dx*2);
 
-        txs = GetTextExtent("Pings");
-        m_pListCtrlTranponders->InsertColumn(tlPINGS, _("Pings"), wxLIST_FORMAT_CENTER, txs.x + dx*2);
+  txs = GetTextExtent("Pings");
+  m_pListCtrlTranponders->InsertColumn(tlPINGS, _("Pings"), wxLIST_FORMAT_CENTER, txs.x + dx*2);
 
-        txs = GetTextExtent("Temperature, C");
-        m_pListCtrlTranponders->InsertColumn(tlTEMP, _("Temperature, C"), wxLIST_FORMAT_CENTER, txs.x + dx*2);
+  txs = GetTextExtent("Temperature, C");
+  m_pListCtrlTranponders->InsertColumn(tlTEMP, _("Temperature, C"), wxLIST_FORMAT_CENTER, txs.x + dx*2);
 
-        // Build the color indicator bitmaps, adding to an image lst
-        int imageRefSize = dx * 2;
-        wxImageList *imglist = new wxImageList(imageRefSize, imageRefSize, true, 1);
+  // Build the color indicator bitmaps, adding to an image lst
+  int imageRefSize = dx * 2;
+  wxImageList *imglist = new wxImageList(imageRefSize, imageRefSize, true, 1);
 
-        for (int i=0 ; i < COLOR_TABLE_COUNT ; i++){
-          wxScreenDC sdc;
+  for (int i=0 ; i < COLOR_TABLE_COUNT ; i++){
+    wxScreenDC sdc;
 
-          wxBitmap tbm(imageRefSize, imageRefSize, -1);
-          wxMemoryDC mdc(tbm);
-          mdc.Clear();
-          wxString colorName = colorTableNames[i]; //colorTableNames[state->color_index];
-          wxColour rcolour = wxTheColourDatabase->Find(colorName);
+    wxBitmap tbm(imageRefSize, imageRefSize, -1);
+    wxMemoryDC mdc(tbm);
+    mdc.Clear();
+    wxString colorName = colorTableNames[i]; //colorTableNames[state->color_index];
+    wxColour rcolour = wxTheColourDatabase->Find(colorName);
 
-          if (!rcolour.IsOk())
-            rcolour = wxColour(255,000,255);
+    if (!rcolour.IsOk())
+      rcolour = wxColour(255,000,255);
 
-          wxPen dpen( rcolour );
-          wxBrush dbrush( rcolour );
-          mdc.SetPen( dpen );
-          mdc.SetBrush( dbrush );
+    wxPen dpen( rcolour );
+    wxBrush dbrush( rcolour );
+    mdc.SetPen( dpen );
+    mdc.SetBrush( dbrush );
 
-          int xd = 0;
-          int yd = 0;
-    //    mdc.DrawRoundedRectangle(xd, yd, w+(label_offset * 2), h+2, -.25);
-          mdc.DrawRectangle(xd, yd, imageRefSize, imageRefSize);
-          mdc.SelectObject(wxNullBitmap);
+    int xd = 0;
+    int yd = 0;
+  //    mdc.DrawRoundedRectangle(xd, yd, w+(label_offset * 2), h+2, -.25);
+    mdc.DrawRectangle(xd, yd, imageRefSize, imageRefSize);
+    mdc.SelectObject(wxNullBitmap);
 
-          imglist->Add(tbm);
-        }
+    imglist->Add(tbm);
+  }
 
-        m_pListCtrlTranponders->AssignImageList(imglist, wxIMAGE_LIST_SMALL);
+  m_pListCtrlTranponders->AssignImageList(imglist, wxIMAGE_LIST_SMALL);
 
-#ifndef __ANDROID__
-        wxStaticBoxSizer* sbSizerSim = new wxStaticBoxSizer( new wxStaticBox( this, wxID_ANY, _("Simulator") ), wxVERTICAL );
-        bSizer2->Add( sbSizerSim, 0, wxALL|wxEXPAND, 5 );
+  #ifndef __ANDROID__
+  wxStaticBoxSizer* sbSizerSim = new wxStaticBoxSizer( new wxStaticBox( this, wxID_ANY, _("Simulator") ), wxVERTICAL );
+  bSizer2->Add( sbSizerSim, 0, wxALL|wxEXPAND, 5 );
 
-        m_simTextCtrl = new wxTextCtrl (this, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxTE_READONLY);
-        sbSizerSim->Add( m_simTextCtrl, 0, wxEXPAND | wxALL, 5);
+  m_simTextCtrl = new wxTextCtrl (this, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxTE_READONLY);
+  sbSizerSim->Add( m_simTextCtrl, 0, wxEXPAND | wxALL, 5);
 
-        if (wxFileExists(msgFileName))
-          m_simTextCtrl->SetValue(msgFileName);
+  if (wxFileExists(msgFileName))
+    m_simTextCtrl->SetValue(msgFileName);
 
-        wxBoxSizer *bsizersimButtons = new wxBoxSizer( wxHORIZONTAL );
-        sbSizerSim->Add( bsizersimButtons, 0, wxEXPAND, 5);
+  wxBoxSizer *bsizersimButtons = new wxBoxSizer( wxHORIZONTAL );
+  sbSizerSim->Add( bsizersimButtons, 0, wxEXPAND, 5);
 
-        m_ChooseFileButton = new wxButton(this, wxID_ANY, _("Choose File..."),  wxDefaultPosition, wxDefaultSize, 0);
-        bsizersimButtons->Add( m_ChooseFileButton, 0, wxALL, 5);
-        m_ChooseFileButton->Bind(wxEVT_COMMAND_BUTTON_CLICKED, &RopelessDialog::OnChooseFileButton, this);
+  m_ChooseFileButton = new wxButton(this, wxID_ANY, _("Choose File..."),  wxDefaultPosition, wxDefaultSize, 0);
+  bsizersimButtons->Add( m_ChooseFileButton, 0, wxALL, 5);
+  m_ChooseFileButton->Bind(wxEVT_COMMAND_BUTTON_CLICKED, &RopelessDialog::OnChooseFileButton, this);
 
-        m_StopSimButton = new wxButton(this, wxID_ANY, _("Stop Sim"),  wxDefaultPosition, wxDefaultSize, 0);
-        bsizersimButtons->Add( m_StopSimButton, 0, wxALL, 5);
-        m_StopSimButton->Bind(wxEVT_COMMAND_BUTTON_CLICKED, &RopelessDialog::OnStopSimButton, this);
+  m_StopSimButton = new wxButton(this, wxID_ANY, _("Stop Sim"),  wxDefaultPosition, wxDefaultSize, 0);
+  bsizersimButtons->Add( m_StopSimButton, 0, wxALL, 5);
+  m_StopSimButton->Bind(wxEVT_COMMAND_BUTTON_CLICKED, &RopelessDialog::OnStopSimButton, this);
 
-        m_StartSimButton = new wxButton(this, wxID_ANY, _("StartSim"),  wxDefaultPosition, wxDefaultSize, 0);
-        bsizersimButtons->Add( m_StartSimButton, 0, wxALL, 5);
-        m_StartSimButton->Bind(wxEVT_COMMAND_BUTTON_CLICKED, &RopelessDialog::OnStartSimButton, this);
+  m_StartSimButton = new wxButton(this, wxID_ANY, _("StartSim"),  wxDefaultPosition, wxDefaultSize, 0);
+  bsizersimButtons->Add( m_StartSimButton, 0, wxALL, 5);
+  m_StartSimButton->Bind(wxEVT_COMMAND_BUTTON_CLICKED, &RopelessDialog::OnStartSimButton, this);
 
-        // CV MOD
-        m_ManualReleaseButton = new wxButton(this, wxID_ANY, _("Manual Release"),  wxDefaultPosition, wxDefaultSize, 0);
-        bsizersimButtons->Add( m_ManualReleaseButton, 0, wxALL, 5);
-        m_ManualReleaseButton->Bind(wxEVT_COMMAND_BUTTON_CLICKED, &RopelessDialog::OnManualReleaseButton, this);
+  m_ManualReleaseButton = new wxButton(this, wxID_ANY, _("Manual Release"),  wxDefaultPosition, wxDefaultSize, 0);
+  bsizersimButtons->Add( m_ManualReleaseButton, 0, wxALL, 5);
+  m_ManualReleaseButton->Bind(wxEVT_COMMAND_BUTTON_CLICKED, &RopelessDialog::OnManualReleaseButton, this);
 
-        if (pParentPi->m_simulatorTimer.IsRunning()){
-          m_StartSimButton->Hide();
-          m_StopSimButton->Show();
-        }
-        else{
-          m_StopSimButton->Hide();
-          m_StartSimButton->Show();
-        }
-#endif
+  if (pParentPi->m_simulatorTimer.IsRunning()){
+    m_StartSimButton->Hide();
+    m_StopSimButton->Show();
+  }
+  else{
+    m_StopSimButton->Hide();
+    m_StartSimButton->Show();
+  }
+  #endif
 
-        m_sdbSizer1 = new wxStdDialogButtonSizer();
-        m_sdbSizer1OK = new wxButton( this, wxID_OK );
-        m_sdbSizer1->AddButton( m_sdbSizer1OK );
-        m_sdbSizer1->Realize();
+  m_sdbSizer1 = new wxStdDialogButtonSizer();
+  m_sdbSizer1OK = new wxButton( this, wxID_OK );
+  m_sdbSizer1->AddButton( m_sdbSizer1OK );
+  m_sdbSizer1->Realize();
 
-        bSizer2->Add( m_sdbSizer1, 0, wxBOTTOM|wxEXPAND|wxTOP, 5 );
+  bSizer2->Add( m_sdbSizer1, 0, wxBOTTOM|wxEXPAND|wxTOP, 5 );
 
-        this->SetSizer( bSizer2 );
-        this->Layout();
-        //bSizer2->Fit( this );
+  this->SetSizer( bSizer2 );
+  this->Layout();
+  //bSizer2->Fit( this );
 
-        this->Centre( wxBOTH );
+  this->Centre( wxBOTH );
 }
 
 RopelessDialog::~RopelessDialog()
 {
-        //delete m_pSerialArray;
+  //delete m_pSerialArray;
 }
 
+// Called on List right click. Attached to wxListEventHandler
 void RopelessDialog::OnTargetRightClick(wxListEvent &event) {
   int mouseX;
   int mouseY;
@@ -2012,7 +2261,9 @@ void RopelessDialog::OnTargetRightClick(wxListEvent &event) {
     const wxPoint pt = wxGetMousePosition();
     mouseX = pt.x - m_pListCtrlTranponders->GetScreenPosition().x;
     mouseY = pt.y - m_pListCtrlTranponders->GetScreenPosition().y;
-    mouseY -= rect.height;
+    
+    // Can't use this in windows. off by 1
+    //mouseY -= rect.height;
 
     int flags;
     index = m_pListCtrlTranponders->HitTest(wxPoint(mouseX, mouseY),
@@ -2021,18 +2272,22 @@ void RopelessDialog::OnTargetRightClick(wxListEvent &event) {
     if( index >= 0 ) {
         wxString sID = m_pListCtrlTranponders->GetItemText(index, 1);
         long fid = atoi(sID.ToStdString().c_str());
+
         // search the transponder list for an ident match
         long foundIndex = -1;
         for (unsigned int i = 0; i < transponderStatus.size(); i++) {
             transponder_state *state = transponderStatus[i];
             if (state->ident == fid) {
                 foundIndex = i;
+                wxLogMessage("List found index: %d",index);
                 break;
             }
         }
 
         if (foundIndex >= 0) {
             g_ropelessPI->m_foundState = transponderStatus[foundIndex];
+
+            wxLogMessage("Right Clicked via List on ID: %d",g_ropelessPI->m_foundState->ident);
 
             wxMenu *contextMenu = new wxMenu;
             wxMenuItem *release_item = 0;
@@ -2071,10 +2326,90 @@ void RopelessDialog::OnTargetRightClick(wxListEvent &event) {
     }
 }
 
+wxArrayInt RopelessDialog::GetSelectedItems()
+{
+    wxArrayInt selectedItems;
+    long itemIndex = m_pListCtrlTranponders->GetNextItem(-1, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
+    
+    while (itemIndex != wxNOT_FOUND) {
+        selectedItems.Add(itemIndex);
+        itemIndex = m_pListCtrlTranponders->GetNextItem(itemIndex, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
+    }
+
+    return selectedItems;
+}
+
+transponder_state* RopelessDialog::getXpdrFromIndex(int index)
+{
+    long fid;
+    transponder_state *state;
+
+    // Get idents of selected items
+    if( index >= 0 ) {
+        wxString sID = m_pListCtrlTranponders->GetItemText(index, 1);
+        fid = atoi(sID.ToStdString().c_str());
+        
+        // search the transponder list for an ident match
+        long foundIndex = -1;
+        for (unsigned int i = 0; i < transponderStatus.size(); i++) {
+            state = transponderStatus[i];
+            if (state->ident == fid) {
+                foundIndex = i;
+                break;
+            }
+        }
+    }
+
+    return state;
+}
+
+void RopelessDialog::OnTargetListDeselected(wxListEvent &event)
+{
+    long deselectedIndex = event.GetIndex();
+    //wxLogMessage("Item deselected: %ld", deselectedIndex);
+
+    if (deselectedIndex >= 0)
+    {
+        transponder_state *state = getXpdrFromIndex(deselectedIndex);
+
+        if (state->ident > 0)
+        {
+            state->color_index = COLOR_INDEX_GREEN;
+
+        }
+        else
+        {
+            state->color_index = COLOR_INDEX_RED;
+        }
+    }
+}
+
+void RopelessDialog::OnTargetListSelected(wxListEvent &event)
+{
+    wxArrayInt selectedItems = GetSelectedItems();
+    int numItems = selectedItems.GetCount();
+
+    wxString message = "Selected items: ";
+    for (size_t i = 0; i < numItems; i++) {
+        message += wxString::Format("%d ", selectedItems[i]);
+    }
+
+    if (numItems > 0)
+    {
+        //wxLogMessage(message);
+
+        transponder_state *state = getXpdrFromIndex(selectedItems[0]);
+
+        state->color_index = COLOR_INDEX_GOLDEN;
+
+    }
+}
+
 void RopelessDialog::OnTargetListColumnClicked(wxListEvent &event) {
   int key = event.GetColumn();
   wxListItem item;
   //item.SetMask(wxLIST_MASK_IMAGE);
+
   if (key == g_RopelessTargetList_sortColumn)
     g_bRopelessTargetList_sortReverse = !g_bRopelessTargetList_sortReverse;
   else {
@@ -2097,7 +2432,7 @@ void RopelessDialog::RefreshTransponderList()
 {
   m_pListCtrlTranponders->DeleteAllItems();
 
-      //  Walk the vector of transponder status
+  //  Walk the vector of transponder status
   for (unsigned int i = 0 ; i < transponderStatus.size() ; i++){
     transponder_state *state = transponderStatus[i];
 
@@ -2126,6 +2461,7 @@ void RopelessDialog::RefreshTransponderList()
       sid = "---";
     else
       sid.Printf("%d", state->release_status);
+
     //item.SetText(sid);
     //m_pListCtrlTranponders->SetItem(item);
     m_pListCtrlTranponders->SetItem(result, tlRELEASE_STATUS, sid);
@@ -2209,11 +2545,11 @@ void RopelessDialog::OnStopSimButton(wxCommandEvent &event)
 
     pParentPi->stopSim();
     Layout();
-
 }
 
 void RopelessDialog::OnStartSimButton(wxCommandEvent &event)
 {
+  wxLogMessage("OnStartSimButton!");
 
    if(::wxFileExists(msgFileName)){
 
@@ -2223,7 +2559,6 @@ void RopelessDialog::OnStartSimButton(wxCommandEvent &event)
         m_StopSimButton->Show();
         pParentPi->startSim();
         Layout();
-
    }
 }
 
@@ -2231,7 +2566,6 @@ void RopelessDialog::OnManualReleaseButton(wxCommandEvent &event)
 {
   transponder_state tmpState;
 
-  // spawn release that accepts ID number and send release command to Transceiver
   wxString msg("Manually Enter Transponder ID to Release: ");
 
   long result = -1;
@@ -2260,14 +2594,40 @@ void RopelessDialog::OnManualReleaseButton(wxCommandEvent &event)
     s1.Printf("Manual Release Req for ID: %d", result);
     wxLogMessage(s1);
 
-    // Create a transponder state just to spoof the release message
     tmpState.ident = result;
     g_ropelessPI->SendReleaseMessage(&tmpState, 0);
   }
 }
 
+void RopelessDialog::clearHighlighted()
+{
+    wxArrayInt selectedItems = GetSelectedItems();
+    int numItems = selectedItems.GetCount();
+
+    // for (size_t i = 0; i < numItems; i++) {
+    //     message += wxString::Format("%d ", selectedItems[i]);
+    // }
+
+    if (numItems > 0)
+    {
+        transponder_state *state = getXpdrFromIndex(selectedItems[0]);
+
+        if (state->ident > 0)
+        {
+            state->color_index = COLOR_INDEX_GREEN;
+
+        }
+        else
+        {
+            state->color_index = COLOR_INDEX_RED;
+        }
+    }
+}
+
 void RopelessDialog::OnClose(wxCloseEvent& event)
 {
+    clearHighlighted();
+
 #ifndef __ANDROID__
   wxPoint p = GetPosition();
   pParentPi->m_dialogPosX = p.x;
@@ -2284,14 +2644,12 @@ void RopelessDialog::OnClose(wxCloseEvent& event)
 
 void RopelessDialog::OnOKClick(wxCommandEvent& event)
 {
+    clearHighlighted();
+
 #ifndef __ANDROID__
     m_StopSimButton->Hide();
     m_StartSimButton->Show();
     g_ropelessPI->stopSim();
 #endif
-    //EndModal( wxID_OK );
-    //wxLogMessage("Closing Ropeless window [OK]...");
     Close();
 }
-
-

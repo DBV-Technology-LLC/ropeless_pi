@@ -51,7 +51,6 @@
 #include <wx/spinctrl.h>
 #include <wx/aui/aui.h>
 #include <wx/fontpicker.h>
-//#include "/home/dsr/Projects/opencpn_sf/opencpn/include/ocpn_plugin.h"
 #include "ocpn_plugin.h"
 #include "ODdc.h"
 #include "pugixml.hpp"
@@ -83,7 +82,9 @@
 #define ID_TPR_RELEASE          8869
 #define ID_TPR_DELETE           8870
 #define ID_TPR_ID               8871
-#define ID_TPR_MANUAL_RELEASE    8872
+#define ID_TPR_MANUAL_RELEASE   8872
+#define ID_TPR_PLACE            8873
+//#define ID_TPR_PLACE            8873
 
 //      Message IDs
 #define SIM_TIMER 5003
@@ -239,9 +240,11 @@ public:
 
      wxTimer m_simulatorTimer;
      int m_start_sim_id, m_stop_sim_id;
+
      transponder_state      *m_foundState;
      bool SendReleaseMessage(transponder_state *state, long code);
 
+     int m_place_trap;
 
 private:
       bool LoadConfig(void);
@@ -254,6 +257,8 @@ private:
 
       void ProcessRFACapture( void );
       void ProcessRLACapture( void );
+      transponder_state* addTransponderPos( int transponderIdent );
+      void placeTransponderManually(int xpdrId, int pairId, double lat, double lon, double utc);
 
       void SaveTransponderStatus();
       void populateTransponderNode(pugi::xml_node &transponderNode,
@@ -433,9 +438,15 @@ public:
     void OnStartSimButton(wxCommandEvent &event);
     void OnManualReleaseButton(wxCommandEvent &event);
     void RefreshTransponderList();
+    void OnTargetListSelected(wxListEvent &event);
+    void OnTargetListDeselected(wxListEvent &event);
     void OnTargetListColumnClicked(wxListEvent &event);
     void OnTargetRightClick(wxListEvent &event);
 
+    wxArrayInt GetSelectedItems();
+    transponder_state* getXpdrFromIndex(int index);
+    void clearHighlighted();
+    
     DECLARE_EVENT_TABLE()
 
 };

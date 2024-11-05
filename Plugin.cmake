@@ -41,8 +41,8 @@ set(PKG_SUMMARY "Ropeless Fishing Interface"
 )
 set(PKG_DESCRIPTION [=[ Ropeless Fishing Plugin]=])
 
-set(PKG_HOMEPAGE https://github.com/bdbcat/o-charts_pi)
-set(PKG_INFO_URL https://o-charts.org/)
+set(PKG_HOMEPAGE https://github.com/bdbcat/ropeless_pi/)
+set(PKG_INFO_URL https://www.ropeless.us/)
 
 set(PKG_AUTHOR "Dave register")
 
@@ -67,6 +67,10 @@ SET(SRC_ROPELESS
     src/pugixml.cpp
     src/mynumdlg.cpp
     src/myokdlg.cpp
+    src/manualPlacementDlg.h
+    src/manualPlacementDlg.cpp
+    src/manualPlacementDlgImpl.h
+    src/manualPlacementDlgImpl.cpp
 )
 
 SET(SRC_NMEA0183
