@@ -41,8 +41,8 @@ set(PKG_SUMMARY "Ropeless Fishing Interface"
 )
 set(PKG_DESCRIPTION [=[ Ropeless Fishing Plugin]=])
 
-set(PKG_HOMEPAGE https://github.com/bdbcat/ropeless_pi/)
-set(PKG_INFO_URL https://www.ropeless.us/)
+set(PKG_HOMEPAGE https://github.com/bdbcat/o-charts_pi)
+set(PKG_INFO_URL https://o-charts.org/)
 
 set(PKG_AUTHOR "Dave register")
 
@@ -70,7 +70,7 @@ SET(SRC_ROPELESS
     src/manualPlacementDlg.h
     src/manualPlacementDlg.cpp
     src/manualPlacementDlgImpl.h
-    src/manualPlacementDlgImpl.cpp
+    src/manualPlacementDlgImpl.cpp   
 )
 
 SET(SRC_NMEA0183
@@ -155,7 +155,7 @@ set(CMAKE_BUILD_TYPE Debug)
 
 add_definitions(-DocpnUSE_GL)
 
-set(PKG_API_LIB api-17)  #  A directory in libs/ e. g., api-17 or api-16
+set(PKG_API_LIB api-16)  #  A directory in libs/ e. g., api-17 or api-16
 
 macro(late_init)
   # Perform initialization after the PACKAGE_NAME library, compilers

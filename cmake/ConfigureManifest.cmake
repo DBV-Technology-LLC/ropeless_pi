@@ -13,7 +13,7 @@
 #
 # @include are expected in lines like:
 #
-#     - @include opencpn-libs/flatpak/glu.yaml
+#     - @include libs/glu.yaml
 #
 # Copy the contents of the filename mentioned after @include into the new
 # manifest.

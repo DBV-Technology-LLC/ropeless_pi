@@ -4,25 +4,22 @@ Binary: opencpn-build-deps
 Architecture: all
 Version: 1.0
 Checksums-Md5:
- 805aea6d31f4c2c6df20d064c9b6002b 2316 opencpn-build-deps_1.0_all.deb
+ ac57380ff3ad750862ae387b0b2f9e25 2316 opencpn-build-deps_1.0_all.deb
 Checksums-Sha1:
- de79289e355669af5ea909c22cfe203ce59a0142 2316 opencpn-build-deps_1.0_all.deb
+ dbc13dad5e4870e005bd10326e6fe26159d028e9 2316 opencpn-build-deps_1.0_all.deb
 Checksums-Sha256:
- 49739d1ddf58370154b4793b18bfe99856c64f72604ed01b608276cf3e0570e0 2316 opencpn-build-deps_1.0_all.deb
+ 906774c0f3783bd8b80dd48b17d31b267e129b8fcf2e928d667e488eca09ba61 2316 opencpn-build-deps_1.0_all.deb
 Build-Origin: Ubuntu
 Build-Architecture: amd64
-Build-Date: Tue, 28 May 2024 16:07:32 -0400
+Build-Date: Wed, 06 Nov 2024 14:56:31 -0500
 Build-Tainted-By:
  merged-usr-via-aliased-dirs
- usr-local-has-includes
- usr-local-has-libraries
- usr-local-has-programs
 Installed-Build-Depends:
  autoconf (= 2.71-2),
  automake (= 1:1.16.5-1.3),
  autopoint (= 0.21-4ubuntu4),
  autotools-dev (= 20220109.1),
- base-files (= 12ubuntu4.6),
+ base-files (= 12ubuntu4.7),
  base-passwd (= 3.5.52build1),
  bash (= 5.1-6ubuntu1.1),
  binutils (= 2.38-4ubuntu2.6),
@@ -73,14 +70,14 @@ Installed-Build-Depends:
  libbinutils (= 2.38-4ubuntu2.6),
  libblkid1 (= 2.37.2-4ubuntu3.4),
  libbz2-1.0 (= 1.0.8-5build1),
- libc-bin (= 2.35-0ubuntu3.7),
- libc-dev-bin (= 2.35-0ubuntu3.7),
- libc6 (= 2.35-0ubuntu3.7),
- libc6-dev (= 2.35-0ubuntu3.7),
+ libc-bin (= 2.35-0ubuntu3.8),
+ libc-dev-bin (= 2.35-0ubuntu3.8),
+ libc6 (= 2.35-0ubuntu3.8),
+ libc6-dev (= 2.35-0ubuntu3.8),
  libcap-ng0 (= 0.7.9-2.2build3),
  libcap2 (= 1:2.44-1ubuntu0.22.04.1),
  libcc1-0 (= 12.3.0-1ubuntu1~22.04),
- libcom-err2 (= 1.46.5-2ubuntu1.1),
+ libcom-err2 (= 1.46.5-2ubuntu1.2),
  libcrypt-dev (= 1:4.4.27-1),
  libcrypt1 (= 1:4.4.27-1),
  libctf-nobfd0 (= 2.38-4ubuntu2.6),
@@ -100,14 +97,14 @@ Installed-Build-Depends:
  libgmp10 (= 2:6.2.1+dfsg-3ubuntu1),
  libgomp1 (= 12.3.0-1ubuntu1~22.04),
  libgpg-error0 (= 1.43-3),
- libgssapi-krb5-2 (= 1.19.2-2ubuntu0.3),
+ libgssapi-krb5-2 (= 1.19.2-2ubuntu0.4),
  libicu70 (= 70.1-2),
  libisl23 (= 0.24-2build1),
  libitm1 (= 12.3.0-1ubuntu1~22.04),
- libk5crypto3 (= 1.19.2-2ubuntu0.3),
+ libk5crypto3 (= 1.19.2-2ubuntu0.4),
  libkeyutils1 (= 1.6.1-2ubuntu3),
- libkrb5-3 (= 1.19.2-2ubuntu0.3),
- libkrb5support0 (= 1.19.2-2ubuntu0.3),
+ libkrb5-3 (= 1.19.2-2ubuntu0.4),
+ libkrb5support0 (= 1.19.2-2ubuntu0.4),
  liblsan0 (= 12.3.0-1ubuntu1~22.04),
  liblz4-1 (= 1.9.3-2build2),
  liblzma5 (= 5.2.5-2ubuntu1),
@@ -131,7 +128,7 @@ Installed-Build-Depends:
  libselinux1 (= 3.3-1build2),
  libsigsegv2 (= 2.13-1ubuntu3),
  libsmartcols1 (= 2.37.2-4ubuntu3.4),
- libssl3 (= 3.0.2-0ubuntu1.15),
+ libssl3 (= 3.0.2-0ubuntu1.18),
  libstdc++-11-dev (= 11.4.0-1ubuntu1~22.04),
  libstdc++6 (= 12.3.0-1ubuntu1~22.04),
  libsub-override-perl (= 0.09-2),
@@ -149,7 +146,7 @@ Installed-Build-Depends:
  libuuid1 (= 2.37.2-4ubuntu3.4),
  libxml2 (= 2.9.13+dfsg-1ubuntu0.4),
  libzstd1 (= 1.4.8+dfsg-3build1),
- linux-libc-dev (= 5.15.0-107.117),
+ linux-libc-dev (= 5.15.0-124.134),
  login (= 1:4.8.1-2ubuntu2.2),
  lsb-base (= 11.1.0ubuntu4),
  lto-disabled-list (= 24),
@@ -176,4 +173,4 @@ Environment:
  DEB_BUILD_OPTIONS="parallel=4"
  DEB_BUILD_PROFILES="noudeb"
  LANG="en_US.UTF-8"
- SOURCE_DATE_EPOCH="1716926850"
+ SOURCE_DATE_EPOCH="1730922990"

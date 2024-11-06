@@ -1757,7 +1757,7 @@ bool ropeless_pi::MouseEventHook( wxMouseEvent &event )
     wxPoint mp(event.m_x, event.m_y);
     GetCanvasLLPix( &g_ovp, mp, &m_cursor_lat, &m_cursor_lon);
 
-    wxLogMessage("Mouse Event!");
+    //wxLogMessage("Mouse Event!");
 
     int transponderFoundID = 0;
     m_foundState = NULL;
@@ -2262,8 +2262,11 @@ void RopelessDialog::OnTargetRightClick(wxListEvent &event) {
     mouseX = pt.x - m_pListCtrlTranponders->GetScreenPosition().x;
     mouseY = pt.y - m_pListCtrlTranponders->GetScreenPosition().y;
     
-    // Can't use this in windows. off by 1
-    //mouseY -= rect.height;
+#ifndef __WXMSW__
+    mouseY -= rect.height;
+#endif
+
+    wxLogMessage("Right Click -= Height!");
 
     int flags;
     index = m_pListCtrlTranponders->HitTest(wxPoint(mouseX, mouseY),
