@@ -240,7 +240,8 @@ public:
   transponder_state *m_foundState;
   bool SendReleaseMessage(transponder_state *state, long code);
 
-  int m_place_trap;
+  int m_place_trap_manually;
+  int m_place_trap_now;
 
 private:
   bool LoadConfig(void);

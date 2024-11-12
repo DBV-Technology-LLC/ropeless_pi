@@ -145,7 +145,7 @@ WX_DEFINE_OBJARRAY(ArrayOf2DPoints);
 
 wxString colorTableNames[] = {"LIME GREEN",  // looks darker green
                               "ORANGE",      // looks darker red
-                              "MAGENTA", "CYAN", "WHEAT"};
+                              "MAGENTA", "CYAN", "YELLOW"};
 
 #define COLOR_TABLE_COUNT 5
 #define COLOR_INDEX_GOLDEN 4
@@ -415,17 +415,13 @@ int ropeless_pi::Init(void) {
 
   wxMenuItem *rptrp =
       new wxMenuItem(NULL, ID_TPR_PLACE, _("Ropeless: Place Trap Manually"));
-  m_place_trap = AddCanvasContextMenuItem(rptrp, this);
-  SetCanvasContextMenuItemViz(m_place_trap, true);
+  m_place_trap_manually = AddCanvasContextMenuItem(rptrp, this);
+  SetCanvasContextMenuItemViz(m_place_trap_manually, true);
 
-  //    wxMenuItem *sim_item = new wxMenuItem(NULL, ID_PLAY_SIM, _("Start
-  //    Ropeless Simulation") ); m_start_sim_id =
-  //    AddCanvasContextMenuItem(sim_item, this );
-  //    SetCanvasContextMenuItemViz(m_start_sim_id, true);
-
-  //    wxMenuItem *sim_stop_item = new wxMenuItem(NULL, ID_STOP_SIM, _("Stop
-  //    Simulation") ); m_stop_sim_id = AddCanvasContextMenuItem(sim_stop_item,
-  //    this ); SetCanvasContextMenuItemViz(m_stop_sim_id, false);
+  wxMenuItem *rptrp2 =
+      new wxMenuItem(NULL, ID_TPR_PLACE, _("Ropeless: Place Trap at Vessel Position"));
+  m_place_trap_now = AddCanvasContextMenuItem(rptrp2, this);
+  SetCanvasContextMenuItemViz(m_place_trap_now, true);
 
   popup = new wxPopupWindow(m_parent_window);
   popupText =
@@ -475,7 +471,8 @@ bool ropeless_pi::DeInit(void) {
     m_dialogSizeHeight = s.y;
   }
 
-  RemoveCanvasContextMenuItem(m_place_trap);
+  RemoveCanvasContextMenuItem(m_place_trap_manually);
+  RemoveCanvasContextMenuItem(m_place_trap_now);
 
   SaveConfig();
 
@@ -568,43 +565,20 @@ void ropeless_pi::OnContextMenuItemCallback(int id) {
     SetCanvasContextMenuItemViz(m_stop_sim_id, false);
 
     stopSim();
-  } else if (id == m_place_trap) {
+  } else if (id == m_place_trap_manually) {
     double mp_lat = m_cursor_lat;
     double mp_lon = m_cursor_lon;
 
     wxString latStr = wxString::Format("%.7f", mp_lat);
     wxString lonStr = wxString::Format("%.7f", mp_lon);
 
-    // wxString latStr = _("Lat Test");
-    // wxString lonStr = _("Lon Test");
+    wxLogMessage("Placing Trap at Manual Location: %s, %s",latStr,lonStr);
 
     wxDateTime lognow = wxDateTime::Now();
     lognow.MakeGMT();
     wxString day = lognow.FormatISODate();
     wxString utc = lognow.FormatISOTime();
     double utc_d = atof(day + utc);
-
-    // Manually place
-    wxLogMessage("Fuckss, Manually Placing Ropeless Trap!");
-    wxLogMessage("Lat/Long of Right Click is : %f,%f", m_cursor_lat,
-                 m_cursor_lon);
-    wxLogMessage("Click @ %s", utc);
-
-    // myOkDialog dialog3;
-    // int result;
-    // dialog3.Create(GetOCPNCanvasWindow(),
-    //                          "Test",
-    //                          "Ropeless Plugin Message",
-    //                          0, 0, 100000,
-    //                          wxDefaultPosition);
-    // if (dialog3.ShowModal() == wxID_OK)
-    // {
-    //     result = 1;
-    // }
-
-    // manualPlacementDlgImpl mPlDlg(GetOCPNCanvasWindow());
-    // manualPlacementDlgImpl mPlDlg = new
-    // manualPlacementDlgImpl(GetOCPNCanvasWindow()); mPlDlg.ShowModal();
 
     manualPlacementDlgImpl mPl(GetOCPNCanvasWindow(), wxID_ANY,
                                _("Place Transponder"), wxDefaultPosition,
@@ -613,20 +587,42 @@ void ropeless_pi::OnContextMenuItemCallback(int id) {
     int res = mPl.ShowModal();
 
     if (res == wxID_OK) {
-      wxLogMessage("Manual Placement res OK!");
-      wxLogMessage("Id: %d, Pair: %d, Owned: %d", mPl.xpdrId, mPl.pairId,
-                   mPl.isOwned);
+      // wxLogMessage("Manual Placement res OK!");
+      // wxLogMessage("Id: %d, Pair: %d, Owned: %d", mPl.xpdrId, mPl.pairId,
+      //              mPl.isOwned);
 
       if (mPl.valid) {
         placeTransponderManually(mPl.xpdrId, mPl.pairId, mp_lat, mp_lon, utc_d);
       }
-    } else if (res == wxID_CANCEL) {
-      wxLogMessage("Manual Placement res CANCEL!");
-
-    } else {
-      wxLogMessage("Manual Placement res Error!");
     }
+  } else if (id == m_place_trap_now) {
+    wxString ownlatStr = wxString::Format("%.7f", m_ownship_lat);
+    wxString ownlonStr = wxString::Format("%.7f", m_ownship_lon);
+    
+    wxLogMessage("Placing Trap at Vessel Location: %s, %s",ownlatStr,ownlonStr);
 
+    wxDateTime lognow = wxDateTime::Now();
+    lognow.MakeGMT();
+    wxString day = lognow.FormatISODate();
+    wxString utc = lognow.FormatISOTime();
+    double utc_d = atof(day + utc);
+
+    manualPlacementDlgImpl mPl(GetOCPNCanvasWindow(), wxID_ANY,
+                               _("Place Transponder"), wxDefaultPosition,
+                               wxSize(-1, -1), wxDEFAULT_DIALOG_STYLE, ownlatStr,
+                               ownlonStr, utc);
+    int res = mPl.ShowModal();
+
+    if (res == wxID_OK) {
+      // wxLogMessage("Manual Placement res OK!");
+      // wxLogMessage("Id: %d, Pair: %d, Owned: %d", mPl.xpdrId, mPl.pairId,
+      //              mPl.isOwned);
+
+      if (mPl.valid) {
+        placeTransponderManually(mPl.xpdrId, mPl.pairId, m_ownship_lat, m_ownship_lon, utc_d);
+      }
+    }
+  }
     // TODO: Manual Placement Option via right-click
     //  Get lat long of mouse when clicked to create new transponder dot
     //  Capture current UTC time / date of placement
@@ -634,7 +630,6 @@ void ropeless_pi::OnContextMenuItemCallback(int id) {
     //  Capture Ok / Cancel
     //  Process fields if OK
     //  Check Lat/Long/Id/Owned
-  }
 
   // startSim();
 }
@@ -1589,7 +1584,7 @@ bool ropeless_pi::MouseEventHook(wxMouseEvent &event) {
   wxPoint mp(event.m_x, event.m_y);
   GetCanvasLLPix(&g_ovp, mp, &m_cursor_lat, &m_cursor_lon);
 
-  wxLogMessage("Mouse Event!");
+  //wxLogMessage("Mouse Event!");
 
   int transponderFoundID = 0;
   m_foundState = NULL;
