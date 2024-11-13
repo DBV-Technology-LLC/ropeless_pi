@@ -63,6 +63,8 @@
 #include <deque>
 #include <wx/socket.h>
 
+#include "transponderReleaseDlgImpl.h"
+
 #define EPL_TOOL_POSITION -1  // Request default positioning of toolbar tool
 
 #define gps_watchdog_timeout_ticks 10
@@ -84,25 +86,37 @@
 #define ID_TPR_ID 8871
 #define ID_TPR_MANUAL_RELEASE 8872
 #define ID_TPR_PLACE 8873
-// #define ID_TPR_PLACE            8873
+#define ID_TPR_RECOVER 8874
 
 //      Message IDs
 #define SIM_TIMER 5003
-#define HISTORY_FADE_SECS 10
+#define RELEASE_TIMER 5004
 #define ID_PLAY_SIM 5058
 #define ID_STOP_SIM 5059
 #define ID_TRANSPONDER_LIST 5060
+
+//      Options
+#define HISTORY_FADE_SECS 10
 
 enum {
   tlICON = 0,
   tlIDENT,
   tlTIMESTAMP,
   tlRELEASE_STATUS,
+  tlRANGE,
   tlDISTANCE,
   tlPINGS,
   tlDEPTH,
-  tlTEMP
+  tlTEMP,
+  tlRECOVERED
 };  // Transponder list Columns;
+
+enum {
+  eRELEASE_TIMEOUT = 0,
+  eRELEASE_SENDING = 1,
+  eRELEASE_VERIFIED = 2,
+  eRELEASE_NOT_VERIFIED = 3
+};
 
 //----------------------------------------------------------------------------------------------------------
 //    Forward declarations
@@ -148,6 +162,9 @@ public:
     temp = 0;
     timeStamp = 0;
     batt_stat = 0;
+    opacity = 128;
+    recovered_state = 0;
+    distance = 0;
   }
 
   ~transponder_state() {};
@@ -164,6 +181,9 @@ public:
   double depth;
   double temp;
   int batt_stat;
+  int opacity;
+  int recovered_state;
+  double distance;
   std::deque<transponder_state_history *> historyQ;
 };
 
@@ -213,6 +233,8 @@ public:
 
   void ProcessTimerEvent(wxTimerEvent &event);
   void ProcessSimTimerEvent(wxTimerEvent &event);
+  void ProcessReleaseTimerEvent(wxTimerEvent &event);
+
   //      void RenderFixHat( void );
   void ShowPreferencesDialog(wxWindow *parent);
 
@@ -228,6 +250,9 @@ public:
   void startSim();
   void stopSim();
 
+  void startReleaseTimer();
+  void stopReleaseTimer();
+
   int m_dialogSizeWidth;
   int m_dialogSizeHeight;
   int m_dialogPosX;
@@ -242,6 +267,9 @@ public:
 
   int m_place_trap_manually;
   int m_place_trap_now;
+
+  wxTimer m_releaseTimer;
+  transponderReleaseDlgImpl *m_releaseDlg = NULL;
 
 private:
   bool LoadConfig(void);

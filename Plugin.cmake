@@ -71,6 +71,10 @@ SET(SRC_ROPELESS
     src/manualPlacementDlg.cpp
     src/manualPlacementDlgImpl.h
     src/manualPlacementDlgImpl.cpp
+    src/transponderReleaseDlg.h
+    src/transponderReleaseDlg.cpp
+    src/transponderReleaseDlgImpl.h
+    src/transponderReleaseDlgImpl.cpp
 )
 
 SET(SRC_NMEA0183

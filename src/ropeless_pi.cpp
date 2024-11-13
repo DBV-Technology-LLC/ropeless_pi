@@ -48,6 +48,7 @@
 #include "mynumdlg.h"
 #include "myokdlg.h"
 #include "manualPlacementDlgImpl.h"
+#include "transponderReleaseDlgImpl.h"
 
 #ifdef __WXMSW__
 #include <winsock.h>
@@ -152,6 +153,8 @@ wxString colorTableNames[] = {"LIME GREEN",  // looks darker green
 #define COLOR_INDEX_GREEN 0
 #define COLOR_INDEX_RED 1
 
+#define SET_RECOVERED_OPACITY
+                              
 wxString msgFileName = "/home/dsr/Projects/ropeless_pi/NMEArevC_06072023.txt";
 
 wxDateTime DaysTowDT(double days) {
@@ -275,7 +278,7 @@ static int wxCALLBACK wxListCompareFunction(wxIntPtr item1, wxIntPtr item2,
 
   switch (g_RopelessTargetList_sortColumn) {
     case tlDISTANCE:
-      return (CompareD(tS2->range, tS1->range));
+      return (CompareD(tS2->distance, tS1->distance));
       break;
 
     case tlTIMESTAMP: {
@@ -285,6 +288,10 @@ static int wxCALLBACK wxListCompareFunction(wxIntPtr item1, wxIntPtr item2,
 
     case tlIDENT:
       return (CompareD((double)tS2->ident, (double)tS1->ident));
+      break;
+
+    case tlRANGE:
+      return (CompareD(tS2->range, tS1->range));
       break;
 
     case tlICON:
@@ -307,6 +314,7 @@ static int wxCALLBACK wxListCompareFunction(wxIntPtr item1, wxIntPtr item2,
 BEGIN_EVENT_TABLE(ropeless_pi, wxEvtHandler)
 EVT_TIMER(TIMER_THIS_PI, ropeless_pi::ProcessTimerEvent)
 EVT_TIMER(SIM_TIMER, ropeless_pi::ProcessSimTimerEvent)
+EVT_TIMER(RELEASE_TIMER, ropeless_pi::ProcessReleaseTimerEvent)
 END_EVENT_TABLE()
 
 ropeless_pi::ropeless_pi(void *ppimgr)
@@ -477,6 +485,8 @@ bool ropeless_pi::DeInit(void) {
   SaveConfig();
 
   SaveTransponderStatus();  // Create XML file
+
+  delete m_releaseDlg;
 
   return true;
 }
@@ -786,6 +796,11 @@ void ropeless_pi::PopupMenuHandler(wxCommandEvent &event) {
       handled = true;
       break;
     }
+    case ID_TPR_RECOVER: {
+      wxLogMessage("PopupMenuHandler: ID_TPR_RECOVER");
+      handled = true;
+      break;
+    }
     default:
       break;
   }
@@ -892,10 +907,51 @@ bool ropeless_pi::SendReleaseMessage(transponder_state *state, long code) {
     wxString ws;
     ws.Printf("Release Request Sent: %s", payload);
     wxLogMessage(ws);
+
+    startReleaseTimer();
+
   } else
     wxLogMessage("Failed to Send Release Request!");
 
   return ret;
+}
+
+void ropeless_pi::startReleaseTimer(){
+  wxLogMessage("Starting Release Timer!");
+
+    if (NULL == m_releaseDlg) {
+
+      wxLogMessage("Creating new release dialog!");
+
+    m_releaseDlg = new transponderReleaseDlgImpl(
+        m_parent_window, -1, "Ropeless Fishing", wxDefaultPosition,
+        wxDefaultSize, wxCAPTION | wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER);
+
+    wxFont *pFont = OCPNGetFont(_T("Dialog"), 0);
+    m_releaseDlg->SetFont(*pFont);
+  }
+  else
+  {
+    wxLogMessage("Release Dialog not NULL!");
+
+  }
+
+  m_releaseDlg->Show(true);
+  m_releaseDlg->Layout();  // Some platforms need a re-Layout at this point
+                          // (gtk, at least)
+
+  m_releaseTimer.SetOwner(this, RELEASE_TIMER);
+  m_releaseTimer.Start(1000, wxTIMER_CONTINUOUS);
+}
+
+void ropeless_pi::stopReleaseTimer() { m_releaseTimer.Stop(); }
+
+void ropeless_pi::ProcessReleaseTimerEvent(wxTimerEvent &event) {
+  wxLogMessage("Relase Timer Expired!");
+
+  stopReleaseTimer();
+
+  //RequestRefresh(GetOCPNCanvasWindow());
 }
 
 void ropeless_pi::startSim() {
@@ -1125,6 +1181,11 @@ void ropeless_pi::RenderTransponder(transponder_state *state) {
   wxPoint ab;
   wxString colorName = colorTableNames[state->color_index];
   wxColour rcolour = wxTheColourDatabase->Find(colorName);
+
+#ifdef SET_RECOVERED_OPACITY
+  rcolour.Set(rcolour.Red(), rcolour.Green(), rcolour.Blue(), state->opacity);
+#endif
+
   if (!rcolour.IsOk()) rcolour = wxColour(255, 000, 255);
 
   // Render the primary instant transponder
@@ -1669,9 +1730,8 @@ bool ropeless_pi::MouseEventHook(wxMouseEvent &event) {
       // release_item = new wxMenuItem(contextMenu, ID_TPR_MUTE, _("Mute
       // Transponder") );
 
-      // wxMenuItem *release_item = 0;
-      // release_item = new wxMenuItem(contextMenu, ID_TPR_RECOVER, _("Report
-      // Recovered") );
+      wxMenuItem *recovered_item = 0;
+      recovered_item = new wxMenuItem(contextMenu, ID_TPR_RECOVER, _("Report Recovered") );
 
       // wxMenuItem *release_item = 0;
       // release_item = new wxMenuItem(contextMenu, ID_TPR_LOST, _("Report
@@ -1692,6 +1752,7 @@ bool ropeless_pi::MouseEventHook(wxMouseEvent &event) {
 
       contextMenu->Append(id_item);
       contextMenu->Append(release_item);
+      contextMenu->Append(recovered_item);
 
       GetOCPNCanvasWindow()->Connect(
           ID_TPR_RELEASE, wxEVT_COMMAND_MENU_SELECTED,
@@ -1706,6 +1767,10 @@ bool ropeless_pi::MouseEventHook(wxMouseEvent &event) {
         GetOCPNCanvasWindow()->Disconnect(
             ID_TPR_RELEASE, wxEVT_COMMAND_MENU_SELECTED,
             wxCommandEventHandler(ropeless_pi::PopupMenuHandler), NULL, this);
+      }
+      else if (recovered_item){
+        // Tell Transceiver we've recovered! Set Transponder
+        wxLogMessage("Setting %d as Recovered!",transponderFoundID);
       }
 
       bret = true;  // I have eaten this event
@@ -1980,20 +2045,28 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
   m_pListCtrlTranponders->InsertColumn(tlTIMESTAMP, _("LastReportTime (UTC)"),
                                        wxLIST_FORMAT_CENTER, txs.x + dx * 2);
 
-  txs = GetTextExtent("Distance, M");
-  m_pListCtrlTranponders->InsertColumn(tlDISTANCE, _("Distance, M"),
+  txs = GetTextExtent("Range, M");
+  m_pListCtrlTranponders->InsertColumn(tlRANGE, _("Range, M"),
                                        wxLIST_FORMAT_CENTER, txs.x + dx * 2);
 
-  txs = GetTextExtent("Depth, M");
-  m_pListCtrlTranponders->InsertColumn(tlDEPTH, _("Depth, M"),
+  txs = GetTextExtent("Distance, M");
+  m_pListCtrlTranponders->InsertColumn(tlDISTANCE, _("Distance, M"),
                                        wxLIST_FORMAT_CENTER, txs.x + dx * 2);
 
   txs = GetTextExtent("Pings");
   m_pListCtrlTranponders->InsertColumn(tlPINGS, _("Pings"),
                                        wxLIST_FORMAT_CENTER, txs.x + dx * 2);
 
+  txs = GetTextExtent("Depth, M");
+  m_pListCtrlTranponders->InsertColumn(tlDEPTH, _("Depth, M"),
+                                       wxLIST_FORMAT_CENTER, txs.x + dx * 2);
+
   txs = GetTextExtent("Temperature, C");
   m_pListCtrlTranponders->InsertColumn(tlTEMP, _("Temperature, C"),
+                                       wxLIST_FORMAT_CENTER, txs.x + dx * 2);
+
+  txs = GetTextExtent("Recovered Status");
+  m_pListCtrlTranponders->InsertColumn(tlRECOVERED, _("Recovered Status"),
                                        wxLIST_FORMAT_CENTER, txs.x + dx * 2);
 
   // Build the color indicator bitmaps, adding to an image lst
@@ -2091,6 +2164,7 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
 }
 
 RopelessDialog::~RopelessDialog() {
+
   // delete m_pSerialArray;
 }
 
@@ -2138,22 +2212,40 @@ void RopelessDialog::OnTargetRightClick(wxListEvent &event) {
                      g_ropelessPI->m_foundState->ident);
 
         wxMenu *contextMenu = new wxMenu;
-        wxMenuItem *release_item = 0;
-        wxMenuItem *delete_item = 0;
 
+        wxMenuItem *id_item = 0;
+        wxString transponderIDString;
+        transponderIDString.Printf("ID: %d", g_ropelessPI->m_foundState->ident);
+        id_item = new wxMenuItem(contextMenu, ID_TPR_ID, _(transponderIDString));
+        
+        wxMenuItem *release_item = 0;
         release_item = new wxMenuItem(contextMenu, ID_TPR_RELEASE,
                                       _("Release Transponder"));
+
+        wxMenuItem *recovered_item = 0;
+        recovered_item = new wxMenuItem(contextMenu, ID_TPR_RECOVER, 
+                                      _("Report Recovered") );
+
+        wxMenuItem *delete_item = 0;
         delete_item = new wxMenuItem(contextMenu, ID_TPR_DELETE, _("Delete"));
 
 #ifdef __ANDROID__
         wxFont *pFont = OCPNGetFont(_T("Dialog"), 0);
         release_item->SetFont(*pFont);
 #endif
+
+        contextMenu->Append(id_item);
         contextMenu->Append(release_item);
+        contextMenu->Append(recovered_item);
         contextMenu->Append(delete_item);
 
         GetOCPNCanvasWindow()->Connect(
             ID_TPR_RELEASE, wxEVT_COMMAND_MENU_SELECTED,
+            wxCommandEventHandler(ropeless_pi::PopupMenuHandler), NULL,
+            pParentPi);
+
+        GetOCPNCanvasWindow()->Connect(
+            ID_TPR_RECOVER, wxEVT_COMMAND_MENU_SELECTED,
             wxCommandEventHandler(ropeless_pi::PopupMenuHandler), NULL,
             pParentPi);
 
@@ -2172,11 +2264,18 @@ void RopelessDialog::OnTargetRightClick(wxListEvent &event) {
               wxCommandEventHandler(ropeless_pi::PopupMenuHandler), NULL,
               pParentPi);
 
+        if (recovered_item)
+          GetOCPNCanvasWindow()->Disconnect(
+              ID_TPR_RECOVER, wxEVT_COMMAND_MENU_SELECTED,
+              wxCommandEventHandler(ropeless_pi::PopupMenuHandler), NULL,
+              pParentPi);
+
         if (delete_item)
           GetOCPNCanvasWindow()->Disconnect(
               ID_TPR_DELETE, wxEVT_COMMAND_MENU_SELECTED,
               wxCommandEventHandler(ropeless_pi::PopupMenuHandler), NULL,
               pParentPi);
+
       }
     }
   }
@@ -2232,6 +2331,8 @@ void RopelessDialog::OnTargetListDeselected(wxListEvent &event) {
     } else {
       state->color_index = COLOR_INDEX_RED;
     }
+
+    RequestRefresh(GetOCPNCanvasWindow());
   }
 }
 
@@ -2250,6 +2351,8 @@ void RopelessDialog::OnTargetListSelected(wxListEvent &event) {
     transponder_state *state = getXpdrFromIndex(selectedItems[0]);
 
     state->color_index = COLOR_INDEX_GOLDEN;
+
+    RequestRefresh(GetOCPNCanvasWindow());
   }
 }
 
@@ -2350,11 +2453,29 @@ void RopelessDialog::RefreshTransponderList() {
 
     // item.SetColumn(tlDISTANCE);
     wxString sdist;
-    sdist.Printf("%g", state->range);
+    sdist.Printf("%g", state->distance);
     // item.SetText(sdist);
     // m_pListCtrlTranponders->SetItem(item);
     m_pListCtrlTranponders->SetItem(result, tlDISTANCE, sdist);
     m_pListCtrlTranponders->SetColumnWidth(tlDISTANCE,
+                                           wxLIST_AUTOSIZE_USEHEADER);
+
+    // item.SetColumn(tlRECOVERED);
+    wxString srec;
+    srec.Printf("%d", state->recovered_state);
+    // item.SetText(sdist);
+    // m_pListCtrlTranponders->SetItem(item);
+    m_pListCtrlTranponders->SetItem(result, tlRECOVERED, srec);
+    m_pListCtrlTranponders->SetColumnWidth(tlRECOVERED,
+                                           wxLIST_AUTOSIZE_USEHEADER);
+
+    // item.SetColumn(tlRANGE);
+    wxString srng;
+    srng.Printf("%g", state->range);
+    // item.SetText(sdist);
+    // m_pListCtrlTranponders->SetItem(item);
+    m_pListCtrlTranponders->SetItem(result, tlRANGE, srng);
+    m_pListCtrlTranponders->SetColumnWidth(tlRANGE,
                                            wxLIST_AUTOSIZE_USEHEADER);
   }
 
