@@ -91,6 +91,7 @@
 //      Message IDs
 #define SIM_TIMER 5003
 #define RELEASE_TIMER 5004
+#define DISTANCE_TIMER 5005
 #define ID_PLAY_SIM 5058
 #define ID_STOP_SIM 5059
 #define ID_TRANSPONDER_LIST 5060
@@ -234,6 +235,7 @@ public:
   void ProcessTimerEvent(wxTimerEvent &event);
   void ProcessSimTimerEvent(wxTimerEvent &event);
   void ProcessReleaseTimerEvent(wxTimerEvent &event);
+  void ProcessDistanceTimerEvent(wxTimerEvent &event);
 
   //      void RenderFixHat( void );
   void ShowPreferencesDialog(wxWindow *parent);
@@ -253,6 +255,9 @@ public:
   void startReleaseTimer();
   void stopReleaseTimer();
 
+  void startDistanceTimer();
+  void stopDistanceTimer();
+
   int m_dialogSizeWidth;
   int m_dialogSizeHeight;
   int m_dialogPosX;
@@ -269,8 +274,12 @@ public:
   int m_place_trap_now;
 
   wxTimer m_releaseTimer;
+  wxTimer m_distanceTimer;
+
   transponderReleaseDlgImpl *m_releaseDlg = NULL;
 
+  bool test;
+  
 private:
   bool LoadConfig(void);
   void ApplyConfig(void);

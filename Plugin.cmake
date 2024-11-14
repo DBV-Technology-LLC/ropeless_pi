@@ -75,6 +75,8 @@ SET(SRC_ROPELESS
     src/transponderReleaseDlg.cpp
     src/transponderReleaseDlgImpl.h
     src/transponderReleaseDlgImpl.cpp
+    src/haversine.h
+    src/haversine.cpp
 )
 
 SET(SRC_NMEA0183

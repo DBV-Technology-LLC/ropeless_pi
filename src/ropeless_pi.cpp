@@ -49,6 +49,7 @@
 #include "myokdlg.h"
 #include "manualPlacementDlgImpl.h"
 #include "transponderReleaseDlgImpl.h"
+#include "haversine.h"
 
 #ifdef __WXMSW__
 #include <winsock.h>
@@ -315,6 +316,7 @@ BEGIN_EVENT_TABLE(ropeless_pi, wxEvtHandler)
 EVT_TIMER(TIMER_THIS_PI, ropeless_pi::ProcessTimerEvent)
 EVT_TIMER(SIM_TIMER, ropeless_pi::ProcessSimTimerEvent)
 EVT_TIMER(RELEASE_TIMER, ropeless_pi::ProcessReleaseTimerEvent)
+EVT_TIMER(DISTANCE_TIMER, ropeless_pi::ProcessDistanceTimerEvent)
 END_EVENT_TABLE()
 
 ropeless_pi::ropeless_pi(void *ppimgr)
@@ -387,6 +389,8 @@ int ropeless_pi::Init(void) {
 
   SetOwner(this, TIMER_THIS_PI);
   Start(1000, wxTIMER_CONTINUOUS);
+
+  startDistanceTimer();
 
   m_event_handler = new PI_EventHandler(this);
   m_tsock = NULL;
@@ -485,6 +489,8 @@ bool ropeless_pi::DeInit(void) {
   SaveConfig();
 
   SaveTransponderStatus();  // Create XML file
+
+  stopDistanceTimer();
 
   delete m_releaseDlg;
 
@@ -954,6 +960,28 @@ void ropeless_pi::startReleaseTimer(){
 }
 
 void ropeless_pi::stopReleaseTimer() { m_releaseTimer.Stop(); }
+
+void ropeless_pi::startDistanceTimer() {
+  m_distanceTimer.SetOwner(this, DISTANCE_TIMER);
+  m_distanceTimer.Start(1000, wxTIMER_CONTINUOUS);
+}
+
+void ropeless_pi::stopDistanceTimer() { m_distanceTimer.Stop(); }
+
+void ropeless_pi::ProcessDistanceTimerEvent(wxTimerEvent &event) {
+
+  wxLogMessage("Calculating distance from Boat to Transponders...");
+
+  if (m_pRLDialog != NULL) {
+    for (unsigned int i = 0; i < transponderStatus.size(); i++) {
+      transponder_state* t = transponderStatus[i];
+      t->distance = haversineDistance(m_ownship_lat,m_ownship_lon,t->predicted_lat,t->predicted_lon);
+    }
+
+    // Refresh the list to show the updated distances
+    m_pRLDialog->RefreshTransponderList();
+  }
+}
 
 void ropeless_pi::ProcessReleaseTimerEvent(wxTimerEvent &event) {
   wxLogMessage("Relase Timer Expired!");
@@ -2170,6 +2198,7 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
   // bSizer2->Fit( this );
 
   this->Centre(wxBOTH);
+
 }
 
 RopelessDialog::~RopelessDialog() {
@@ -2389,6 +2418,15 @@ void RopelessDialog::OnTargetListColumnClicked(wxListEvent &event) {
 }
 
 void RopelessDialog::RefreshTransponderList() {
+  
+  std::vector<long> selectedIndices;
+  long item = -1;
+  while ((item = m_pListCtrlTranponders->GetNextItem(item, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED)) != wxNOT_FOUND) {
+      selectedIndices.push_back(item);
+  }
+
+  m_pListCtrlTranponders->Freeze();
+
   m_pListCtrlTranponders->DeleteAllItems();
 
   //  Walk the vector of transponder status
@@ -2462,7 +2500,9 @@ void RopelessDialog::RefreshTransponderList() {
 
     // item.SetColumn(tlDISTANCE);
     wxString sdist;
-    sdist.Printf("%g", state->distance);
+    sdist = wxString::Format(wxT("%.*f"), 2, state->distance);
+    // wxString sdist;
+    // sdist.Printf("%g", state->distance);
     // item.SetText(sdist);
     // m_pListCtrlTranponders->SetItem(item);
     m_pListCtrlTranponders->SetItem(result, tlDISTANCE, sdist);
@@ -2491,6 +2531,15 @@ void RopelessDialog::RefreshTransponderList() {
   if (g_RopelessTargetList_sortColumn > 0)
     m_pListCtrlTranponders->SortItems(
         wxListCompareFunction, reinterpret_cast<wxIntPtr>(&transponderStatus));
+
+  // Step 3: Restore previously selected items, adjusting for any list changes
+  for (auto index : selectedIndices) {
+      if (index < m_pListCtrlTranponders->GetItemCount()) {
+          m_pListCtrlTranponders->SetItemState(index, wxLIST_STATE_SELECTED, wxLIST_STATE_SELECTED);
+      }
+  }
+  
+  m_pListCtrlTranponders->Thaw(); // Unfreeze to display updated list
 
 #ifdef __WXMSW__
   m_pListCtrlTranponders->Refresh(false);
