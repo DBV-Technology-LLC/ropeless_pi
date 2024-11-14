@@ -98,6 +98,11 @@
 
 //      Options
 #define HISTORY_FADE_SECS 10
+#define COLOR_TABLE_COUNT 5
+#define COLOR_INDEX_GOLDEN 4
+#define COLOR_INDEX_GREEN 0
+#define COLOR_INDEX_RED 1
+#define SET_RECOVERED_OPACITY
 
 enum {
   tlICON = 0,
@@ -116,8 +121,17 @@ enum {
   eRELEASE_TIMEOUT = 0,
   eRELEASE_SENDING = 1,
   eRELEASE_VERIFIED = 2,
-  eRELEASE_NOT_VERIFIED = 3
+  eRELEASE_NOT_VERIFIED = 3,
+  eRELEASE_NOT_FAILED = 4
 };
+
+enum {
+  eREC_DEPLOYED = 0,
+  eREC_RECOVERED = 1,
+  eREC_LOST = 2,
+};
+
+const wxString releaseStatusNames[] = {"TIMEOUT", "SENDING...", "VERIFIED", "NOT VERIFIED", "FAILED"};
 
 //----------------------------------------------------------------------------------------------------------
 //    Forward declarations
@@ -163,9 +177,9 @@ public:
     temp = 0;
     timeStamp = 0;
     batt_stat = 0;
-    opacity = 128;
-    recovered_state = 0;
+    recovered_state = eREC_DEPLOYED;
     distance = 0;
+    pings = 0;
   }
 
   ~transponder_state() {};
@@ -182,6 +196,7 @@ public:
   double depth;
   double temp;
   int batt_stat;
+  int pings;
   int opacity;
   int recovered_state;
   double distance;
@@ -279,7 +294,7 @@ public:
   transponderReleaseDlgImpl *m_releaseDlg = NULL;
 
   bool test;
-  
+
 private:
   bool LoadConfig(void);
   void ApplyConfig(void);

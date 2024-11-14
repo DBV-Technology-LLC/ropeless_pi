@@ -148,14 +148,7 @@ WX_DEFINE_OBJARRAY(ArrayOf2DPoints);
 wxString colorTableNames[] = {"LIME GREEN",  // looks darker green
                               "ORANGE",      // looks darker red
                               "MAGENTA", "CYAN", "YELLOW"};
-
-#define COLOR_TABLE_COUNT 5
-#define COLOR_INDEX_GOLDEN 4
-#define COLOR_INDEX_GREEN 0
-#define COLOR_INDEX_RED 1
-
-#define SET_RECOVERED_OPACITY
-                              
+                            
 wxString msgFileName = "/home/dsr/Projects/ropeless_pi/NMEArevC_06072023.txt";
 
 wxDateTime DaysTowDT(double days) {
@@ -813,6 +806,19 @@ void ropeless_pi::PopupMenuHandler(wxCommandEvent &event) {
     }
     case ID_TPR_RECOVER: {
       wxLogMessage("PopupMenuHandler: ID_TPR_RECOVER");
+
+      // Toggle Recovered / Not
+      transponder_state* this_transponder_state = GetStateByIdent(m_foundState->ident);
+
+      if (this_transponder_state->recovered_state == eREC_RECOVERED)
+      {
+        this_transponder_state->recovered_state = eREC_DEPLOYED;
+      }
+      else if (this_transponder_state->recovered_state == eREC_DEPLOYED)
+      {
+        this_transponder_state->recovered_state = eREC_RECOVERED;
+      }
+
       handled = true;
       break;
     }
@@ -1097,6 +1103,26 @@ void ropeless_pi::populateTransponderNode(pugi::xml_node &transponderNode,
   child = transponderNode.append_child("Lon");
   ss.Printf("%f", state->predicted_lon);
   child.append_child(pugi::node_pcdata).set_value(ss.c_str());
+
+  child = transponderNode.append_child("Range");
+  ss.Printf("%f", state->range);
+  child.append_child(pugi::node_pcdata).set_value(ss.c_str());
+
+  child = transponderNode.append_child("Pings");
+  ss.Printf("%d", state->pings);
+  child.append_child(pugi::node_pcdata).set_value(ss.c_str());
+
+  child = transponderNode.append_child("Depth");
+  ss.Printf("%f", state->depth);
+  child.append_child(pugi::node_pcdata).set_value(ss.c_str());
+
+  child = transponderNode.append_child("Temp");
+  ss.Printf("%f", state->temp);
+  child.append_child(pugi::node_pcdata).set_value(ss.c_str());
+
+  child = transponderNode.append_child("RecoveredStatus");
+  ss.Printf("%d", state->recovered_state);
+  child.append_child(pugi::node_pcdata).set_value(ss.c_str());
 }
 
 void ropeless_pi::SaveTransponderStatus() {
@@ -1117,7 +1143,7 @@ void ropeless_pi::SaveTransponderStatus() {
     pugi::xml_node transponderNode =
         transpondersNode.append_child("transponder");
     pugi::xml_attribute version = transponderNode.append_attribute("version");
-    version.set_value("1");
+    version.set_value("2");
 
     populateTransponderNode(transponderNode, state);
   }
@@ -1157,6 +1183,31 @@ bool ropeless_pi::parseTransponderNode(pugi::xml_node &transponderNode,
         double dval;
         val.ToDouble(&dval);
         state->predicted_lon = dval;
+      }
+      if (!strcmp(child.name(), "Range")) {
+        wxString val(child.first_child().value());
+        double dval;
+        val.ToDouble(&dval);
+        state->range = dval;
+      }
+      if (!strcmp(child.name(), "Pings")) {
+        state->pings = atoi(child.first_child().value());
+      }
+      if (!strcmp(child.name(), "Depth")) {
+        wxString val(child.first_child().value());
+        double dval;
+        val.ToDouble(&dval);
+        state->depth = dval;
+      }
+      if (!strcmp(child.name(), "Temp")) {
+        wxString val(child.first_child().value());
+        double dval;
+        val.ToDouble(&dval);
+        state->temp = dval;
+      }
+      if (!strcmp(child.name(), "RecoveredStatus")) {
+        state->recovered_state = atoi(child.first_child().value());
+        wxLogMessage("Parsed Recovered State: %d",state->recovered_state);
       }
     }
   }
@@ -1218,9 +1269,19 @@ void ropeless_pi::RenderTransponder(transponder_state *state) {
   wxPoint ab;
   wxString colorName = colorTableNames[state->color_index];
   wxColour rcolour = wxTheColourDatabase->Find(colorName);
+  int opacity;
+
+  if (state->recovered_state == eREC_DEPLOYED)
+  {
+    opacity = 255;
+  }
+  else if (state->recovered_state == eREC_RECOVERED)
+  {
+    opacity = 64;
+  }
 
 #ifdef SET_RECOVERED_OPACITY
-  rcolour.Set(rcolour.Red(), rcolour.Green(), rcolour.Blue(), state->opacity);
+  rcolour.Set(rcolour.Red(), rcolour.Green(), rcolour.Blue(), opacity);
 #endif
 
   if (!rcolour.IsOk()) rcolour = wxColour(255, 000, 255);
@@ -1258,7 +1319,9 @@ void ropeless_pi::RenderTransponder(transponder_state *state) {
     wxPoint x2(ab.x + circle_size * .707, ab.y + circle_size * .707);
     wxPoint x3(ab.x - circle_size * .707, ab.y + circle_size * .707);
     wxPoint x4(ab.x + circle_size * .707, ab.y - circle_size * .707);
-    wxPen xpen(*wxBLACK, 3);
+
+    wxColour pColour = wxColour(0, 0, 0, opacity);
+    wxPen xpen(pColour, 3);
     m_oDC->SetPen(xpen);
     m_oDC->DrawLine(x1.x, x1.y, x2.x, x2.y, true);
     m_oDC->DrawLine(x3.x, x3.y, x4.x, x4.y, true);
@@ -1278,6 +1341,8 @@ void ropeless_pi::RenderTrawlConnector(transponder_state *state1,
   wxPoint P1, P2;
   GetCanvasPixLL(g_vp, &P1, state1->predicted_lat, state1->predicted_lon);
   GetCanvasPixLL(g_vp, &P2, state2->predicted_lat, state2->predicted_lon);
+
+  // TODO: Check if both transponders are recovered. Set trawl connector opacity too
 
   wxColour rcolour = wxTheColourDatabase->Find(wxString("BLACK"));
   wxPen dpen(rcolour, 3);
@@ -1446,7 +1511,7 @@ void ropeless_pi::ProcessRFACapture(void) {
   this_transponder_state->bearing = m_NMEA0183.Rfa.TransponderBearing;
   this_transponder_state->depth = m_NMEA0183.Rfa.TransponderDepth;
   this_transponder_state->temp = m_NMEA0183.Rfa.TransponderTemp;
-  this_transponder_state->batt_stat = m_NMEA0183.Rfa.TransponderBattStat;
+  this_transponder_state->pings = m_NMEA0183.Rfa.TransponderBattStat;
 
   //  Capture ownship position/COG
   double ownship_lat = m_NMEA0183.Rfa.OwnshipPosition.Latitude.Latitude;
@@ -1492,7 +1557,7 @@ void ropeless_pi::placeTransponderManually(int xpdrId, int pairId, double lat,
   this_transponder_state->bearing = 0;
   this_transponder_state->depth = 0;
   this_transponder_state->temp = 0;
-  this_transponder_state->batt_stat = 0;
+  this_transponder_state->pings = 0;
 }
 
 // Check for transponder state in list. if does not exist add new one
@@ -1768,7 +1833,7 @@ bool ropeless_pi::MouseEventHook(wxMouseEvent &event) {
       // Transponder") );
 
       wxMenuItem *recovered_item = 0;
-      recovered_item = new wxMenuItem(contextMenu, ID_TPR_RECOVER, _("Report Recovered") );
+      recovered_item = new wxMenuItem(contextMenu, ID_TPR_RECOVER, _("Mark Recovered") );
 
       // wxMenuItem *release_item = 0;
       // release_item = new wxMenuItem(contextMenu, ID_TPR_LOST, _("Report
@@ -1789,10 +1854,18 @@ bool ropeless_pi::MouseEventHook(wxMouseEvent &event) {
 
       contextMenu->Append(id_item);
       contextMenu->Append(release_item);
-      contextMenu->Append(recovered_item);
+
+      if (m_foundState->ident > 0)
+      {
+        contextMenu->Append(recovered_item);
+      }
 
       GetOCPNCanvasWindow()->Connect(
           ID_TPR_RELEASE, wxEVT_COMMAND_MENU_SELECTED,
+          wxCommandEventHandler(ropeless_pi::PopupMenuHandler), NULL, this);
+
+      GetOCPNCanvasWindow()->Connect(
+          ID_TPR_RECOVER, wxEVT_COMMAND_MENU_SELECTED,
           wxCommandEventHandler(ropeless_pi::PopupMenuHandler), NULL, this);
 
       wxLogMessage("Creating popup!");
@@ -1808,6 +1881,11 @@ bool ropeless_pi::MouseEventHook(wxMouseEvent &event) {
       else if (recovered_item){
         // Tell Transceiver we've recovered! Set Transponder
         wxLogMessage("Setting %d as Recovered!",transponderFoundID);
+
+        GetOCPNCanvasWindow()->Disconnect(
+          ID_TPR_RELEASE, wxEVT_COMMAND_MENU_SELECTED,
+          wxCommandEventHandler(ropeless_pi::PopupMenuHandler), NULL, this);
+
       }
 
       bret = true;  // I have eaten this event
@@ -2262,7 +2340,7 @@ void RopelessDialog::OnTargetRightClick(wxListEvent &event) {
 
         wxMenuItem *recovered_item = 0;
         recovered_item = new wxMenuItem(contextMenu, ID_TPR_RECOVER, 
-                                      _("Report Recovered") );
+                                      _("Mark Recovered") );
 
         wxMenuItem *delete_item = 0;
         delete_item = new wxMenuItem(contextMenu, ID_TPR_DELETE, _("Delete"));
@@ -2492,7 +2570,7 @@ void RopelessDialog::RefreshTransponderList() {
 
     // item.SetColumn(tlPINGS);
     wxString sping;
-    sping.Printf("%d", state->batt_stat);
+    sping.Printf("%d", state->pings);
     // item.SetText(sping);
     // m_pListCtrlTranponders->SetItem(item);
     m_pListCtrlTranponders->SetItem(result, tlPINGS, sping);
