@@ -588,12 +588,18 @@ void ropeless_pi::OnContextMenuItemCallback(int id) {
     lognow.MakeGMT();
     wxString day = lognow.FormatISODate();
     wxString utc = lognow.FormatISOTime();
-    double utc_d = atof(day + utc);
+
+    time_t sec = lognow.GetTicks();
+    double ms = lognow.GetMillisecond();
+    double utc_d = static_cast <double>(sec) + (ms / 1000.0);
+
+    //wxLogMessage("Manual Placement Date: %f",utc_d);
 
     manualPlacementDlgImpl mPl(GetOCPNCanvasWindow(), wxID_ANY,
                                _("Place Transponder"), wxDefaultPosition,
                                wxSize(-1, -1), wxDEFAULT_DIALOG_STYLE, latStr,
-                               lonStr, utc);
+                               lonStr, day + " " + utc);
+
     int res = mPl.ShowModal();
 
     if (res == wxID_OK) {
@@ -615,12 +621,15 @@ void ropeless_pi::OnContextMenuItemCallback(int id) {
     lognow.MakeGMT();
     wxString day = lognow.FormatISODate();
     wxString utc = lognow.FormatISOTime();
-    double utc_d = atof(day + utc);
+
+    time_t sec = lognow.GetTicks();
+    double ms = lognow.GetMillisecond();
+    double utc_d = static_cast <double>(sec) + (ms / 1000.0);
 
     manualPlacementDlgImpl mPl(GetOCPNCanvasWindow(), wxID_ANY,
                                _("Place Transponder"), wxDefaultPosition,
                                wxSize(-1, -1), wxDEFAULT_DIALOG_STYLE, ownlatStr,
-                               ownlonStr, utc);
+                               ownlonStr, day + " " + utc);
     int res = mPl.ShowModal();
 
     if (res == wxID_OK) {
