@@ -16,11 +16,12 @@
 #include <wx/font.h>
 #include <wx/colour.h>
 #include <wx/settings.h>
-#include <wx/sizer.h>
-#include <wx/button.h>
 #include <wx/bitmap.h>
 #include <wx/image.h>
 #include <wx/icon.h>
+#include <wx/statbmp.h>
+#include <wx/sizer.h>
+#include <wx/button.h>
 #include <wx/dialog.h>
 
 ///////////////////////////////////////////////////////////////////////////
@@ -34,12 +35,20 @@ class transponderReleaseDlg : public wxDialog
 
 	protected:
 		wxStaticText* m_staticText2;
-		wxStaticText* m_staticText21;
+		wxStaticText* m_staticTextID;
+		wxStaticBitmap* m_bitmap1;
 		wxStaticText* m_staticText1;
-		wxStaticText* m_staticText11;
-		wxButton* m_button2;
-		wxButton* m_button1;
-		wxButton* m_button11;
+		wxStaticText* m_staticTextStatus;
+		wxButton* m_buttonRecovered;
+		wxButton* m_buttonRetry;
+		wxButton* m_buttonOk;
+
+		// Virtual event handlers, override them in your derived class
+		virtual void OnClose( wxCloseEvent& event ) { event.Skip(); }
+		virtual void markRecoveredClick( wxCommandEvent& event ) { event.Skip(); }
+		virtual void retryClick( wxCommandEvent& event ) { event.Skip(); }
+		virtual void okClick( wxCommandEvent& event ) { event.Skip(); }
+
 
 	public:
 

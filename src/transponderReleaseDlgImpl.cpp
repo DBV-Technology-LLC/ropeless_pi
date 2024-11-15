@@ -31,19 +31,69 @@
 #endif
 
 #include "transponderReleaseDlgImpl.h"
+#include "ropeless_pi.h"
 
-transponderReleaseDlgImpl::transponderReleaseDlgImpl(wxWindow* parent, int id, 
+transponderReleaseDlgImpl::transponderReleaseDlgImpl(wxWindow* parent, ropeless_pi* parent_pi, int id,
 	const wxString& title, const wxPoint& pos, const wxSize& size, long style) : transponderReleaseDlg(parent, id, title, pos, size, style)
 {
 
-	wxLogMessage("Creating transponderReleaseDlg!");
+	pParentPi = parent_pi;
 
+	//wxLogMessage("Creating transponderReleaseDlg!");
+	wxString test = "---";
+	updateStatus(test);
+
+	hideButtons();
 }
 
 void transponderReleaseDlgImpl::updateID(int id)
 {	
-	wxLogMessage("Setting Release ID String!");
 	wxString idStr;
 	idStr.Printf("%d",id);
-	m_staticText21->SetLabel(idStr);
+	m_staticTextID->SetLabel(idStr);
+}
+
+void transponderReleaseDlgImpl::updateStatus(wxString status)
+{	
+	m_staticTextStatus->SetLabel(status);
+}
+
+void transponderReleaseDlgImpl::showButtons(void)
+{
+	m_buttonRecovered->Show(true);
+	m_buttonRetry->Show(true);
+}
+
+void transponderReleaseDlgImpl::hideButtons(void)
+{
+	m_buttonRecovered->Show(false);
+	m_buttonRetry->Show(false);
+}
+
+void transponderReleaseDlgImpl::OnClose(wxCloseEvent& event) {
+    //Destroy(); // this breaks since it's deleted
+    this->Hide();	
+}
+
+void transponderReleaseDlgImpl::CloseDialog() {
+    wxCloseEvent closeEvent(wxEVT_CLOSE_WINDOW);
+    GetEventHandler()->ProcessEvent(closeEvent); // Trigger the close event
+}
+
+void transponderReleaseDlgImpl::markRecoveredClick(wxCommandEvent& event)
+{
+	wxLogMessage("Mark Recovered Clicked in Release Dialog");
+	pParentPi->releaseCallbackRecovered();
+}
+
+void transponderReleaseDlgImpl::retryClick(wxCommandEvent& event)
+{
+	wxLogMessage("Retry Clicked in Release Dialog");
+	pParentPi->releaseCallbackRetry();
+}
+
+void transponderReleaseDlgImpl::okClick(wxCommandEvent& event)
+{
+	wxLogMessage("Ok Recovered Clicked in Release Dialog");
+	CloseDialog();
 }

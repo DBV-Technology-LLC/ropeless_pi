@@ -31,14 +31,19 @@ transponderReleaseDlg::transponderReleaseDlg( wxWindow* parent, wxWindowID id, c
 
 	bSizer2->Add( m_staticText2, 0, wxALL, 10 );
 
-	m_staticText21 = new wxStaticText( this, wxID_ANY, _("ID"), wxDefaultPosition, wxSize( -1,-1 ), 0 );
-	m_staticText21->Wrap( -1 );
-	m_staticText21->SetFont( wxFont( 24, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, false, wxEmptyString ) );
+	m_staticTextID = new wxStaticText( this, wxID_ANY, _("ID"), wxDefaultPosition, wxSize( -1,-1 ), 0 );
+	m_staticTextID->Wrap( -1 );
+	m_staticTextID->SetFont( wxFont( 24, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, false, wxEmptyString ) );
 
-	bSizer2->Add( m_staticText21, 0, wxALL, 10 );
+	bSizer2->Add( m_staticTextID, 0, wxALL, 10 );
 
 
 	bSizer2->Add( 0, 0, 1, wxEXPAND, 5 );
+
+	m_bitmap1 = new wxStaticBitmap( this, wxID_ANY, wxNullBitmap, wxDefaultPosition, wxDefaultSize, 0 );
+	m_bitmap1->Hide();
+
+	bSizer2->Add( m_bitmap1, 0, wxALIGN_CENTER|wxALL|wxEXPAND, 5 );
 
 
 	bSizer1->Add( bSizer2, 1, wxEXPAND, 5 );
@@ -52,11 +57,12 @@ transponderReleaseDlg::transponderReleaseDlg( wxWindow* parent, wxWindowID id, c
 
 	bSizer3->Add( m_staticText1, 0, wxALL, 10 );
 
-	m_staticText11 = new wxStaticText( this, wxID_ANY, _("VALIDATED"), wxDefaultPosition, wxSize( -1,-1 ), 0 );
-	m_staticText11->Wrap( -1 );
-	m_staticText11->SetFont( wxFont( 24, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, false, wxEmptyString ) );
+	m_staticTextStatus = new wxStaticText( this, wxID_ANY, _("Connecting"), wxDefaultPosition, wxSize( -1,-1 ), 0 );
+	m_staticTextStatus->Wrap( -1 );
+	m_staticTextStatus->SetFont( wxFont( 24, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, false, wxEmptyString ) );
+	m_staticTextStatus->SetMinSize( wxSize( 220,-1 ) );
 
-	bSizer3->Add( m_staticText11, 0, wxALL, 10 );
+	bSizer3->Add( m_staticTextStatus, 0, wxALL, 10 );
 
 
 	bSizer1->Add( bSizer3, 1, wxEXPAND, 10 );
@@ -64,26 +70,26 @@ transponderReleaseDlg::transponderReleaseDlg( wxWindow* parent, wxWindowID id, c
 	wxBoxSizer* bSizer9;
 	bSizer9 = new wxBoxSizer( wxHORIZONTAL );
 
-	m_button2 = new wxButton( this, wxID_ANY, _("Mark Recovered"), wxDefaultPosition, wxDefaultSize, 0 );
-	m_button2->SetFont( wxFont( 18, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, false, wxEmptyString ) );
+	m_buttonRecovered = new wxButton( this, wxID_ANY, _("Mark Recovered"), wxDefaultPosition, wxDefaultSize, 0 );
+	m_buttonRecovered->SetFont( wxFont( 18, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, false, wxEmptyString ) );
 
-	bSizer9->Add( m_button2, 0, wxALIGN_BOTTOM|wxALL, 10 );
-
-
-	bSizer9->Add( 0, 0, 1, wxEXPAND, 10 );
-
-	m_button1 = new wxButton( this, wxID_ANY, _("Retry"), wxDefaultPosition, wxDefaultSize, 0 );
-	m_button1->SetFont( wxFont( 18, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, false, wxEmptyString ) );
-
-	bSizer9->Add( m_button1, 0, wxALIGN_BOTTOM|wxALL, 10 );
+	bSizer9->Add( m_buttonRecovered, 0, wxALIGN_BOTTOM|wxALL, 10 );
 
 
 	bSizer9->Add( 0, 0, 1, wxEXPAND, 10 );
 
-	m_button11 = new wxButton( this, wxID_ANY, _("OK"), wxDefaultPosition, wxDefaultSize, 0 );
-	m_button11->SetFont( wxFont( 18, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, false, wxEmptyString ) );
+	m_buttonRetry = new wxButton( this, wxID_ANY, _("Retry"), wxDefaultPosition, wxDefaultSize, 0 );
+	m_buttonRetry->SetFont( wxFont( 18, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, false, wxEmptyString ) );
 
-	bSizer9->Add( m_button11, 0, wxALIGN_BOTTOM|wxALL, 10 );
+	bSizer9->Add( m_buttonRetry, 0, wxALIGN_BOTTOM|wxALL, 10 );
+
+
+	bSizer9->Add( 0, 0, 1, wxEXPAND, 10 );
+
+	m_buttonOk = new wxButton( this, wxID_ANY, _("OK"), wxDefaultPosition, wxDefaultSize, 0 );
+	m_buttonOk->SetFont( wxFont( 18, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, false, wxEmptyString ) );
+
+	bSizer9->Add( m_buttonOk, 0, wxALIGN_BOTTOM|wxALL, 10 );
 
 
 	bSizer1->Add( bSizer9, 1, wxEXPAND, 0 );
@@ -94,8 +100,20 @@ transponderReleaseDlg::transponderReleaseDlg( wxWindow* parent, wxWindowID id, c
 	bSizer1->Fit( this );
 
 	this->Centre( wxBOTH );
+
+	// Connect Events
+	this->Connect( wxEVT_CLOSE_WINDOW, wxCloseEventHandler( transponderReleaseDlg::OnClose ) );
+	m_buttonRecovered->Connect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( transponderReleaseDlg::markRecoveredClick ), NULL, this );
+	m_buttonRetry->Connect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( transponderReleaseDlg::retryClick ), NULL, this );
+	m_buttonOk->Connect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( transponderReleaseDlg::okClick ), NULL, this );
 }
 
 transponderReleaseDlg::~transponderReleaseDlg()
 {
+	// Disconnect Events
+	this->Disconnect( wxEVT_CLOSE_WINDOW, wxCloseEventHandler( transponderReleaseDlg::OnClose ) );
+	m_buttonRecovered->Disconnect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( transponderReleaseDlg::markRecoveredClick ), NULL, this );
+	m_buttonRetry->Disconnect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( transponderReleaseDlg::retryClick ), NULL, this );
+	m_buttonOk->Disconnect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( transponderReleaseDlg::okClick ), NULL, this );
+
 }

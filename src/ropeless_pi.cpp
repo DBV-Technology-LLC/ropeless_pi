@@ -71,6 +71,7 @@
 #include <sstream>
 #include <iostream>
 #include <string.h>
+#include <functional>
 
 #if !defined(NAN)
 static const long long lNaN = 0xfff8000000000000;
@@ -725,6 +726,7 @@ void ropeless_pi::PopupMenuHandler(wxCommandEvent &event) {
 
       // If we own the transponder don't prompt for release code
       if (m_foundState->ident > 0) {
+
 #ifdef __ANDROID__
         wxFont *pFont = OCPNGetFont(_T("Dialog"), 0);
         okDialog.SetFont(*pFont);
@@ -733,10 +735,11 @@ void ropeless_pi::PopupMenuHandler(wxCommandEvent &event) {
         okDialog.Create(GetOCPNCanvasWindow(), msg, "Ropeless Plugin Message",
                         0, 0, 100000, wxDefaultPosition);
 
-        if (okDialog.ShowModal() == wxID_OK) {
-          result = 1;
-        }
-      } else {
+        if (okDialog.ShowModal() == wxID_OK) {result = 1;}
+       
+      } 
+      else {
+
 #ifdef __ANDROID__
         wxFont *pFont = OCPNGetFont(_T("Dialog"), 0);
         dialog.SetFont(*pFont);
@@ -747,8 +750,13 @@ void ropeless_pi::PopupMenuHandler(wxCommandEvent &event) {
                       wxDefaultPosition);
 
         if (dialog.ShowModal() == wxID_OK) result = dialog.GetValue();
+
+        result = -1;
       }
 
+      wxLogMessage("Sending Release Message...");
+
+      // TODO: Override non-owned traps via code. Verify on Transceiver
       if (result >= 0) SendReleaseMessage(m_foundState, result);
 
       handled = true;
@@ -786,15 +794,14 @@ void ropeless_pi::PopupMenuHandler(wxCommandEvent &event) {
         // Check if status for this transponder is in the status vector
         transponder_state *this_transponder_state = NULL;
         for (unsigned int i = 0; i < transponderStatus.size(); i++) {
-          if (transponderStatus[i]->ident ==
-              g_ropelessPI->m_foundState->ident) {
+          if (transponderStatus[i]->ident == g_ropelessPI->m_foundState->ident) {
             transponderStatus.erase(transponderStatus.begin() + i);
             wxLogMessage("Success!");
             break;
           }
         }
 
-        m_pRLDialog->RefreshTransponderList();
+        //m_pRLDialog->RefreshTransponderList();
       }
       handled = true;
       break;
@@ -950,42 +957,44 @@ bool ropeless_pi::SendReleaseMessage(transponder_state *state, long code) {
 
     stopReleaseTimer();
 
-    wxLogMessage("Failed to Send Release Request!");
   }
 
   return ret;
 }
 
 void ropeless_pi::startReleaseTimer(){
-  wxLogMessage("Starting Release Timer!");
 
-    if (NULL == m_releaseDlg) {
-
-      wxLogMessage("Creating new release dialog!");
+  if (NULL == m_releaseDlg) {
 
     m_releaseDlg = new transponderReleaseDlgImpl(
-        m_parent_window, -1, "Transponder Release Status", wxDefaultPosition,
+        m_parent_window, this, -1, "Transponder Release Status", wxDefaultPosition,
         wxDefaultSize, wxCAPTION | wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER);
 
     wxFont *pFont = OCPNGetFont(_T("Dialog"), 0);
     m_releaseDlg->SetFont(*pFont);
   }
-  else
-  {
-    wxLogMessage("Release Dialog not NULL!");
-  }
 
   m_releaseDlg->updateID(m_release_tim_state.ptstate->ident);
-
+  m_releaseDlg->updateStatus("Connecting...");
+  m_releaseDlg->hideButtons();
   m_releaseDlg->Show(true);
-  m_releaseDlg->Layout();  // Some platforms need a re-Layout at this point
-                          // (gtk, at least)
+  m_releaseDlg->Layout();
 
   m_releaseTimer.SetOwner(this, RELEASE_TIMER);
+  m_releaseTimer.Stop();
   m_releaseTimer.Start(5000, wxTIMER_CONTINUOUS);
 }
 
 void ropeless_pi::stopReleaseTimer() { m_releaseTimer.Stop(); }
+
+void ropeless_pi::updateReleaseTimer(int count)
+{
+  wxString statusStr;
+  statusStr.Printf("Sending... %2d",count);
+
+  m_releaseTimer.Stop();    
+  m_releaseTimer.Start(5000);
+}
 
 void ropeless_pi::startDistanceTimer() {
   m_distanceTimer.SetOwner(this, DISTANCE_TIMER);
@@ -995,8 +1004,6 @@ void ropeless_pi::startDistanceTimer() {
 void ropeless_pi::stopDistanceTimer() { m_distanceTimer.Stop(); }
 
 void ropeless_pi::ProcessDistanceTimerEvent(wxTimerEvent &event) {
-
-  //wxLogMessage("Calculating distance from Boat to Transponders...");
 
   if (m_pRLDialog != NULL) {
     for (unsigned int i = 0; i < transponderStatus.size(); i++) {
@@ -1019,11 +1026,8 @@ void ropeless_pi::ProcessReleaseTimerEvent(wxTimerEvent &event) {
   {
     //m_release_tim_state.ptstate->release_status = eRELEASE_TIMEOUT;
     wxLogMessage("Release Timer Expired for ID: %d",m_release_tim_state.ptstate->ident);
-    //wxLogMessage("Release Timeout!");
-  }
-  else
-  {
-    wxLogMessage("Release Timer Error Pointer NULL");
+    m_releaseDlg->updateStatus("Timeout");
+    m_releaseDlg->showButtons();
   }
 
   stopReleaseTimer();
@@ -1032,7 +1036,6 @@ void ropeless_pi::ProcessReleaseTimerEvent(wxTimerEvent &event) {
 }
 
 void ropeless_pi::startSim() {
-  wxLogMessage("Start Sim?");
 
   // Open the data file
   msgFile.Open(msgFileName);
@@ -1859,8 +1862,7 @@ bool ropeless_pi::MouseEventHook(wxMouseEvent &event) {
       id_item = new wxMenuItem(contextMenu, ID_TPR_ID, _(transponderIDString));
 
       wxMenuItem *release_item = 0;
-      release_item =
-          new wxMenuItem(contextMenu, ID_TPR_RELEASE, _("Release Transponder"));
+      release_item = new wxMenuItem(contextMenu, ID_TPR_RELEASE, _("Release Transponder"));
 
       // wxMenuItem *release_item = 0;
       // release_item = new wxMenuItem(contextMenu, ID_TPR_QUERY, _("Query
@@ -1871,7 +1873,6 @@ bool ropeless_pi::MouseEventHook(wxMouseEvent &event) {
       // Transponder") );
 
       wxMenuItem *recovered_item = 0;
-
       if (m_foundState->recovered_state == eREC_DEPLOYED)
       {
         recovered_item = new wxMenuItem(contextMenu, ID_TPR_RECOVER, _("Mark Recovered") );
@@ -1881,14 +1882,11 @@ bool ropeless_pi::MouseEventHook(wxMouseEvent &event) {
         recovered_item = new wxMenuItem(contextMenu, ID_TPR_RECOVER, _("Mark Deployed") );
       }
       
-
       // wxMenuItem *release_item = 0;
-      // release_item = new wxMenuItem(contextMenu, ID_TPR_LOST, _("Report
-      // Lost") );
+      // release_item = new wxMenuItem(contextMenu, ID_TPR_LOST, _("Report Lost") );
 
-      // wxMenuItem *delete_item = 0;
-      // delete_item = new wxMenuItem(contextMenu, ID_TPR_DELETE, _("Delete
-      // Transponder") );
+      wxMenuItem *delete_item = 0;
+      delete_item = new wxMenuItem(contextMenu, ID_TPR_DELETE, _("Delete Transponder") );
 
       // wxMenuItem *release_item = 0;
       // release_item = new wxMenuItem(contextMenu, ID_TPR_RELEASE, _("Info") );
@@ -1907,12 +1905,18 @@ bool ropeless_pi::MouseEventHook(wxMouseEvent &event) {
         contextMenu->Append(recovered_item);
       }
 
+      contextMenu->Append(delete_item);
+
       GetOCPNCanvasWindow()->Connect(
           ID_TPR_RELEASE, wxEVT_COMMAND_MENU_SELECTED,
           wxCommandEventHandler(ropeless_pi::PopupMenuHandler), NULL, this);
 
       GetOCPNCanvasWindow()->Connect(
           ID_TPR_RECOVER, wxEVT_COMMAND_MENU_SELECTED,
+          wxCommandEventHandler(ropeless_pi::PopupMenuHandler), NULL, this);
+
+      GetOCPNCanvasWindow()->Connect(
+          ID_TPR_DELETE, wxEVT_COMMAND_MENU_SELECTED,
           wxCommandEventHandler(ropeless_pi::PopupMenuHandler), NULL, this);
 
       wxLogMessage("Creating popup!");
@@ -1932,7 +1936,12 @@ bool ropeless_pi::MouseEventHook(wxMouseEvent &event) {
         GetOCPNCanvasWindow()->Disconnect(
           ID_TPR_RELEASE, wxEVT_COMMAND_MENU_SELECTED,
           wxCommandEventHandler(ropeless_pi::PopupMenuHandler), NULL, this);
-
+      }
+      else if (delete_item)
+      {
+        GetOCPNCanvasWindow()->Disconnect(
+            ID_TPR_DELETE, wxEVT_COMMAND_MENU_SELECTED,
+            wxCommandEventHandler(ropeless_pi::PopupMenuHandler), NULL, this);
       }
 
       bret = true;  // I have eaten this event
@@ -1996,6 +2005,18 @@ void ropeless_pi::ShowPreferencesDialog(wxWindow *parent) {
     }
     delete dialog;
 #endif
+}
+
+void ropeless_pi::releaseCallbackRecovered(void)
+{
+  wxLogMessage("Executing from roeless_pi RECOVERED");
+  m_release_tim_state.ptstate->recovered_state = eREC_RECOVERED;
+}
+
+void ropeless_pi::releaseCallbackRetry(void)
+{
+  wxLogMessage("Executing from roeless_pi RETRY");
+  SendReleaseMessage(m_release_tim_state.ptstate, 0);
 }
 
 // Event Handler implementation
@@ -2386,8 +2407,14 @@ void RopelessDialog::OnTargetRightClick(wxListEvent &event) {
                                       _("Release Transponder"));
 
         wxMenuItem *recovered_item = 0;
-        recovered_item = new wxMenuItem(contextMenu, ID_TPR_RECOVER, 
-                                      _("Mark Recovered") );
+        if (g_ropelessPI->m_foundState->recovered_state == eREC_DEPLOYED)
+        {
+          recovered_item = new wxMenuItem(contextMenu, ID_TPR_RECOVER, _("Mark Recovered") );
+        }
+        else if (g_ropelessPI->m_foundState->recovered_state == eREC_RECOVERED)
+        {
+          recovered_item = new wxMenuItem(contextMenu, ID_TPR_RECOVER, _("Mark Deployed") );
+        }
 
         wxMenuItem *delete_item = 0;
         delete_item = new wxMenuItem(contextMenu, ID_TPR_DELETE, _("Delete"));
@@ -2551,7 +2578,6 @@ void RopelessDialog::RefreshTransponderList() {
   }
 
   m_pListCtrlTranponders->Freeze();
-
   m_pListCtrlTranponders->DeleteAllItems();
 
   //  Walk the vector of transponder status
@@ -2689,18 +2715,18 @@ void RopelessDialog::RefreshTransponderList() {
     m_pListCtrlTranponders->SortItems(
         wxListCompareFunction, reinterpret_cast<wxIntPtr>(&transponderStatus));
 
-  // Step 3: Restore previously selected items, adjusting for any list changes
   for (auto index : selectedIndices) {
       if (index < m_pListCtrlTranponders->GetItemCount()) {
           m_pListCtrlTranponders->SetItemState(index, wxLIST_STATE_SELECTED, wxLIST_STATE_SELECTED);
       }
   }
   
-  m_pListCtrlTranponders->Thaw(); // Unfreeze to display updated list
+  m_pListCtrlTranponders->Thaw();
 
 #ifdef __WXMSW__
   m_pListCtrlTranponders->Refresh(false);
 #endif
+
 }
 
 void RopelessDialog::OnChooseFileButton(wxCommandEvent &event) {

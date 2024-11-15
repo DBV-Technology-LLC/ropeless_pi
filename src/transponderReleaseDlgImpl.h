@@ -28,20 +28,32 @@
 
 #include "transponderReleaseDlg.h"
 
+class ropeless_pi; // it exists
+
 class transponderReleaseDlgImpl : public transponderReleaseDlg {
     private:
-
     public:
 
-        transponderReleaseDlgImpl( wxWindow* parent, wxWindowID id = wxID_ANY, const wxString& title = _("Place Transponder"), const wxPoint& pos = wxDefaultPosition, 
+        transponderReleaseDlgImpl( wxWindow* parent, ropeless_pi* parent_pi, wxWindowID id = wxID_ANY, const wxString& title = _("Place Transponder"), const wxPoint& pos = wxDefaultPosition, 
             const wxSize& size = wxSize( -1,-1 ), long style = wxDEFAULT_DIALOG_STYLE);
 
         ~transponderReleaseDlgImpl() = default;
         
+        ropeless_pi *pParentPi;
+
         void updateID(int id);
-        
+        void updateStatus(wxString status);
+        void showButtons(void);
+        void hideButtons(void);
+
+        void CloseDialog(void);
+
     protected:
 
+        virtual void OnClose( wxCloseEvent& event );
+        virtual void markRecoveredClick( wxCommandEvent& event );
+        virtual void retryClick( wxCommandEvent& event );
+        virtual void okClick( wxCommandEvent& event );
 };
 
 #endif // _TRANSPONDERRELEASEIMPL_H

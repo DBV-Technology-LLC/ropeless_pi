@@ -286,6 +286,7 @@ public:
 
   void startReleaseTimer();
   void stopReleaseTimer();
+  void updateReleaseTimer(int count);
 
   void startDistanceTimer();
   void stopDistanceTimer();
@@ -312,7 +313,9 @@ public:
 
   release_timer_state m_release_tim_state;
 
-  bool test;
+  void releaseCallbackRecovered(void);
+  void releaseCallbackRetry(void);
+  void releaseCallbackExit(void);
 
 private:
   bool LoadConfig(void);
