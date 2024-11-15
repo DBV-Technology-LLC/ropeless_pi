@@ -122,7 +122,9 @@ enum {
   eRELEASE_SENDING = 1,
   eRELEASE_VERIFIED = 2,
   eRELEASE_NOT_VERIFIED = 3,
-  eRELEASE_NOT_FAILED = 4
+  eRELEASE_FAILED = 4,
+  eRELEASE_NOT_INIT = 5,
+  eRELEASE_NETWORK_ERR = 6
 };
 
 enum {
@@ -131,7 +133,7 @@ enum {
   eREC_LOST = 2,
 };
 
-const wxString releaseStatusNames[] = {"TIMEOUT", "SENDING...", "VERIFIED", "NOT VERIFIED", "FAILED"};
+const wxString releaseStatusNames[] = {"TIMEOUT", "SENDING...", "VERIFIED", "NOT VERIFIED", "FAILED", "---", "NETWORK ERROR"};
 
 //----------------------------------------------------------------------------------------------------------
 //    Forward declarations
@@ -201,6 +203,21 @@ public:
   int recovered_state;
   double distance;
   std::deque<transponder_state_history *> historyQ;
+};
+
+class release_timer_state{
+public:
+
+  release_timer_state() {
+    timer_state = 0;
+    ptstate = NULL;
+  }
+
+  ~release_timer_state() {};
+
+  int timer_state;
+  transponder_state* ptstate;
+
 };
 
 //----------------------------------------------------------------------------------------------------------
@@ -292,6 +309,8 @@ public:
   wxTimer m_distanceTimer;
 
   transponderReleaseDlgImpl *m_releaseDlg = NULL;
+
+  release_timer_state m_release_tim_state;
 
   bool test;
 

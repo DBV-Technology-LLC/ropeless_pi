@@ -39,3 +39,11 @@ transponderReleaseDlgImpl::transponderReleaseDlgImpl(wxWindow* parent, int id,
 	wxLogMessage("Creating transponderReleaseDlg!");
 
 }
+
+void transponderReleaseDlgImpl::updateID(int id)
+{	
+	wxLogMessage("Setting Release ID String!");
+	wxString idStr;
+	idStr.Printf("%d",id);
+	m_staticText21->SetLabel(idStr);
+}

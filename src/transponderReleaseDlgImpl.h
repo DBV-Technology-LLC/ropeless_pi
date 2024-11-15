@@ -38,6 +38,8 @@ class transponderReleaseDlgImpl : public transponderReleaseDlg {
 
         ~transponderReleaseDlgImpl() = default;
         
+        void updateID(int id);
+        
     protected:
 
 };
