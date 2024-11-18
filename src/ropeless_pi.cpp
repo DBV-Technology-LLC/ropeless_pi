@@ -294,6 +294,7 @@ static int wxCALLBACK wxListCompareFunction(wxIntPtr item1, wxIntPtr item2,
     case tlPINGS:
     case tlDEPTH:
     case tlTEMP:
+    case tlBATT_STAT:
     default:
       return 0;
   }
@@ -807,23 +808,25 @@ void ropeless_pi::PopupMenuHandler(wxCommandEvent &event) {
       break;
     }
     case ID_TPR_PLACE: {
-      wxLogMessage("PopupMenuHandler: ID_TPR_PLACE");
+      //wxLogMessage("PopupMenuHandler: ID_TPR_PLACE");
       handled = true;
       break;
     }
     case ID_TPR_RECOVER: {
-      wxLogMessage("PopupMenuHandler: ID_TPR_RECOVER");
+      //wxLogMessage("PopupMenuHandler: ID_TPR_RECOVER");
 
-      // Toggle Recovered / Not
       transponder_state* this_transponder_state = GetStateByIdent(m_foundState->ident);
 
-      if (this_transponder_state->recovered_state == eREC_RECOVERED)
-      {
-        this_transponder_state->recovered_state = eREC_DEPLOYED;
-      }
-      else if (this_transponder_state->recovered_state == eREC_DEPLOYED)
-      {
-        this_transponder_state->recovered_state = eREC_RECOVERED;
+      if (this_transponder_state != NULL) 
+      {     
+        if (this_transponder_state->recovered_state == eREC_RECOVERED)
+        {
+          this_transponder_state->recovered_state = eREC_DEPLOYED;
+        }
+        else if (this_transponder_state->recovered_state == eREC_DEPLOYED)
+        {
+          this_transponder_state->recovered_state = eREC_RECOVERED;
+        }
       }
 
       handled = true;
@@ -1551,7 +1554,7 @@ void ropeless_pi::ProcessRFACapture(void) {
   this_transponder_state->bearing = m_NMEA0183.Rfa.TransponderBearing;
   this_transponder_state->depth = m_NMEA0183.Rfa.TransponderDepth;
   this_transponder_state->temp = m_NMEA0183.Rfa.TransponderTemp;
-  this_transponder_state->pings = m_NMEA0183.Rfa.TransponderBattStat;
+  this_transponder_state->batt_stat = m_NMEA0183.Rfa.TransponderBattStat;
 
   //  Capture ownship position/COG
   double ownship_lat = m_NMEA0183.Rfa.OwnshipPosition.Latitude.Latitude;
@@ -1599,6 +1602,8 @@ void ropeless_pi::placeTransponderManually(int xpdrId, int pairId, double lat,
   this_transponder_state->depth = 0;
   this_transponder_state->temp = 0;
   this_transponder_state->pings = 0;
+  this_transponder_state->batt_stat = 0;
+
 }
 
 // Check for transponder state in list. if does not exist add new one
@@ -2248,6 +2253,10 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
   m_pListCtrlTranponders->InsertColumn(tlTEMP, _("Temperature, C"),
                                        wxLIST_FORMAT_CENTER, txs.x + dx * 2);
 
+  txs = GetTextExtent("Battery %");
+  m_pListCtrlTranponders->InsertColumn(tlBATT_STAT, _("Battery %"),
+                                       wxLIST_FORMAT_CENTER, txs.x + dx * 2);
+
   txs = GetTextExtent("Recovered Status");
   m_pListCtrlTranponders->InsertColumn(tlRECOVERED, _("Recovered Status"),
                                        wxLIST_FORMAT_CENTER, txs.x + dx * 2);
@@ -2708,6 +2717,15 @@ void RopelessDialog::RefreshTransponderList() {
     // m_pListCtrlTranponders->SetItem(item);
     m_pListCtrlTranponders->SetItem(result, tlRANGE, srng);
     m_pListCtrlTranponders->SetColumnWidth(tlRANGE,
+                                           wxLIST_AUTOSIZE_USEHEADER);
+
+    // item.SetColumn(tlBATT_STAT);
+    wxString sbatt;
+    sbatt.Printf("%d", state->batt_stat);
+    // item.SetText(sdist);
+    // m_pListCtrlTranponders->SetItem(item);
+    m_pListCtrlTranponders->SetItem(result, tlBATT_STAT, sbatt);
+    m_pListCtrlTranponders->SetColumnWidth(tlBATT_STAT,
                                            wxLIST_AUTOSIZE_USEHEADER);
   }
 

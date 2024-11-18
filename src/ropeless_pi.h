@@ -114,6 +114,7 @@ enum {
   tlPINGS,
   tlDEPTH,
   tlTEMP,
+  tlBATT_STAT,
   tlRECOVERED
 };  // Transponder list Columns;
 
