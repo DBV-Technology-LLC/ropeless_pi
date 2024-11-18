@@ -888,6 +888,12 @@ unsigned char ropeless_pi::ComputeChecksum(wxString msg) {
 bool ropeless_pi::SendReleaseMessage(transponder_state *state, long code) {
   bool ret = true;
 
+  // Don't send a release if we're actively tracking a current request
+  if (m_release_tim_state.timer_state == 1) {
+    wxLogMessage("Release in progress! Can't send release yet...");
+    return false;
+  }
+
   wxString payload("$RSRLB,");
   wxString pl1;
 
@@ -942,15 +948,8 @@ bool ropeless_pi::SendReleaseMessage(transponder_state *state, long code) {
     ws.Printf("Release Request Sent: %s", payload);
     wxLogMessage(ws);
 
-    // Check for possiblity it was a manual release...
-    if (state->ident_partner != 0)
-    {
-      m_release_tim_state.timer_state = 1;
-      m_release_tim_state.ptstate = state;
-
-      // Successfully sent the message!
-      startReleaseTimer();
-    }
+    // Successfully sent the message!
+    startReleaseTimer(state);
   } 
   else
   {
@@ -959,13 +958,12 @@ bool ropeless_pi::SendReleaseMessage(transponder_state *state, long code) {
     state->release_status = eRELEASE_NETWORK_ERR;
 
     stopReleaseTimer();
-
   }
 
   return ret;
 }
 
-void ropeless_pi::startReleaseTimer(){
+void ropeless_pi::startReleaseTimer(transponder_state* state){
 
   if (NULL == m_releaseDlg) {
 
@@ -976,6 +974,9 @@ void ropeless_pi::startReleaseTimer(){
     wxFont *pFont = OCPNGetFont(_T("Dialog"), 0);
     m_releaseDlg->SetFont(*pFont);
   }
+
+  m_release_tim_state.timer_state = 1;
+  m_release_tim_state.ptstate = state;
 
   m_releaseDlg->updateID(m_release_tim_state.ptstate->ident);
   m_releaseDlg->updateStatus("Connecting...");
@@ -990,13 +991,63 @@ void ropeless_pi::startReleaseTimer(){
 
 void ropeless_pi::stopReleaseTimer() { m_releaseTimer.Stop(); }
 
-void ropeless_pi::updateReleaseTimer(int count)
+void ropeless_pi::updateReleaseTimer(transponder_state * state)
 {
-  wxString statusStr;
-  statusStr.Printf("Sending... %2d",count);
+  // We got an RLA message from the NMEA input
+  // - are we currently displaying release state?
+  // - does this match the currently tracked transponder?
+  m_releaseTimer.Stop();
 
-  m_releaseTimer.Stop();    
-  m_releaseTimer.Start(5000);
+  if (m_release_tim_state.timer_state == 0 || m_release_tim_state.ptstate == NULL) return;
+
+  transponder_state* timer_state = m_release_tim_state.ptstate;
+
+  if (state->ident != timer_state->ident) return;
+
+  // Nice we're tracking this transponders release 
+  int rlsNum;
+  wxString appendStr = "";
+  wxString rid;
+  if (state->release_status == -4)
+  {
+    rlsNum = eRELEASE_NETWORK_ERR;
+  }
+  if (state->release_status == -3)
+  {
+    rlsNum = eRELEASE_TIMEOUT;
+  }
+  else if (state->release_status == -2)
+  {
+    rlsNum = eRELEASE_NOT_INIT;
+  }
+  else if (state->release_status == -1)
+  {
+    rlsNum = eRELEASE_NOT_VERIFIED;
+  }
+  else if (state->release_status == 0)
+  {
+    rlsNum = eRELEASE_VERIFIED;
+  }
+  else if (state->release_status > 0)
+  {
+    rlsNum = eRELEASE_SENDING;
+    appendStr.Printf("%d",state->release_status);
+    m_releaseTimer.Start(5000);
+  }
+  else
+  {
+    state->release_status = -3;
+    rlsNum = eRELEASE_NOT_INIT;
+  }
+
+  rid.Printf("%s%s", releaseStatusNames[rlsNum],appendStr);
+  m_releaseDlg->updateStatus(rid);
+
+  if (state->release_status <= 0)
+  {
+    m_release_tim_state.timer_state = 0;
+    m_releaseDlg->showButtons();
+  }
 }
 
 void ropeless_pi::startDistanceTimer() {
@@ -1689,6 +1740,9 @@ void ropeless_pi::ProcessRLACapture(void) {
   if (m_pRLDialog) {
     m_pRLDialog->RefreshTransponderList();
   }
+
+  updateReleaseTimer(this_transponder_state);
+
 }
 
 void ropeless_pi::SetNMEASentence(wxString &sentence) {
@@ -2637,8 +2691,8 @@ void RopelessDialog::RefreshTransponderList() {
     }
     else if (state->release_status > 0)
     {
-      rlsNum = eRELEASE_NOT_INIT;
-      appendStr.Printf("%d");
+      rlsNum = eRELEASE_SENDING;
+      appendStr.Printf("%d",state->release_status);
     }
     else
     {
@@ -2648,10 +2702,12 @@ void RopelessDialog::RefreshTransponderList() {
 
     rid.Printf("%s%s", releaseStatusNames[rlsNum],appendStr);
 
-    //wxLogMessage("Release Num: %d",rlsNum);
+    // wxListItem testItem;
+    // testItem.SetId(i);
+    // testItem.SetColumn(1);
+    // testItem.SetBackgroundColour(*wxGREEN);
+    // m_pListCtrlTranponders->SetItem(testItem);
 
-    // item.SetText(sid);
-    // m_pListCtrlTranponders->SetItem(item);
     m_pListCtrlTranponders->SetItem(result, tlRELEASE_STATUS, rid);
     m_pListCtrlTranponders->SetColumnWidth(tlRELEASE_STATUS,
                                            wxLIST_AUTOSIZE_USEHEADER);
@@ -2703,7 +2759,7 @@ void RopelessDialog::RefreshTransponderList() {
 
     // item.SetColumn(tlRECOVERED);
     wxString srec;
-    srec.Printf("%d", state->recovered_state);
+    srec.Printf("%s", recoveredStrList[state->recovered_state]);
     // item.SetText(sdist);
     // m_pListCtrlTranponders->SetItem(item);
     m_pListCtrlTranponders->SetItem(result, tlRECOVERED, srec);
@@ -2834,6 +2890,17 @@ void RopelessDialog::clearHighlighted() {
       state->color_index = COLOR_INDEX_RED;
     }
   }
+}
+
+long RopelessDialog::FindItemByName(wxListCtrl* listCtrl, const wxString& name) {
+  long itemIndex = -1;
+  while ((itemIndex = listCtrl->GetNextItem(itemIndex, wxLIST_NEXT_ALL, wxLIST_STATE_DONTCARE)) != wxNOT_FOUND) {
+      wxLogMessage("Item at index %ld: %s", itemIndex, listCtrl->GetItemText(itemIndex));;
+      if (listCtrl->GetItemText(itemIndex) == name) {
+          return itemIndex;
+      }
+  }
+  return wxNOT_FOUND; // Return -1 if the item is not found
 }
 
 void RopelessDialog::OnClose(wxCloseEvent &event) {

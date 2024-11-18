@@ -135,6 +135,7 @@ enum {
 };
 
 const wxString releaseStatusNames[] = {"TIMEOUT", "SENDING...", "VERIFIED", "NOT VERIFIED", "FAILED", "---", "NETWORK ERROR"};
+const wxString recoveredStrList[] = {"DEPLOYED","RECOVERED"};
 
 //----------------------------------------------------------------------------------------------------------
 //    Forward declarations
@@ -285,9 +286,9 @@ public:
   void startSim();
   void stopSim();
 
-  void startReleaseTimer();
+  void startReleaseTimer(transponder_state* state);
   void stopReleaseTimer();
-  void updateReleaseTimer(int count);
+  void ropeless_pi::updateReleaseTimer(transponder_state * state);
 
   void startDistanceTimer();
   void stopDistanceTimer();
@@ -515,6 +516,7 @@ public:
   wxArrayInt GetSelectedItems();
   transponder_state *getXpdrFromIndex(int index);
   void clearHighlighted();
+  long FindItemByName(wxListCtrl* listCtrl, const wxString& name);
 
   DECLARE_EVENT_TABLE()
 };
