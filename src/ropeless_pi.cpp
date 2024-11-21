@@ -654,26 +654,10 @@ void ropeless_pi::OnContextMenuItemCallback(int id) {
   // startSim();
 }
 
-// void deleteTransponder(void)
-// {
-//     // Check if status for this transponder is in the status vector
-//   transponder_state *this_transponder_state = NULL;
-//   for (unsigned int i = 0 ; i < transponderStatus.size() ; i++){
-//     if (transponderStatus[i]->ident == transponderIdent){
-//       this_transponder_state = transponderStatus[i];
-//       break;
-//     }
-//   }
-
-//   RefreshTransponderList();
-
-// }
-
 // Called from wxMenu AND OnTargetRightClick
 void ropeless_pi::PopupMenuHandler(wxCommandEvent &event) {
   bool handled = false;
   switch (event.GetId()) {
-      // wxLogMessage("PopupMenuHandler!");
 
     case ID_PLAY_SIM: {
       startSim();
@@ -725,7 +709,6 @@ void ropeless_pi::PopupMenuHandler(wxCommandEvent &event) {
       myNumberEntryDialog dialog;
       myOkDialog okDialog;
 
-      // If we own the transponder don't prompt for release code
       if (m_foundState->ident > 0) {
 
 #ifdef __ANDROID__
@@ -755,10 +738,7 @@ void ropeless_pi::PopupMenuHandler(wxCommandEvent &event) {
         result = -1;
       }
 
-      wxLogMessage("Sending Release Message...");
-
-      // TODO: Override non-owned traps via code. Verify on Transceiver
-      if (result >= 0) SendReleaseMessage(m_foundState, result);
+      if (result >= 0) SendReleaseMessage(m_foundState, eCMD_RELEASE);
 
       handled = true;
       break;
@@ -784,23 +764,8 @@ void ropeless_pi::PopupMenuHandler(wxCommandEvent &event) {
       wxLogMessage("Deleting Transponder!");
 
       if (dialog2.ShowModal() == wxID_OK) {
-        result = 1;
-      }
 
-      if (result == 1) {
-        // SendReleaseMessage(g_ropelessPI->m_foundState, result);
-        // Delete transponder!
-        // deleteTransponder();
-
-        // Check if status for this transponder is in the status vector
-        transponder_state *this_transponder_state = NULL;
-        for (unsigned int i = 0; i < transponderStatus.size(); i++) {
-          if (transponderStatus[i]->ident == g_ropelessPI->m_foundState->ident) {
-            transponderStatus.erase(transponderStatus.begin() + i);
-            wxLogMessage("Success!");
-            break;
-          }
-        }
+        DeleteTransponder(g_ropelessPI->m_foundState->ident);
 
         //m_pRLDialog->RefreshTransponderList();
       }
@@ -808,26 +773,12 @@ void ropeless_pi::PopupMenuHandler(wxCommandEvent &event) {
       break;
     }
     case ID_TPR_PLACE: {
-      //wxLogMessage("PopupMenuHandler: ID_TPR_PLACE");
       handled = true;
       break;
     }
     case ID_TPR_RECOVER: {
-      //wxLogMessage("PopupMenuHandler: ID_TPR_RECOVER");
 
-      transponder_state* this_transponder_state = GetStateByIdent(m_foundState->ident);
-
-      if (this_transponder_state != NULL) 
-      {     
-        if (this_transponder_state->recovered_state == eREC_RECOVERED)
-        {
-          this_transponder_state->recovered_state = eREC_DEPLOYED;
-        }
-        else if (this_transponder_state->recovered_state == eREC_DEPLOYED)
-        {
-          this_transponder_state->recovered_state = eREC_RECOVERED;
-        }
-      }
+      toggleTransponderRecovered(m_foundState->ident);
 
       handled = true;
       break;
@@ -889,8 +840,14 @@ bool ropeless_pi::SendReleaseMessage(transponder_state *state, long code) {
   bool ret = true;
 
   // Don't send a release if we're actively tracking a current request
-  if (m_release_tim_state.timer_state == 1) {
+  if (m_release_tim_state.timer_state == 1 && code == eCMD_RELEASE) {
     wxLogMessage("Release in progress! Can't send release yet...");
+    return false;
+  }
+
+  if (state == NULL) 
+  {
+    wxLogMessage("Error: SendReleaseMessage state = NULL");
     return false;
   }
 
@@ -905,7 +862,7 @@ bool ropeless_pi::SendReleaseMessage(transponder_state *state, long code) {
   payload += pl1;
 
   if (!m_tsock) {
-    m_tconn_addr.Service(59647);
+    m_tconn_addr.Service(UDP_PORT);
     m_tconn_addr.BroadcastAddress();
 
     wxString a = m_tconn_addr.IPAddress();
@@ -914,7 +871,7 @@ bool ropeless_pi::SendReleaseMessage(transponder_state *state, long code) {
                           wxSOCKET_REUSEADDR);
 
     if (m_tsock == NULL) {
-      wxLogMessage("Release UDP Socket returned NULL!");
+      wxLogMessage("Error: Release UDP Socket returned NULL!");
       return false;
     }
 
@@ -927,15 +884,20 @@ bool ropeless_pi::SendReleaseMessage(transponder_state *state, long code) {
   udp_socket = dynamic_cast<wxDatagramSocket *>(m_tsock);
 
   if (udp_socket && udp_socket->IsOk()) {
-    // wxLogMessage("Socket ok... trying to send");
     udp_socket->SendTo(m_tconn_addr, payload.mb_str(), payload.size());
 
     if (udp_socket->Error()) {
       wxString emsg;
       wxSocketError err = udp_socket->LastError();
-      emsg.Printf("Error Sending on UDP Socket: %d", err);
+      emsg.Printf("Error: Sending on UDP Socket: %d", err);
       wxLogMessage(emsg);
       ret = false;
+    }
+    else
+    {
+      wxString ws;
+      ws.Printf("Cmd Sent: %s", payload);
+      wxLogMessage(ws);
     }
   } 
   else
@@ -943,21 +905,18 @@ bool ropeless_pi::SendReleaseMessage(transponder_state *state, long code) {
     ret = false;
   }
 
-  if (ret != false) {
-    wxString ws;
-    ws.Printf("Release Request Sent: %s", payload);
-    wxLogMessage(ws);
-
-    // Successfully sent the message!
-    startReleaseTimer(state);
-  } 
-  else
+  if (code == eCMD_RELEASE)
   {
-    m_release_tim_state.timer_state = 0;
-    m_release_tim_state.ptstate = state;
-    state->release_status = eRELEASE_NETWORK_ERR;
+    if (ret != false) {
+      startReleaseTimer(state);
+    } 
+    else{
+      m_release_tim_state.timer_state = 0;
+      m_release_tim_state.ptstate = state;
+      state->release_status = eRELEASE_NETWORK_ERR;
 
-    stopReleaseTimer();
+      stopReleaseTimer();
+    }
   }
 
   return ret;
@@ -1418,12 +1377,11 @@ void ropeless_pi::RenderTransponder(transponder_state *state) {
     m_oDC->DrawLine(x3.x, x3.y, x4.x, x4.y, true);
   }
 
-  // // TODO: Display name
-  // wxString idStr = "TEST";
-  // wxFont font(24, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL,
-  // wxFONTWEIGHT_BOLD); m_oDC->SetFont(font);
-  // m_oDC->SetTextForeground(*wxBLACK);
-  // m_oDC->DrawText(idStr,ab.x,ab.y-50);
+  // TODO: Display name -- Currently does not work. No text is rendered
+  // wxFont font(48, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD);
+  // m_oDC->SetFont(font);
+  // m_oDC->SetTextForeground(*wxRED);
+  // m_oDC->DrawText(wxT("Hello OpenCPN!"), ab.x, ab.y);  
   // wxLogMessage("Drawing Text!");
 }
 
@@ -1452,6 +1410,30 @@ transponder_state *ropeless_pi::GetStateByIdent(int identTarget) {
   }
 
   return rv;
+}
+
+bool ropeless_pi::DeleteTransponder(int id)
+{
+  // Check if status for this transponder is in the status vector
+  transponder_state *this_transponder_state = NULL;
+  for (unsigned int i = 0; i < transponderStatus.size(); i++) {
+    if (transponderStatus[i]->ident == id) {
+
+      SendReleaseMessage(GetStateByIdent(id),eCMD_DELETE);
+
+      transponderStatus.erase(transponderStatus.begin() + i);
+
+      return true;
+    }
+  }
+
+  return false;
+}
+
+void ropeless_pi::SendSyncMessage(void)
+{
+  transponder_state empty = {};
+  SendReleaseMessage(&empty,eCMD_SYNC);
 }
 
 void ropeless_pi::RenderTrawls() {
@@ -2066,16 +2048,39 @@ void ropeless_pi::ShowPreferencesDialog(wxWindow *parent) {
 #endif
 }
 
+void ropeless_pi::toggleTransponderRecovered(int id)
+{
+
+  transponder_state* tstate = GetStateByIdent(id);
+
+  if (tstate != NULL) 
+  {     
+    if (tstate->recovered_state == eREC_RECOVERED)
+    {
+      tstate->recovered_state = eREC_DEPLOYED;
+    }
+    else if (tstate->recovered_state == eREC_DEPLOYED)
+    {
+      tstate->recovered_state = eREC_RECOVERED;
+      SendReleaseMessage(tstate, eCMD_RECOVER);
+    }
+  }
+  else
+  {
+    return;
+  }
+}
+
 void ropeless_pi::releaseCallbackRecovered(void)
 {
   wxLogMessage("Executing from roeless_pi RECOVERED");
-  m_release_tim_state.ptstate->recovered_state = eREC_RECOVERED;
+  toggleTransponderRecovered(m_release_tim_state.ptstate->ident);
 }
 
 void ropeless_pi::releaseCallbackRetry(void)
 {
   wxLogMessage("Executing from roeless_pi RETRY");
-  SendReleaseMessage(m_release_tim_state.ptstate, 0);
+  SendReleaseMessage(m_release_tim_state.ptstate, eCMD_RELEASE);
 }
 
 // Event Handler implementation
@@ -2385,6 +2390,17 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
   bsizersimButtons->Add(m_ManualReleaseButton, 0, wxALL, 5);
   m_ManualReleaseButton->Bind(wxEVT_COMMAND_BUTTON_CLICKED,
                               &RopelessDialog::OnManualReleaseButton, this);
+
+  m_SyncButton = new wxButton(this, wxID_ANY, _("Sync"),
+                                       wxDefaultPosition, wxDefaultSize, 0);
+  bsizersimButtons->Add(m_SyncButton, 0, wxALL, 5);
+  m_SyncButton->Bind(wxEVT_COMMAND_BUTTON_CLICKED,
+                              &RopelessDialog::OnSyncButton, this);
+
+  // TODO: Track network status
+  // m_NetworkStatusText = new wxStaticText( this, wxID_ANY, _("Network: Disconnected"), wxDefaultPosition, wxDefaultSize, 0 );
+  // m_NetworkStatusText->Wrap( -1 );
+  // bsizersimButtons->Add( m_NetworkStatusText, 0, wxALL, 5 );
 
   if (pParentPi->m_simulatorTimer.IsRunning()) {
     m_StartSimButton->Hide();
@@ -2867,9 +2883,14 @@ void RopelessDialog::OnManualReleaseButton(wxCommandEvent &event) {
     wxLogMessage(s1);
 
     tmpState.ident = result;
-    g_ropelessPI->SendReleaseMessage(&tmpState, 0);
+    g_ropelessPI->SendReleaseMessage(&tmpState, eCMD_RELEASE);
 
   }
+}
+
+void RopelessDialog::OnSyncButton(wxCommandEvent &event)
+{
+  g_ropelessPI->SendSyncMessage();
 }
 
 void RopelessDialog::clearHighlighted() {

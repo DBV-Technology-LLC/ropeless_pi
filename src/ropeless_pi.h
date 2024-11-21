@@ -69,6 +69,8 @@
 
 #define gps_watchdog_timeout_ticks 10
 
+#define UDP_PORT 59647
+
 //    Constants
 #ifndef PI
 #define PI 3.1415926535897931160E0 /* pi */
@@ -134,6 +136,14 @@ enum {
   eREC_LOST = 2,
 };
 
+enum {
+  eCMD_RELEASE = 0,
+  eCMD_RECOVER = 1,
+  eCMD_SYNC = 2,
+  eCMD_DELETE = 3,
+  eCMD_DEPLOYED = 4,
+};
+
 const wxString releaseStatusNames[] = {"TIMEOUT", "SENDING...", "VERIFIED", "NOT VERIFIED", "FAILED", "---", "NETWORK ERROR"};
 const wxString recoveredStrList[] = {"DEPLOYED","RECOVERED"};
 
@@ -175,6 +185,8 @@ class transponder_state {
 public:
   transponder_state() {
     release_status = -2;
+    ident = 0;
+    ident_partner = 0;
     range = 0;
     bearing = 0;
     depth = 0;
@@ -288,7 +300,8 @@ public:
 
   void startReleaseTimer(transponder_state* state);
   void stopReleaseTimer();
-  void ropeless_pi::updateReleaseTimer(transponder_state * state);
+  void updateReleaseTimer(transponder_state * state);
+  void toggleTransponderRecovered(int id);
 
   void startDistanceTimer();
   void stopDistanceTimer();
@@ -304,6 +317,7 @@ public:
 
   transponder_state *m_foundState;
   bool SendReleaseMessage(transponder_state *state, long code);
+  void SendSyncMessage(void);
 
   int m_place_trap_manually;
   int m_place_trap_now;
@@ -324,6 +338,8 @@ private:
   void ApplyConfig(void);
 
   transponder_state *GetStateByIdent(int identTarget);
+  bool DeleteTransponder(int id);
+
   void RenderTransponder(transponder_state *state);
   void RenderTrawls();
   void RenderTrawlConnector(transponder_state *state1,
@@ -488,7 +504,9 @@ public:
 
   wxTextCtrl *m_simTextCtrl;
   wxButton *m_ChooseFileButton, *m_StopSimButton, *m_StartSimButton,
-      *m_ManualReleaseButton;
+      *m_ManualReleaseButton, *m_SyncButton;
+
+  wxStaticText *m_NetworkStatusText;
 
   ropeless_pi *pParentPi;
   OCPNListCtrl *m_pListCtrlTranponders;
@@ -512,6 +530,7 @@ public:
   void OnTargetListDeselected(wxListEvent &event);
   void OnTargetListColumnClicked(wxListEvent &event);
   void OnTargetRightClick(wxListEvent &event);
+  void OnSyncButton(wxCommandEvent &event);
 
   wxArrayInt GetSelectedItems();
   transponder_state *getXpdrFromIndex(int index);
