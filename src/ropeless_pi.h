@@ -329,6 +329,8 @@ public:
 
   release_timer_state m_release_tim_state;
 
+  transponder_state manualReleaseState;
+  
   void releaseCallbackRecovered(void);
   void releaseCallbackRetry(void);
   void releaseCallbackExit(void);

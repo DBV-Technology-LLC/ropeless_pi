@@ -2858,7 +2858,6 @@ void RopelessDialog::OnStartSimButton(wxCommandEvent &event) {
 }
 
 void RopelessDialog::OnManualReleaseButton(wxCommandEvent &event) {
-  transponder_state tmpState;
 
   wxString msg("Manually Enter Transponder ID to Release: ");
 
@@ -2882,8 +2881,8 @@ void RopelessDialog::OnManualReleaseButton(wxCommandEvent &event) {
     s1.Printf("Manual Release Req for ID: %d", result);
     wxLogMessage(s1);
 
-    tmpState.ident = result;
-    g_ropelessPI->SendReleaseMessage(&tmpState, eCMD_RELEASE);
+    g_ropelessPI->manualReleaseState.ident = result;
+    g_ropelessPI->SendReleaseMessage(&g_ropelessPI->manualReleaseState, eCMD_RELEASE);
 
   }
 }
