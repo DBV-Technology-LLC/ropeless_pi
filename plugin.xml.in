@@ -14,7 +14,8 @@
 
   <description> @PKG_DESCRIPTION@ </description>
 
-  <target>@plugin_target@</target>
+  <!-- <target>@plugin_target@</target> -->
+  <target>ubuntu-wx32-x86_64</target>
   <target-version>@plugin_target_version@</target-version>
   <target-arch>@target_arch@</target-arch>
   <tarball-url> @pkg_tarball_url@ </tarball-url>

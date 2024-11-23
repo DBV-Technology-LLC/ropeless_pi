@@ -2451,8 +2451,9 @@ void RopelessDialog::OnTargetRightClick(wxListEvent &event) {
     mouseX = pt.x - m_pListCtrlTranponders->GetScreenPosition().x;
     mouseY = pt.y - m_pListCtrlTranponders->GetScreenPosition().y;
 
-    // Can't use this in windows. off by 1
-    // mouseY -= rect.height;
+#ifndef __WXMSW__
+    mouseY -= rect.height;
+#endif
 
     int flags;
     index = m_pListCtrlTranponders->HitTest(wxPoint(mouseX, mouseY), flags);
