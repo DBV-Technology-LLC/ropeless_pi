@@ -70,6 +70,7 @@
 #define gps_watchdog_timeout_ticks 10
 
 #define UDP_PORT 59647
+#define RELEASE_TIME_MS 15000
 
 //    Constants
 #ifndef PI

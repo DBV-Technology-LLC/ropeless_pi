@@ -39,7 +39,6 @@ transponderReleaseDlgImpl::transponderReleaseDlgImpl(wxWindow* parent, ropeless_
 
 	pParentPi = parent_pi;
 
-	//wxLogMessage("Creating transponderReleaseDlg!");
 	wxString test = "---";
 	updateStatus(test);
 
@@ -82,18 +81,16 @@ void transponderReleaseDlgImpl::CloseDialog() {
 
 void transponderReleaseDlgImpl::markRecoveredClick(wxCommandEvent& event)
 {
-	wxLogMessage("Mark Recovered Clicked in Release Dialog");
 	pParentPi->releaseCallbackRecovered();
+    this->Hide();	
 }
 
 void transponderReleaseDlgImpl::retryClick(wxCommandEvent& event)
 {
-	wxLogMessage("Retry Clicked in Release Dialog");
 	pParentPi->releaseCallbackRetry();
 }
 
 void transponderReleaseDlgImpl::okClick(wxCommandEvent& event)
 {
-	wxLogMessage("Ok Recovered Clicked in Release Dialog");
 	CloseDialog();
 }

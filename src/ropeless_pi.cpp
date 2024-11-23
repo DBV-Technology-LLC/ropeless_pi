@@ -516,7 +516,7 @@ void ropeless_pi::OnToolbarToolCallback(int id) {
   // if (!m_buseable) return;
   if (NULL == m_pRLDialog) {
     m_pRLDialog = new RopelessDialog(
-        m_parent_window, this, -1, "Ropeless Fishing", wxDefaultPosition,
+        m_parent_window, this, -1, "Ropeless Fishing v2.3.0.0", wxDefaultPosition,
         wxDefaultSize, wxCAPTION | wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER);
     wxFont *pFont = OCPNGetFont(_T("Dialog"), 0);
     m_pRLDialog->SetFont(*pFont);
@@ -945,7 +945,7 @@ void ropeless_pi::startReleaseTimer(transponder_state* state){
 
   m_releaseTimer.SetOwner(this, RELEASE_TIMER);
   m_releaseTimer.Stop();
-  m_releaseTimer.Start(5000, wxTIMER_CONTINUOUS);
+  m_releaseTimer.Start(RELEASE_TIME_MS, wxTIMER_CONTINUOUS);
 }
 
 void ropeless_pi::stopReleaseTimer() { m_releaseTimer.Stop(); }
@@ -991,7 +991,7 @@ void ropeless_pi::updateReleaseTimer(transponder_state * state)
   {
     rlsNum = eRELEASE_SENDING;
     appendStr.Printf("%d",state->release_status);
-    m_releaseTimer.Start(5000);
+    m_releaseTimer.Start(RELEASE_TIME_MS);
   }
   else
   {
@@ -2073,13 +2073,17 @@ void ropeless_pi::toggleTransponderRecovered(int id)
 
 void ropeless_pi::releaseCallbackRecovered(void)
 {
-  wxLogMessage("Executing from roeless_pi RECOVERED");
-  toggleTransponderRecovered(m_release_tim_state.ptstate->ident);
+  transponder_state* tstate = GetStateByIdent(m_release_tim_state.ptstate->ident);
+
+  if (tstate != NULL) 
+  {   
+    tstate->recovered_state = eREC_RECOVERED;
+    SendReleaseMessage(tstate, eCMD_RECOVER);
+  }
 }
 
 void ropeless_pi::releaseCallbackRetry(void)
 {
-  wxLogMessage("Executing from roeless_pi RETRY");
   SendReleaseMessage(m_release_tim_state.ptstate, eCMD_RELEASE);
 }
 
