@@ -70,7 +70,7 @@
 #define gps_watchdog_timeout_ticks 10
 
 #define UDP_PORT 59647
-#define RELEASE_TIME_MS 15000
+#define RELEASE_TIME_MS 3000
 
 //    Constants
 #ifndef PI
@@ -303,6 +303,7 @@ public:
   void stopReleaseTimer();
   void updateReleaseTimer(transponder_state * state);
   void toggleTransponderRecovered(int id);
+  void updateReleaseDialog(bool show);
 
   void startDistanceTimer();
   void stopDistanceTimer();

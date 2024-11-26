@@ -385,7 +385,9 @@ int ropeless_pi::Init(void) {
   SetOwner(this, TIMER_THIS_PI);
   Start(1000, wxTIMER_CONTINUOUS);
 
+#ifdef SHOW_DISTANCE
   startDistanceTimer();
+#endif
 
   m_event_handler = new PI_EventHandler(this);
   m_tsock = NULL;
@@ -485,7 +487,9 @@ bool ropeless_pi::DeInit(void) {
 
   SaveTransponderStatus();  // Create XML file
 
+#ifdef SHOW_DISTANCE
   stopDistanceTimer();
+#endif
 
   delete m_releaseDlg;
 
@@ -516,7 +520,7 @@ void ropeless_pi::OnToolbarToolCallback(int id) {
   // if (!m_buseable) return;
   if (NULL == m_pRLDialog) {
     m_pRLDialog = new RopelessDialog(
-        m_parent_window, this, -1, "Ropeless Fishing v2.3.0.0", wxDefaultPosition,
+        m_parent_window, this, -1, "Ropeless Fishing v2.3.0.1", wxDefaultPosition,
         wxDefaultSize, wxCAPTION | wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER);
     wxFont *pFont = OCPNGetFont(_T("Dialog"), 0);
     m_pRLDialog->SetFont(*pFont);
@@ -911,19 +915,23 @@ bool ropeless_pi::SendReleaseMessage(transponder_state *state, long code) {
       startReleaseTimer(state);
     } 
     else{
+      state->release_status = -4;
+
       m_release_tim_state.timer_state = 0;
       m_release_tim_state.ptstate = state;
-      state->release_status = eRELEASE_NETWORK_ERR;
 
-      stopReleaseTimer();
+      wxLogMessage("Release request failed!");
+
+      updateReleaseDialog(true);
+
     }
   }
 
   return ret;
 }
 
-void ropeless_pi::startReleaseTimer(transponder_state* state){
-
+void ropeless_pi::updateReleaseDialog(bool show)
+{
   if (NULL == m_releaseDlg) {
 
     m_releaseDlg = new transponderReleaseDlgImpl(
@@ -934,44 +942,17 @@ void ropeless_pi::startReleaseTimer(transponder_state* state){
     m_releaseDlg->SetFont(*pFont);
   }
 
-  m_release_tim_state.timer_state = 1;
-  m_release_tim_state.ptstate = state;
-
-  m_releaseDlg->updateID(m_release_tim_state.ptstate->ident);
-  m_releaseDlg->updateStatus("Connecting...");
-  m_releaseDlg->hideButtons();
-  m_releaseDlg->Show(true);
-  m_releaseDlg->Layout();
-
-  m_releaseTimer.SetOwner(this, RELEASE_TIMER);
-  m_releaseTimer.Stop();
-  m_releaseTimer.Start(RELEASE_TIME_MS, wxTIMER_CONTINUOUS);
-}
-
-void ropeless_pi::stopReleaseTimer() { m_releaseTimer.Stop(); }
-
-void ropeless_pi::updateReleaseTimer(transponder_state * state)
-{
-  // We got an RLA message from the NMEA input
-  // - are we currently displaying release state?
-  // - does this match the currently tracked transponder?
-  m_releaseTimer.Stop();
-
-  if (m_release_tim_state.timer_state == 0 || m_release_tim_state.ptstate == NULL) return;
-
-  transponder_state* timer_state = m_release_tim_state.ptstate;
-
-  if (state->ident != timer_state->ident) return;
-
-  // Nice we're tracking this transponders release 
   int rlsNum;
   wxString appendStr = "";
   wxString rid;
+
+  transponder_state* state = m_release_tim_state.ptstate;
+
   if (state->release_status == -4)
   {
     rlsNum = eRELEASE_NETWORK_ERR;
   }
-  if (state->release_status == -3)
+  else if (state->release_status == -3)
   {
     rlsNum = eRELEASE_TIMEOUT;
   }
@@ -1002,11 +983,50 @@ void ropeless_pi::updateReleaseTimer(transponder_state * state)
   rid.Printf("%s%s", releaseStatusNames[rlsNum],appendStr);
   m_releaseDlg->updateStatus(rid);
 
+  wxLogMessage("Updating Release Dialog with status: %d",state->release_status);
   if (state->release_status <= 0)
   {
     m_release_tim_state.timer_state = 0;
     m_releaseDlg->showButtons();
   }
+  else
+  {
+    m_releaseDlg->hideButtons();
+  }
+
+  m_releaseDlg->updateID(m_release_tim_state.ptstate->ident);
+  m_releaseDlg->Show(show);
+  m_releaseDlg->Layout();
+}
+
+void ropeless_pi::startReleaseTimer(transponder_state* state){
+
+  m_release_tim_state.timer_state = 1;
+  m_release_tim_state.ptstate = state;
+
+  updateReleaseDialog(true);
+
+  m_releaseTimer.SetOwner(this, RELEASE_TIMER);
+  m_releaseTimer.Stop();
+  m_releaseTimer.Start(RELEASE_TIME_MS, wxTIMER_CONTINUOUS);
+}
+
+void ropeless_pi::stopReleaseTimer() { m_releaseTimer.Stop(); }
+
+void ropeless_pi::updateReleaseTimer(transponder_state * state)
+{
+  // We got an RLA message from the NMEA input
+  // - are we currently displaying release state?
+  // - does this match the currently tracked transponder?
+  m_releaseTimer.Stop();
+
+  if (m_release_tim_state.timer_state == 0 || m_release_tim_state.ptstate == NULL) return;
+
+  transponder_state* timer_state = m_release_tim_state.ptstate;
+
+  if (state->ident != timer_state->ident) return;
+
+  updateReleaseDialog(false);
 }
 
 void ropeless_pi::startDistanceTimer() {
@@ -2300,9 +2320,11 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
   m_pListCtrlTranponders->InsertColumn(tlRANGE, _("Range, M"),
                                        wxLIST_FORMAT_CENTER, txs.x + dx * 2);
 
+#ifdef SHOW_DISTANCE
   txs = GetTextExtent("Distance, M");
   m_pListCtrlTranponders->InsertColumn(tlDISTANCE, _("Distance, M"),
                                        wxLIST_FORMAT_CENTER, txs.x + dx * 2);
+#endif
 
   txs = GetTextExtent("Pings");
   m_pListCtrlTranponders->InsertColumn(tlPINGS, _("Pings"),
@@ -2767,6 +2789,7 @@ void RopelessDialog::RefreshTransponderList() {
     m_pListCtrlTranponders->SetItem(result, tlPINGS, sping);
     m_pListCtrlTranponders->SetColumnWidth(tlPINGS, wxLIST_AUTOSIZE_USEHEADER);
 
+#ifdef SHOW_DISTANCE
     // item.SetColumn(tlDISTANCE);
     wxString sdist;
     sdist = wxString::Format(wxT("%.*f"), 2, state->distance);
@@ -2777,7 +2800,8 @@ void RopelessDialog::RefreshTransponderList() {
     m_pListCtrlTranponders->SetItem(result, tlDISTANCE, sdist);
     m_pListCtrlTranponders->SetColumnWidth(tlDISTANCE,
                                            wxLIST_AUTOSIZE_USEHEADER);
-
+#endif
+    
     // item.SetColumn(tlRECOVERED);
     wxString srec;
     srec.Printf("%s", recoveredStrList[state->recovered_state]);
