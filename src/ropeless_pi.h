@@ -70,7 +70,7 @@
 #define gps_watchdog_timeout_ticks 10
 
 #define UDP_PORT 59647
-#define RELEASE_TIME_MS 3000
+#define RELEASE_TIME_MS 5000
 
 //    Constants
 #ifndef PI
@@ -145,7 +145,7 @@ enum {
   eCMD_DEPLOYED = 4,
 };
 
-const wxString releaseStatusNames[] = {"TIMEOUT", "SENDING...", "VERIFIED", "NOT VERIFIED", "FAILED", "---", "NETWORK ERROR"};
+const wxString releaseStatusNames[] = {"TIMEOUT", "SENDING...", "VERIFIED", "NOT VERIFIED", "FAILED", "CONNECTING...", "NETWORK ERROR"};
 const wxString recoveredStrList[] = {"DEPLOYED","RECOVERED"};
 
 //----------------------------------------------------------------------------------------------------------

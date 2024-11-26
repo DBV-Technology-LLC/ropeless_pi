@@ -272,9 +272,12 @@ static int wxCALLBACK wxListCompareFunction(wxIntPtr item1, wxIntPtr item2,
   auto tS2 = (*v)[static_cast<size_t>(item2)];
 
   switch (g_RopelessTargetList_sortColumn) {
+
+#ifdef SHOW_DISTANCE
     case tlDISTANCE:
       return (CompareD(tS2->distance, tS1->distance));
       break;
+#endif
 
     case tlTIMESTAMP: {
       return (CompareD(tS2->timeStamp, tS1->timeStamp));
@@ -520,7 +523,7 @@ void ropeless_pi::OnToolbarToolCallback(int id) {
   // if (!m_buseable) return;
   if (NULL == m_pRLDialog) {
     m_pRLDialog = new RopelessDialog(
-        m_parent_window, this, -1, "Ropeless Fishing v2.3.0.1", wxDefaultPosition,
+        m_parent_window, this, -1, "Ropeless Fishing v2.3.0.2", wxDefaultPosition,
         wxDefaultSize, wxCAPTION | wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER);
     wxFont *pFont = OCPNGetFont(_T("Dialog"), 0);
     m_pRLDialog->SetFont(*pFont);
@@ -912,16 +915,15 @@ bool ropeless_pi::SendReleaseMessage(transponder_state *state, long code) {
   if (code == eCMD_RELEASE)
   {
     if (ret != false) {
+      state->release_status = -2;
       startReleaseTimer(state);
     } 
     else{
       state->release_status = -4;
-
       m_release_tim_state.timer_state = 0;
       m_release_tim_state.ptstate = state;
 
       wxLogMessage("Release request failed!");
-
       updateReleaseDialog(true);
 
     }
@@ -983,8 +985,7 @@ void ropeless_pi::updateReleaseDialog(bool show)
   rid.Printf("%s%s", releaseStatusNames[rlsNum],appendStr);
   m_releaseDlg->updateStatus(rid);
 
-  wxLogMessage("Updating Release Dialog with status: %d",state->release_status);
-  if (state->release_status <= 0)
+  if (state->release_status != -2 && state->release_status <= 0)
   {
     m_release_tim_state.timer_state = 0;
     m_releaseDlg->showButtons();
@@ -995,7 +996,7 @@ void ropeless_pi::updateReleaseDialog(bool show)
   }
 
   m_releaseDlg->updateID(m_release_tim_state.ptstate->ident);
-  m_releaseDlg->Show(show);
+  m_releaseDlg->Show(m_releaseDlg->IsShown() | show);
   m_releaseDlg->Layout();
 }
 
@@ -1057,10 +1058,9 @@ void ropeless_pi::ProcessReleaseTimerEvent(wxTimerEvent &event) {
   transponder_state* this_transponder_state = m_release_tim_state.ptstate;
   if (this_transponder_state != NULL)
   {
-    //m_release_tim_state.ptstate->release_status = eRELEASE_TIMEOUT;
+    m_release_tim_state.ptstate->release_status = -3;
     wxLogMessage("Release Timer Expired for ID: %d",m_release_tim_state.ptstate->ident);
-    m_releaseDlg->updateStatus("Timeout");
-    m_releaseDlg->showButtons();
+    updateReleaseDialog(true);
   }
 
   stopReleaseTimer();
@@ -2739,7 +2739,7 @@ void RopelessDialog::RefreshTransponderList() {
     }
     else
     {
-      state->release_status = -3;
+      state->release_status = -2;
       rlsNum = eRELEASE_NOT_INIT;
     }
 

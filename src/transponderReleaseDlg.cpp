@@ -45,7 +45,6 @@ transponderReleaseDlg::transponderReleaseDlg( wxWindow* parent, wxWindowID id, c
 
 	bSizer2->Add( m_bitmap1, 0, wxALIGN_CENTER|wxALL|wxEXPAND, 5 );
 
-
 	bSizer1->Add( bSizer2, 1, wxEXPAND, 5 );
 
 	wxBoxSizer* bSizer3;
@@ -60,7 +59,7 @@ transponderReleaseDlg::transponderReleaseDlg( wxWindow* parent, wxWindowID id, c
 	m_staticTextStatus = new wxStaticText( this, wxID_ANY, _("Connecting"), wxDefaultPosition, wxSize( -1,-1 ), 0 );
 	m_staticTextStatus->Wrap( -1 );
 	m_staticTextStatus->SetFont( wxFont( 24, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, false, wxEmptyString ) );
-	m_staticTextStatus->SetMinSize( wxSize( 220,-1 ) );
+	m_staticTextStatus->SetMinSize( wxSize( 300,-1 ) );
 
 	bSizer3->Add( m_staticTextStatus, 0, wxALL, 10 );
 
