@@ -71,6 +71,7 @@
 
 #define UDP_PORT 59647
 #define RELEASE_TIME_MS 5000
+#define SHOW_DISTANCE
 
 //    Constants
 #ifndef PI
@@ -128,7 +129,9 @@ enum {
   eRELEASE_NOT_VERIFIED = 3,
   eRELEASE_FAILED = 4,
   eRELEASE_NOT_INIT = 5,
-  eRELEASE_NETWORK_ERR = 6
+  eRELEASE_NETWORK_ERR = 6,
+  eRELEASE_CONNECTING = 7,
+
 };
 
 enum {
@@ -145,7 +148,7 @@ enum {
   eCMD_DEPLOYED = 4,
 };
 
-const wxString releaseStatusNames[] = {"TIMEOUT", "SENDING...", "VERIFIED", "NOT VERIFIED", "FAILED", "CONNECTING...", "NETWORK ERROR"};
+const wxString releaseStatusNames[] = {"TIMEOUT", "SENDING...", "VERIFIED", "NOT VERIFIED", "FAILED", "---", "NETWORK ERROR", "CONNECTING..."};
 const wxString recoveredStrList[] = {"DEPLOYED","RECOVERED"};
 
 //----------------------------------------------------------------------------------------------------------
@@ -299,7 +302,7 @@ public:
   void startSim();
   void stopSim();
 
-  void startReleaseTimer(transponder_state* state);
+  void startReleaseTimer();
   void stopReleaseTimer();
   void updateReleaseTimer(transponder_state * state);
   void toggleTransponderRecovered(int id);

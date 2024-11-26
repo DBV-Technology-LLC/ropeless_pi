@@ -73,7 +73,7 @@ if __name__ == '__main__':
                     socktx.sendto(response.encode('utf-8'), ('127.0.0.1', 2947))
                     print(f"Sent response: '{response}' to {('127.0.0.1', 2947)}")
 
-                msg = f"RSRLA,{tid},0"
+                msg = f"RSRLA,{tid},-1"
                 response = "$" + msg + f"*{(checksum(msg)):02X}"
 
                 socktx.sendto(response.encode('utf-8'), ('127.0.0.1', 2947))

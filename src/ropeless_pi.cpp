@@ -915,13 +915,14 @@ bool ropeless_pi::SendReleaseMessage(transponder_state *state, long code) {
   if (code == eCMD_RELEASE)
   {
     if (ret != false) {
-      state->release_status = -2;
-      startReleaseTimer(state);
+      state->release_status = -5;
+      m_release_tim_state.ptstate = state;
+      startReleaseTimer();
     } 
     else{
       state->release_status = -4;
-      m_release_tim_state.timer_state = 0;
       m_release_tim_state.ptstate = state;
+      stopReleaseTimer();
 
       wxLogMessage("Release request failed!");
       updateReleaseDialog(true);
@@ -950,7 +951,17 @@ void ropeless_pi::updateReleaseDialog(bool show)
 
   transponder_state* state = m_release_tim_state.ptstate;
 
-  if (state->release_status == -4)
+  if (state == NULL) 
+  {
+    wxLogMessage("Release Dialog has NULL ptr");
+    return;
+  }
+
+  if (state->release_status == -5)
+  {
+    rlsNum = eRELEASE_CONNECTING;
+  }
+  else if (state->release_status == -4)
   {
     rlsNum = eRELEASE_NETWORK_ERR;
   }
@@ -978,14 +989,14 @@ void ropeless_pi::updateReleaseDialog(bool show)
   }
   else
   {
-    state->release_status = -3;
+    state->release_status = -2;
     rlsNum = eRELEASE_NOT_INIT;
   }
 
   rid.Printf("%s%s", releaseStatusNames[rlsNum],appendStr);
   m_releaseDlg->updateStatus(rid);
 
-  if (state->release_status != -2 && state->release_status <= 0)
+  if (state->release_status != -5 && state->release_status <= 0)
   {
     m_release_tim_state.timer_state = 0;
     m_releaseDlg->showButtons();
@@ -995,15 +1006,22 @@ void ropeless_pi::updateReleaseDialog(bool show)
     m_releaseDlg->hideButtons();
   }
 
+  if (state->release_status > 0)
+  {
+    m_releaseDlg->Show(m_releaseDlg->IsShown());
+  }
+  else
+  {
+    m_releaseDlg->Show(true);
+  }
+
   m_releaseDlg->updateID(m_release_tim_state.ptstate->ident);
-  m_releaseDlg->Show(m_releaseDlg->IsShown() | show);
   m_releaseDlg->Layout();
 }
 
-void ropeless_pi::startReleaseTimer(transponder_state* state){
+void ropeless_pi::startReleaseTimer(void){
 
   m_release_tim_state.timer_state = 1;
-  m_release_tim_state.ptstate = state;
 
   updateReleaseDialog(true);
 
@@ -1012,7 +1030,10 @@ void ropeless_pi::startReleaseTimer(transponder_state* state){
   m_releaseTimer.Start(RELEASE_TIME_MS, wxTIMER_CONTINUOUS);
 }
 
-void ropeless_pi::stopReleaseTimer() { m_releaseTimer.Stop(); }
+void ropeless_pi::stopReleaseTimer(void) { 
+  m_release_tim_state.timer_state = 0;
+  m_releaseTimer.Stop(); 
+}
 
 void ropeless_pi::updateReleaseTimer(transponder_state * state)
 {
@@ -1027,7 +1048,7 @@ void ropeless_pi::updateReleaseTimer(transponder_state * state)
 
   if (state->ident != timer_state->ident) return;
 
-  updateReleaseDialog(false);
+  updateReleaseDialog(true);
 }
 
 void ropeless_pi::startDistanceTimer() {
@@ -1052,8 +1073,7 @@ void ropeless_pi::ProcessDistanceTimerEvent(wxTimerEvent &event) {
 
 void ropeless_pi::ProcessReleaseTimerEvent(wxTimerEvent &event) {
 
-  // Set the current release to TIMEOUT and free up timer
-  m_release_tim_state.timer_state = 0;
+  stopReleaseTimer();
 
   transponder_state* this_transponder_state = m_release_tim_state.ptstate;
   if (this_transponder_state != NULL)
@@ -1062,8 +1082,6 @@ void ropeless_pi::ProcessReleaseTimerEvent(wxTimerEvent &event) {
     wxLogMessage("Release Timer Expired for ID: %d",m_release_tim_state.ptstate->ident);
     updateReleaseDialog(true);
   }
-
-  stopReleaseTimer();
 
   //RequestRefresh(GetOCPNCanvasWindow());
 }
@@ -1731,6 +1749,12 @@ void ropeless_pi::ProcessRLACapture(void) {
     }
   }
 
+  // Check if ident matches released transponder
+  if (manualReleaseState.ident == transponderIdent)
+  {
+    this_transponder_state = &manualReleaseState;
+  }
+  
   // If specified transponder is not present, ignore the message
   if (this_transponder_state == NULL) {
     return;
