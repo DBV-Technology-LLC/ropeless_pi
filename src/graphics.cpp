@@ -42,6 +42,9 @@
 
 void GLDrawLine( wxCoord x1, wxCoord y1, wxCoord x2, wxCoord y2 );
 
+// Forward declaration for function defined in ODdc.cpp
+extern int NextPow2(int size);
+
 TexFont                 g_TexFontMessage;
 
 #ifndef PI
@@ -330,17 +333,8 @@ void RenderGLText( TexFont *ptf, wxString &msg, wxFont *font, int xp, int yp, do
     }
 }
 
-int NextPow2(int size)
-{
-    int n = size-1;          // compute dimensions needed as next larger power of 2
-    int shift = 1;
-    while ((n+1) & n){
-        n |= n >> shift;
-        shift <<= 1;
-    }
-    
-    return n + 1;
-}
+// NextPow2 function removed to avoid conflict with ODdc.cpp
+// Function is already defined in ODdc.cpp
 
 unsigned int GetIconTexture( wxBitmap *pbm, int &glw, int &glh )
 {

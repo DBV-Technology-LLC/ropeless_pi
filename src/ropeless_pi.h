@@ -141,6 +141,17 @@ enum {
 };
 
 enum {
+  ePOS_SOURCE_USER = 0,
+  ePOS_SOURCE_CLOUD = 1,
+  ePOS_SOURCE_ACOUSTIC = 2,
+  ePOS_SOURCE_GPS = 3,
+};
+
+enum {
+  eCOMM_UDP = 0,
+};
+
+enum {
   eCMD_RELEASE = 0,
   eCMD_RECOVER = 1,
   eCMD_SYNC = 2,
@@ -150,6 +161,8 @@ enum {
 
 const wxString releaseStatusNames[] = {"TIMEOUT", "SENDING...", "VERIFIED", "NOT VERIFIED", "FAILED", "---", "NETWORK ERROR", "CONNECTING..."};
 const wxString recoveredStrList[] = {"DEPLOYED","RECOVERED"};
+const wxString positionSourceNames[] = {"USER", "CLOUD", "ACOUSTIC", "GPS"};
+const wxString commModeNames[] = {"UDP Broadcast"};
 
 //----------------------------------------------------------------------------------------------------------
 //    Forward declarations
@@ -173,7 +186,7 @@ WX_DECLARE_OBJARRAY(vector2D *, ArrayOf2DPoints);
 
 class transponder_state_history {
 public:
-  transponder_state_history() {};
+  transponder_state_history() { position_source = ePOS_SOURCE_USER; };
   ~transponder_state_history() {};
 
   int ident;
@@ -183,6 +196,7 @@ public:
   double predicted_lat;
   double predicted_lon;
   double tsh_timer_age;
+  int position_source;
 };
 
 class transponder_state {
@@ -200,6 +214,7 @@ public:
     recovered_state = eREC_DEPLOYED;
     distance = 0;
     pings = 0;
+    position_source = ePOS_SOURCE_USER;
   }
 
   ~transponder_state() {};
@@ -220,6 +235,7 @@ public:
   int opacity;
   int recovered_state;
   double distance;
+  int position_source;
   std::deque<transponder_state_history *> historyQ;
 };
 
@@ -323,6 +339,8 @@ public:
   transponder_state *m_foundState;
   bool SendReleaseMessage(transponder_state *state, long code);
   void SendSyncMessage(void);
+  wxString GetConnectionStatusText();
+  
 
   int m_place_trap_manually;
   int m_place_trap_now;
@@ -356,7 +374,7 @@ private:
   void ProcessRLACapture(void);
   transponder_state *addTransponderPos(int transponderIdent);
   void placeTransponderManually(int xpdrId, int pairId, double lat, double lon,
-                                double utc);
+                                double utc, int pos_source = ePOS_SOURCE_USER);
 
   void SaveTransponderStatus();
   void populateTransponderNode(pugi::xml_node &transponderNode,
@@ -513,7 +531,7 @@ public:
   wxButton *m_ChooseFileButton, *m_StopSimButton, *m_StartSimButton,
       *m_ManualReleaseButton, *m_SyncButton;
 
-  wxStaticText *m_NetworkStatusText;
+  wxStaticText *m_ConnectionStatusText;
 
   ropeless_pi *pParentPi;
   OCPNListCtrl *m_pListCtrlTranponders;
@@ -538,6 +556,7 @@ public:
   void OnTargetListColumnClicked(wxListEvent &event);
   void OnTargetRightClick(wxListEvent &event);
   void OnSyncButton(wxCommandEvent &event);
+
 
   wxArrayInt GetSelectedItems();
   transponder_state *getXpdrFromIndex(int index);

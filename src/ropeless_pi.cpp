@@ -50,13 +50,10 @@
 #include "manualPlacementDlgImpl.h"
 #include "transponderReleaseDlgImpl.h"
 #include "haversine.h"
+//#include "graphics.h"
 
 #ifdef __WXMSW__
-#include <winsock.h>
 #include <windows.h>
-#else
-#include <arpa/inet.h>
-#include <netinet/tcp.h>
 #endif
 
 #ifdef ocpnUSE_GL
@@ -371,6 +368,10 @@ int ropeless_pi::Init(void) {
   //    Get a pointer to the opencpn configuration object
   m_pconfig = GetOCPNConfigObject();
 
+  m_event_handler = new PI_EventHandler(this);
+  m_tsock = NULL;
+  
+  
   //    And load the configuration items
   LoadConfig();
 
@@ -391,9 +392,6 @@ int ropeless_pi::Init(void) {
 #ifdef SHOW_DISTANCE
   startDistanceTimer();
 #endif
-
-  m_event_handler = new PI_EventHandler(this);
-  m_tsock = NULL;
 
 #if 0
 #ifndef __WXMSW__
@@ -495,6 +493,7 @@ bool ropeless_pi::DeInit(void) {
 #endif
 
   delete m_releaseDlg;
+  
 
   return true;
 }
@@ -865,9 +864,12 @@ bool ropeless_pi::SendReleaseMessage(transponder_state *state, long code) {
   payload += pl1;
 
   unsigned char cs = ComputeChecksum(payload);
-  pl1.Printf("*%02X\r\n", cs);
+  pl1.Printf("*%02X", cs);
   payload += pl1;
 
+
+  // Send via UDP
+  payload += "\r\n";  // Add line ending for UDP
   if (!m_tsock) {
     m_tconn_addr.Service(UDP_PORT);
     m_tconn_addr.BroadcastAddress();
@@ -932,6 +934,13 @@ bool ropeless_pi::SendReleaseMessage(transponder_state *state, long code) {
 
   return ret;
 }
+
+
+
+
+
+
+
 
 void ropeless_pi::updateReleaseDialog(bool show)
 {
@@ -1211,6 +1220,10 @@ void ropeless_pi::populateTransponderNode(pugi::xml_node &transponderNode,
   child = transponderNode.append_child("RecoveredStatus");
   ss.Printf("%d", state->recovered_state);
   child.append_child(pugi::node_pcdata).set_value(ss.c_str());
+
+  child = transponderNode.append_child("PositionSource");
+  ss.Printf("%d", state->position_source);
+  child.append_child(pugi::node_pcdata).set_value(ss.c_str());
 }
 
 void ropeless_pi::SaveTransponderStatus() {
@@ -1297,6 +1310,9 @@ bool ropeless_pi::parseTransponderNode(pugi::xml_node &transponderNode,
         state->recovered_state = atoi(child.first_child().value());
         wxLogMessage("Parsed Recovered State: %d",state->recovered_state);
       }
+      if (!strcmp(child.name(), "PositionSource")) {
+        state->position_source = atoi(child.first_child().value());
+      }
     }
   }
 
@@ -1374,13 +1390,71 @@ void ropeless_pi::RenderTransponder(transponder_state *state) {
 
   if (!rcolour.IsOk()) rcolour = wxColour(255, 000, 255);
 
-  // Render the primary instant transponder
+  // Render the primary instant transponder using custom bitmap
   GetCanvasPixLL(g_vp, &ab, state->predicted_lat, state->predicted_lon);
-  wxPen dpen(rcolour);
-  wxBrush dbrush(rcolour);
-  m_oDC->SetPen(dpen);
-  m_oDC->SetBrush(dbrush);
-  m_oDC->DrawCircle(ab.x, ab.y, circle_size);
+  
+  // Load custom transponder bitmap
+  static wxBitmap customBitmap;
+  if (!customBitmap.IsOk()) {
+    // Get the plugin data directory path
+    wxString pluginDir = GetPluginDataDir("ropeless_pi");
+    wxString bitmapPath = pluginDir + wxFileName::GetPathSeparator() + _T("test_xpdr.png");
+    
+    // Try to load the bitmap
+    if (wxFileExists(bitmapPath)) {
+      customBitmap.LoadFile(bitmapPath, wxBITMAP_TYPE_PNG);
+    }
+    
+    // Fallback if bitmap doesn't load - create a simple colored square
+    if (!customBitmap.IsOk()) {
+      customBitmap = wxBitmap(circle_size * 2, circle_size * 2);
+      wxMemoryDC memDC(customBitmap);
+      memDC.SetBackground(wxBrush(rcolour));
+      memDC.Clear();
+      memDC.SetPen(wxPen(wxColour(0, 0, 0), 2));
+      memDC.DrawRectangle(2, 2, circle_size * 2 - 4, circle_size * 2 - 4);
+      memDC.SelectObject(wxNullBitmap);
+    }
+  }
+  
+  // Draw the custom bitmap centered at the transponder position
+  if (customBitmap.IsOk()) {
+    int bmp_x = ab.x - customBitmap.GetWidth() / 2;
+    int bmp_y = ab.y - customBitmap.GetHeight() / 2;
+    m_oDC->DrawBitmap(customBitmap, bmp_x, bmp_y, true); // true = use transparency
+  } else {
+    // Fallback to original circle if bitmap fails
+    wxPen dpen(rcolour);
+    wxBrush dbrush(rcolour);
+    m_oDC->SetPen(dpen);
+    m_oDC->SetBrush(dbrush);
+    m_oDC->DrawCircle(ab.x, ab.y, circle_size);
+  }
+  
+  // Draw 6 evenly spaced segments around the circle
+  wxPen solidBlackPen(wxColour(0, 0, 0), 3);
+  m_oDC->SetPen(solidBlackPen);
+  
+  int radius = circle_size + 4;
+  int dashLength = 30;  // Each dash covers 30 degrees (360/6 = 60, so 30 dash + 30 gap)
+  
+  // Draw 6 segments spaced evenly around the circle
+  for (int i = 0; i < 6; i++) {
+    int startAngle = i * 60;  // Start every 60 degrees (0, 60, 120, 180, 240, 300)
+    int endAngle = startAngle + dashLength;  // Each dash is 30 degrees long
+    
+    // Calculate start and end coordinates
+    double startRad = startAngle * M_PI / 180.0;
+    double endRad = endAngle * M_PI / 180.0;
+    
+    int x1 = ab.x + radius * cos(startRad);
+    int y1 = ab.y + radius * sin(startRad);
+    int x2 = ab.x + radius * cos(endRad);
+    int y2 = ab.y + radius * sin(endRad);
+    
+    // Draw the segment
+    m_oDC->DrawLine(x1, y1, x2, y2, true);
+  }
 
 #if 0
     // Render the history buffer, if present
@@ -1415,12 +1489,51 @@ void ropeless_pi::RenderTransponder(transponder_state *state) {
     m_oDC->DrawLine(x3.x, x3.y, x4.x, x4.y, true);
   }
 
-  // TODO: Display name -- Currently does not work. No text is rendered
-  // wxFont font(48, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD);
-  // m_oDC->SetFont(font);
-  // m_oDC->SetTextForeground(*wxRED);
-  // m_oDC->DrawText(wxT("Hello OpenCPN!"), ab.x, ab.y);  
-  // wxLogMessage("Drawing Text!");
+  // Display transponder number above the circle using text-to-bitmap approach
+  wxString transponderText = wxString::Format(wxT("%d"), state->ident);
+  
+  // Create a memory bitmap to render text
+  wxFont textFont(16, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD);
+  
+  // Create a memory DC to measure text size
+  wxMemoryDC memDC;
+  wxBitmap tempBmp(100, 50); // Temporary bitmap for measurement
+  memDC.SelectObject(tempBmp);
+  memDC.SetFont(textFont);
+  
+  // Measure the text
+  wxCoord textW, textH;
+  memDC.GetTextExtent(transponderText, &textW, &textH);
+  
+  // Create the actual bitmap with proper size and padding
+  int bmpW = textW + 8; // Add padding
+  int bmpH = textH + 8;
+  wxBitmap textBmp(bmpW, bmpH);
+  
+  // Render text to the bitmap
+  memDC.SelectObject(textBmp);
+  memDC.SetBackground(wxBrush(wxColour(255, 255, 255))); // White background
+  memDC.Clear();
+  memDC.SetFont(textFont);
+  memDC.SetTextForeground(wxColour(0, 0, 0)); // Black text
+  
+  // Draw text centered in the bitmap
+  memDC.DrawText(transponderText, 4, 4); // 4px padding
+  
+  // Draw black border around the bitmap
+  wxPen borderPen(wxColour(0, 0, 0), 2);
+  memDC.SetPen(borderPen);
+  memDC.SetBrush(*wxTRANSPARENT_BRUSH);
+  memDC.DrawRectangle(0, 0, bmpW, bmpH);
+  
+  memDC.SelectObject(wxNullBitmap); // Deselect bitmap
+  
+  // Position the bitmap above the circle
+  int bmp_x = ab.x - bmpW/2;
+  int bmp_y = ab.y - circle_size - bmpH - 8;
+  
+  // Draw the bitmap using ODDC's DrawBitmap function
+  m_oDC->DrawBitmap(textBmp, bmp_x, bmp_y, false);
 }
 
 void ropeless_pi::RenderTrawlConnector(transponder_state *state1,
@@ -1472,6 +1585,10 @@ void ropeless_pi::SendSyncMessage(void)
 {
   transponder_state empty = {};
   SendReleaseMessage(&empty,eCMD_SYNC);
+}
+
+wxString ropeless_pi::GetConnectionStatusText() {
+  return _("Mode: UDP");
 }
 
 void ropeless_pi::RenderTrawls() {
@@ -1592,6 +1709,8 @@ void ropeless_pi::ProcessRFACapture(void) {
         this_transponder_state->predicted_lat;
     this_transponder_state_history->predicted_lon =
         this_transponder_state->predicted_lon;
+    this_transponder_state_history->position_source =
+        this_transponder_state->position_source;
     this_transponder_state_history->color_index =
         this_transponder_state->color_index;
     this_transponder_state_history->tsh_timer_age = HISTORY_FADE_SECS;
@@ -1620,6 +1739,8 @@ void ropeless_pi::ProcessRFACapture(void) {
   if (m_NMEA0183.Rfa.TransponderPosition.Longitude.Easting == West)
     this_transponder_state->predicted_lon =
         -this_transponder_state->predicted_lon;
+  
+  this_transponder_state->position_source = ePOS_SOURCE_ACOUSTIC;
 
   this_transponder_state->range = m_NMEA0183.Rfa.TransponderRange;
   this_transponder_state->bearing = m_NMEA0183.Rfa.TransponderBearing;
@@ -1653,7 +1774,7 @@ void ropeless_pi::ProcessRFACapture(void) {
 }
 
 void ropeless_pi::placeTransponderManually(int xpdrId, int pairId, double lat,
-                                           double lon, double utc) {
+                                           double lon, double utc, int pos_source) {
   
   //wxLogMessage("Placing Transponder Manually!");
 
@@ -1667,6 +1788,7 @@ void ropeless_pi::placeTransponderManually(int xpdrId, int pairId, double lat,
 
   this_transponder_state->predicted_lat = lat;
   this_transponder_state->predicted_lon = lon;
+  this_transponder_state->position_source = pos_source;
 
   this_transponder_state->range = 0;
   this_transponder_state->bearing = 0;
@@ -1719,6 +1841,8 @@ transponder_state *ropeless_pi::addTransponderPos(int transponderIdent) {
         this_transponder_state->predicted_lat;
     this_transponder_state_history->predicted_lon =
         this_transponder_state->predicted_lon;
+    this_transponder_state_history->position_source =
+        this_transponder_state->position_source;
     this_transponder_state_history->color_index =
         this_transponder_state->color_index;
     this_transponder_state_history->tsh_timer_age = HISTORY_FADE_SECS;
@@ -1822,7 +1946,11 @@ bool ropeless_pi::LoadConfig(void) {
     pConf->Read(_T( "SerialPort" ), &m_serialPort);
     pConf->Read(_T( "TrackedPoint" ), &m_trackedWPGUID);
 
+    // Communication mode (UDP only)
+  
     m_trackedWP = getWaypointName(m_trackedWPGUID);
+    
+    ApplyConfig();
 
     return true;
   } else
@@ -1840,6 +1968,8 @@ bool ropeless_pi::SaveConfig(void) {
     pConf->Write("dialogPosX", m_dialogPosX);
     pConf->Write("dialogPosY", m_dialogPosY);
 
+    // Communication mode (UDP only) - no need to save
+
     //         pConf->Write ( _T( "SerialPort" ),  m_serialPort );
     //         pConf->Write ( _T( "TrackedPoint" ),  m_trackedWPGUID );
     //
@@ -1854,7 +1984,9 @@ bool ropeless_pi::SaveConfig(void) {
     return false;
 }
 
-void ropeless_pi::ApplyConfig(void) {}
+void ropeless_pi::ApplyConfig(void) {
+  // UDP mode requires no special initialization - handled in SendReleaseMessage
+}
 
 bool ropeless_pi::MouseEventHook(wxMouseEvent &event) {
   bool bret = false;
@@ -2447,10 +2579,10 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
   m_SyncButton->Bind(wxEVT_COMMAND_BUTTON_CLICKED,
                               &RopelessDialog::OnSyncButton, this);
 
-  // TODO: Track network status
-  // m_NetworkStatusText = new wxStaticText( this, wxID_ANY, _("Network: Disconnected"), wxDefaultPosition, wxDefaultSize, 0 );
-  // m_NetworkStatusText->Wrap( -1 );
-  // bsizersimButtons->Add( m_NetworkStatusText, 0, wxALL, 5 );
+  // Connection Status Display
+  m_ConnectionStatusText = new wxStaticText( this, wxID_ANY, _("Mode: UDP"), wxDefaultPosition, wxDefaultSize, 0 );
+  m_ConnectionStatusText->Wrap( -1 );
+  bsizersimButtons->Add( m_ConnectionStatusText, 0, wxALL, 5 );
 
   if (pParentPi->m_simulatorTimer.IsRunning()) {
     m_StartSimButton->Hide();
@@ -2944,6 +3076,7 @@ void RopelessDialog::OnSyncButton(wxCommandEvent &event)
 {
   g_ropelessPI->SendSyncMessage();
 }
+
 
 void RopelessDialog::clearHighlighted() {
   wxArrayInt selectedItems = GetSelectedItems();

@@ -77,6 +77,12 @@ SET(SRC_ROPELESS
     src/transponderReleaseDlgImpl.cpp
     src/haversine.h
     src/haversine.cpp
+    src/graphics.h
+    src/graphics.cpp
+)
+
+SET(SRC_DATA
+    data/test_xpdr.png
 )
 
 SET(SRC_NMEA0183
@@ -150,7 +156,7 @@ SET(SRC_NMEA0183
     src/nmea0183/rla.hpp
 )
 
-set(SRC ${SRC_ROPELESS} ${SRC_NMEA0183})
+set(SRC ${SRC_ROPELESS} ${SRC_NMEA0183} ${SRC_DATA})
 
 
 if(QT_ANDROID)

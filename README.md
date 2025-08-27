@@ -19,6 +19,8 @@ See BUILDING.md
 
 ### General
 
+- Log file in Windows : C:\ProgramData\opencpn\opencpn.log
+
 ### Ubuntu
 
 ### Windows
