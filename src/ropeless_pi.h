@@ -165,6 +165,9 @@ const wxString recoveredStrList[] = {"DEPLOYED","RECOVERED"};
 const wxString positionSourceNames[] = {"USER", "CLOUD", "ACOUSTIC", "GPS"};
 const wxString commModeNames[] = {"UDP Broadcast"};
 
+// static int wxCALLBACK wxListCompareFunction(wxIntPtr item1, wxIntPtr item2,
+//                                             wxIntPtr sortData);
+
 //----------------------------------------------------------------------------------------------------------
 //    Forward declarations
 //----------------------------------------------------------------------------------------------------------
@@ -519,72 +522,72 @@ private:
 
 typedef enum BearingTypeEnum { MAG_BRG = 0, TRUE_BRG } _BearingTypeEnum;
 
-class RopelessDialog : public wxDialog {
-private:
-protected:
-  wxStdDialogButtonSizer *m_sdbSizer1;
-  wxButton *m_sdbSizer1OK;
-  wxButton *m_sdbSizer1Cancel;
+// class RopelessDialog : public wxDialog {
+// private:
+// protected:
+//   wxStdDialogButtonSizer *m_sdbSizer1;
+//   wxButton *m_sdbSizer1OK;
+//   wxButton *m_sdbSizer1Cancel;
 
-public:
-  //     wxRadioBox* m_rbViewType;
-  //     wxCheckBox* m_cbShowPlotOptions;
-  //     wxCheckBox* m_cbShowAtCursor;
-  //     wxCheckBox* m_cbLiveIcon;
-  //     wxCheckBox* m_cbShowIcon;
-  //     wxSlider* m_sOpacity;
+// public:
+//   //     wxRadioBox* m_rbViewType;
+//   //     wxCheckBox* m_cbShowPlotOptions;
+//   //     wxCheckBox* m_cbShowAtCursor;
+//   //     wxCheckBox* m_cbLiveIcon;
+//   //     wxCheckBox* m_cbShowIcon;
+//   //     wxSlider* m_sOpacity;
 
-  wxComboBox *m_comboPort;
-  wxArrayString *m_pSerialArray;
+//   wxComboBox *m_comboPort;
+//   wxArrayString *m_pSerialArray;
 
-  wxComboBox *m_wpComboPort;
+//   wxComboBox *m_wpComboPort;
 
-  wxString m_trackedPointName;
-  wxString m_trackedPointGUID;
+//   wxString m_trackedPointName;
+//   wxString m_trackedPointGUID;
 
-  wxComboBox *m_comboIcon;
-  wxTextCtrl *m_pTenderGPSOffsetX;
-  wxTextCtrl *m_pTenderGPSOffsetY;
-  wxTextCtrl *m_pTenderLength;
-  wxTextCtrl *m_pTenderWidth;
+//   wxComboBox *m_comboIcon;
+//   wxTextCtrl *m_pTenderGPSOffsetX;
+//   wxTextCtrl *m_pTenderGPSOffsetY;
+//   wxTextCtrl *m_pTenderLength;
+//   wxTextCtrl *m_pTenderWidth;
 
-  wxTextCtrl *m_simTextCtrl;
-  wxButton *m_ChooseFileButton, *m_StopSimButton, *m_StartSimButton,
-      *m_ManualReleaseButton, *m_SyncButton;
+//   wxTextCtrl *m_simTextCtrl;
+//   wxButton *m_ChooseFileButton, *m_StopSimButton, *m_StartSimButton,
+//       *m_ManualReleaseButton, *m_SyncButton;
 
-  wxStaticText *m_ConnectionStatusText;
+//   wxStaticText *m_ConnectionStatusText;
 
-  ropeless_pi *pParentPi;
-  OCPNListCtrl *m_pListCtrlTranponders;
+//   ropeless_pi *pParentPi;
+//   OCPNListCtrl *m_pListCtrlTranponders;
 
-  RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
-                 wxWindowID id = wxID_ANY,
-                 const wxString &title = _("Ropeless"),
-                 const wxPoint &pos = wxDefaultPosition,
-                 const wxSize &size = wxDefaultSize,
-                 long style = wxCAPTION | wxDEFAULT_DIALOG_STYLE);
-  ~RopelessDialog();
+//   RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
+//                  wxWindowID id = wxID_ANY,
+//                  const wxString &title = _("Ropeless"),
+//                  const wxPoint &pos = wxDefaultPosition,
+//                  const wxSize &size = wxDefaultSize,
+//                  long style = wxCAPTION | wxDEFAULT_DIALOG_STYLE);
+//   ~RopelessDialog();
 
-  void OnOKClick(wxCommandEvent &event);
-  void OnClose(wxCloseEvent &event);
-  void OnChooseFileButton(wxCommandEvent &event);
-  void OnStopSimButton(wxCommandEvent &event);
-  void OnStartSimButton(wxCommandEvent &event);
-  void OnManualReleaseButton(wxCommandEvent &event);
-  void RefreshTransponderList();
-  void OnTargetListSelected(wxListEvent &event);
-  void OnTargetListDeselected(wxListEvent &event);
-  void OnTargetListColumnClicked(wxListEvent &event);
-  void OnTargetRightClick(wxListEvent &event);
-  void OnSyncButton(wxCommandEvent &event);
+//   void OnOKClick(wxCommandEvent &event);
+//   void OnClose(wxCloseEvent &event);
+//   void OnChooseFileButton(wxCommandEvent &event);
+//   void OnStopSimButton(wxCommandEvent &event);
+//   void OnStartSimButton(wxCommandEvent &event);
+//   void OnManualReleaseButton(wxCommandEvent &event);
+//   void RefreshTransponderList();
+//   void OnTargetListSelected(wxListEvent &event);
+//   void OnTargetListDeselected(wxListEvent &event);
+//   void OnTargetListColumnClicked(wxListEvent &event);
+//   void OnTargetRightClick(wxListEvent &event);
+//   void OnSyncButton(wxCommandEvent &event);
 
 
-  wxArrayInt GetSelectedItems();
-  transponder_state *getXpdrFromIndex(int index);
-  void clearHighlighted();
-  long FindItemByName(wxListCtrl* listCtrl, const wxString& name);
+//   wxArrayInt GetSelectedItems();
+//   transponder_state *getXpdrFromIndex(int index);
+//   void clearHighlighted();
+//   long FindItemByName(wxListCtrl* listCtrl, const wxString& name);
 
-  DECLARE_EVENT_TABLE()
-};
+//   DECLARE_EVENT_TABLE()
+// };
 
 #endif

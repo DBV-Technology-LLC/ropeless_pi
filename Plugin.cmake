@@ -81,6 +81,8 @@ SET(SRC_ROPELESS
     src/graphics.cpp
     src/NMEA_TCP_OutputConnection.h
     src/NMEA_TCP_OutputConnection.cpp
+    src/RopelessDialog.h
+    src/RopelessDialog.cpp
 )
 
 SET(SRC_DATA

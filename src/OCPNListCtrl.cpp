@@ -24,7 +24,7 @@
 
 #include "OCPNListCtrl.h"
 //#include "AIS_Target_Data.h"
-#include "ropeless_pi.h"
+#include "RopelessDialog.h"
 
 OCPNListCtrl::OCPNListCtrl(RopelessDialog* parent, wxWindowID id,
                            const wxPoint& pos, const wxSize& size, long style)
