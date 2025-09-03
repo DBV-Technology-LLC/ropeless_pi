@@ -79,6 +79,8 @@ SET(SRC_ROPELESS
     src/haversine.cpp
     src/graphics.h
     src/graphics.cpp
+    src/NMEA_TCP_OutputConnection.h
+    src/NMEA_TCP_OutputConnection.cpp
 )
 
 SET(SRC_DATA

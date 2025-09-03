@@ -370,10 +370,14 @@ int ropeless_pi::Init(void) {
 
   m_event_handler = new PI_EventHandler(this);
   m_tsock = NULL;
+  m_nmea_tcp_output = NULL;
   
   
   //    And load the configuration items
   LoadConfig();
+  
+  // Initialize TCP NMEA Output
+  InitializeTCPOutput();
 
   //     m_pTrackRolloverWin = new RolloverWin( GetOCPNCanvasWindow() );
   //     m_pTrackRolloverWin->SetPosition( wxPoint( 5, 150 ) );
@@ -483,6 +487,9 @@ bool ropeless_pi::DeInit(void) {
 
   RemoveCanvasContextMenuItem(m_place_trap_manually);
   RemoveCanvasContextMenuItem(m_place_trap_now);
+
+  // Cleanup TCP NMEA Output
+  ShutdownTCPOutput();
 
   SaveConfig();
 
@@ -1308,7 +1315,7 @@ bool ropeless_pi::parseTransponderNode(pugi::xml_node &transponderNode,
       }
       if (!strcmp(child.name(), "RecoveredStatus")) {
         state->recovered_state = atoi(child.first_child().value());
-        wxLogMessage("Parsed Recovered State: %d",state->recovered_state);
+        //wxLogMessage("Parsed Recovered State: %d",state->recovered_state);
       }
       if (!strcmp(child.name(), "PositionSource")) {
         state->position_source = atoi(child.first_child().value());
@@ -1803,6 +1810,9 @@ void ropeless_pi::placeTransponderManually(int xpdrId, int pairId, double lat,
   this_transponder_state->pings = 0;
   this_transponder_state->batt_stat = 0;
 
+  // Generate and send RSGML message for manual placement
+  SendGMLMessageForManualPlacement(this_transponder_state, lat, lon, utc);
+
 }
 
 // Check for transponder state in list. if does not exist add new one
@@ -1928,6 +1938,11 @@ void ropeless_pi::SetNMEASentence(wxString &sentence) {
                      m_NMEA0183.Dbs.AcousticStatus,
                      m_NMEA0183.Dbs.CloudStatus,
                      m_NMEA0183.Dbs.NumDevices);
+        
+        // Forward message via TCP if connected
+        if (IsTCPOutputConnected()) {
+          SendNMEAMessage(&m_NMEA0183.Dbs);
+        }
       }
     }
     if (m_NMEA0183.LastSentenceIDReceived == _T("GML")) {
@@ -1946,6 +1961,11 @@ void ropeless_pi::SetNMEASentence(wxString &sentence) {
                      m_NMEA0183.Gml.Ownership,
                      m_NMEA0183.Gml.Source,
                      m_NMEA0183.Gml.DateNum);
+                     
+        // Forward message via TCP if connected
+        if (IsTCPOutputConnected()) {
+          SendNMEAMessage(&m_NMEA0183.Gml);
+        }
       }
     }
     if (m_NMEA0183.LastSentenceIDReceived == _T("GMS")) {
@@ -1961,6 +1981,11 @@ void ropeless_pi::SetNMEASentence(wxString &sentence) {
                      m_NMEA0183.Gms.SeafloorTemp,
                      m_NMEA0183.Gms.AirPressure,
                      m_NMEA0183.Gms.DateNum);
+                     
+        // Forward message via TCP if connected
+        if (IsTCPOutputConnected()) {
+          SendNMEAMessage(&m_NMEA0183.Gms);
+        }
       }
     }
     if (m_NMEA0183.LastSentenceIDReceived == _T("GMR")) {
@@ -1974,6 +1999,11 @@ void ropeless_pi::SetNMEASentence(wxString &sentence) {
                      m_NMEA0183.Gmr.ResCode,
                      m_NMEA0183.Gmr.Param1,
                      m_NMEA0183.Gmr.Param2);
+                     
+        // Forward message via TCP if connected
+        if (IsTCPOutputConnected()) {
+          SendNMEAMessage(&m_NMEA0183.Gmr);
+        }
       }
     }
   }
@@ -1998,9 +2028,14 @@ int ropeless_pi::GetToolbarToolCount(void) { return 1; }
 void ropeless_pi::SetColorScheme(PI_ColorScheme cs) {}
 
 bool ropeless_pi::LoadConfig(void) {
+
+  wxLogMessage("Loading config...\n");
+  
   wxFileConfig *pConf = (wxFileConfig *)m_pconfig;
 
   if (pConf) {
+    wxLogMessage("Reading config file from OpenCPN configuration");
+
     pConf->SetPath(_T( "/Settings/Ropeless_pi" ));
     pConf->Read("dialogSizeWidth", &m_dialogSizeWidth, -1);
     pConf->Read("dialogSizeHeight", &m_dialogSizeHeight, -1);
@@ -2010,6 +2045,28 @@ bool ropeless_pi::LoadConfig(void) {
     pConf->Read(_T( "SerialPort" ), &m_serialPort);
     pConf->Read(_T( "TrackedPoint" ), &m_trackedWPGUID);
 
+    // TCP NMEA Output Configuration
+    pConf->Read(_T( "TCP_Host" ), &m_tcp_host, _T("localhost"));
+    pConf->Read(_T( "TCP_Port" ), &m_tcp_port, 4001);
+    
+    // Read boolean values more explicitly
+    bool tcp_enabled_default = true;
+    bool tcp_auto_reconnect_default = true;
+    pConf->Read(_T( "TCP_Enabled" ), &m_tcp_enabled, tcp_enabled_default);
+    pConf->Read(_T( "TCP_AutoReconnect" ), &m_tcp_auto_reconnect, tcp_auto_reconnect_default);
+    
+    // Debug logging to see what was loaded
+    wxLogMessage("TCP Config loaded - Host: %s, Port: %d, Enabled: %s, AutoReconnect: %s", 
+                 m_tcp_host, m_tcp_port, 
+                 m_tcp_enabled ? "true" : "false", 
+                 m_tcp_auto_reconnect ? "true" : "false");
+    
+    // Force TCP to be enabled for initial testing (remove this later)
+    if (!m_tcp_enabled) {
+        wxLogMessage("TCP was disabled in config - forcing it enabled for testing");
+        m_tcp_enabled = true;
+    }
+
     // Communication mode (UDP only)
   
     m_trackedWP = getWaypointName(m_trackedWPGUID);
@@ -2018,7 +2075,10 @@ bool ropeless_pi::LoadConfig(void) {
 
     return true;
   } else
+  {
+    wxLogMessage("Failed to load config");
     return false;
+  }
 }
 
 bool ropeless_pi::SaveConfig(void) {
@@ -2031,6 +2091,12 @@ bool ropeless_pi::SaveConfig(void) {
     pConf->Write("dialogSizeHeight", m_dialogSizeHeight);
     pConf->Write("dialogPosX", m_dialogPosX);
     pConf->Write("dialogPosY", m_dialogPosY);
+
+    // TCP NMEA Output Configuration
+    pConf->Write(_T( "TCP_Host" ), m_tcp_host);
+    pConf->Write(_T( "TCP_Port" ), m_tcp_port);
+    pConf->Write(_T( "TCP_Enabled" ), m_tcp_enabled);
+    pConf->Write(_T( "TCP_AutoReconnect" ), m_tcp_auto_reconnect);
 
     // Communication mode (UDP only) - no need to save
 
@@ -2325,6 +2391,129 @@ void ropeless_pi::releaseCallbackRecovered(void)
 void ropeless_pi::releaseCallbackRetry(void)
 {
   SendReleaseMessage(m_release_tim_state.ptstate, eCMD_RELEASE);
+}
+
+// TCP NMEA Output Methods
+void ropeless_pi::InitializeTCPOutput() {
+    if (m_nmea_tcp_output) {
+        return; // Already initialized
+    }
+    
+    if (m_tcp_enabled && !m_tcp_host.IsEmpty() && m_tcp_port > 0) {
+        wxLogMessage("NMEA TCP Output: Initializing TCP client connection to %s:%d", m_tcp_host, m_tcp_port);
+        
+        m_nmea_tcp_output = new NMEA_TCP_OutputConnection(m_tcp_host, m_tcp_port);
+        m_nmea_tcp_output->SetAutoReconnect(m_tcp_auto_reconnect);
+        
+        // Attempt initial connection
+        m_nmea_tcp_output->Connect();
+        wxLogMessage("NMEA TCP Output: TCP client initialized and connecting...");
+    } else if (m_tcp_enabled) {
+        wxLogMessage("NMEA TCP Output: TCP enabled but invalid host/port configuration - Host: '%s', Port: %d", 
+                     m_tcp_host, m_tcp_port);
+    } else {
+        wxLogMessage("NMEA TCP Output: TCP client disabled in configuration");
+    }
+}
+
+void ropeless_pi::ShutdownTCPOutput() {
+    if (m_nmea_tcp_output) {
+        m_nmea_tcp_output->Disconnect();
+        delete m_nmea_tcp_output;
+        m_nmea_tcp_output = nullptr;
+        wxLogMessage("NMEA TCP Output: Connection shutdown");
+    }
+}
+
+bool ropeless_pi::IsTCPOutputConnected() const {
+    return m_nmea_tcp_output && m_nmea_tcp_output->IsConnected();
+}
+
+bool ropeless_pi::SendNMEAMessage(RESPONSE* message) {
+    if (!m_nmea_tcp_output || !message) {
+        return false;
+    }
+    
+    return m_nmea_tcp_output->SendNMEAMessage(message);
+}
+
+void ropeless_pi::ConfigureTCPOutput(const wxString& host, int port, bool enabled, bool auto_reconnect) {
+    m_tcp_host = host;
+    m_tcp_port = port;
+    m_tcp_enabled = enabled;
+    m_tcp_auto_reconnect = auto_reconnect;
+    
+    // Restart connection with new settings
+    ShutdownTCPOutput();
+    if (enabled) {
+        InitializeTCPOutput();
+    }
+}
+
+wxString ropeless_pi::GetTCPOutputStatus() const {
+    if (!m_tcp_enabled) {
+        return _T("TCP Output: Disabled");
+    }
+    
+    if (!m_nmea_tcp_output) {
+        return wxString::Format(_T("TCP Output: Not initialized (Host: %s, Port: %d)"), m_tcp_host, m_tcp_port);
+    }
+    
+    wxString status;
+    if (m_nmea_tcp_output->IsConnected()) {
+        status = wxString::Format(_T("TCP Output: Connected to %s:%d"), m_tcp_host, m_tcp_port);
+    } else if (m_nmea_tcp_output->IsConnecting()) {
+        status = wxString::Format(_T("TCP Output: Connecting to %s:%d..."), m_tcp_host, m_tcp_port);
+    } else {
+        status = wxString::Format(_T("TCP Output: Disconnected from %s:%d"), m_tcp_host, m_tcp_port);
+    }
+    
+    if (m_nmea_tcp_output) {
+        size_t queued = m_nmea_tcp_output->GetQueueSize();
+        unsigned long sent = m_nmea_tcp_output->GetMessagesSent();
+        if (queued > 0 || sent > 0) {
+            status += wxString::Format(_T(" (Sent: %lu, Queued: %zu)"), sent, queued);
+        }
+    }
+    
+    return status;
+}
+
+// RSGML Message Generation
+void ropeless_pi::SendGMLMessageForManualPlacement(transponder_state* state, double lat, double lon, double utc) {
+    if (!state) return;
+    
+    wxLogMessage("Sending GML for manual placement!");
+    
+    // Create GML message
+    GML gml_msg;
+    
+    // Fill in the RSGML fields based on manual placement
+    gml_msg.MarkID = state->ident;              // Use transponder ID as MarkID
+    gml_msg.MarkType = 1;                       // 1 = Manual placement mark type
+    gml_msg.PosStatus = 1;                      // 1 = Valid/confirmed position
+    gml_msg.TrawlID = state->ident_partner;     // Use partner ID as TrawlID
+    gml_msg.TrawlNum = 1;                       // Default trawl number
+    gml_msg.Latitude = lat;                     // Placement latitude
+    gml_msg.Longitude = lon;                    // Placement longitude
+    gml_msg.Depth = (int)state->depth;          // Depth from state (may be 0 for manual)
+    gml_msg.MfgID = 1001;                       // Default manufacturer ID
+    gml_msg.Mfg = 10;                          // Default manufacturer code
+    gml_msg.Ownership = 1;                      // 1 = Own vessel's equipment
+    gml_msg.Source = 2;                         // 2 = Manual entry source
+    gml_msg.DateNum = utc;                      // UTC timestamp as matlab datenum
+    
+    // Send via TCP if connected
+    if (IsTCPOutputConnected()) {
+        if (SendNMEAMessage(&gml_msg)) {
+            wxLogMessage("RSGML: Sent manual mark placement - MarkID=%d, Lat=%.6f, Lon=%.6f, Time=%.6f", 
+                         gml_msg.MarkID, gml_msg.Latitude, gml_msg.Longitude, gml_msg.DateNum);
+        } else {
+            wxLogMessage("RSGML: Failed to send manual mark placement message");
+        }
+    } else {
+        wxLogMessage("RSGML: TCP not connected - manual mark placement not sent (MarkID=%d)", gml_msg.MarkID);
+    }
 }
 
 // Event Handler implementation

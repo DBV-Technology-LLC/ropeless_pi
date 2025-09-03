@@ -60,6 +60,7 @@
 #include "TexFont.h"
 #include "vector2d.h"
 #include "OCPN_DataStreamEvent.h"
+#include "NMEA_TCP_OutputConnection.h"
 #include <deque>
 #include <wx/socket.h>
 
@@ -331,6 +332,12 @@ public:
   int m_dialogSizeHeight;
   int m_dialogPosX;
   int m_dialogPosY;
+  
+  // TCP NMEA Output Configuration
+  wxString m_tcp_host;
+  int m_tcp_port;
+  bool m_tcp_enabled;
+  bool m_tcp_auto_reconnect;
   RopelessDialog *m_pRLDialog;
 
   wxTimer m_simulatorTimer;
@@ -340,6 +347,17 @@ public:
   bool SendReleaseMessage(transponder_state *state, long code);
   void SendSyncMessage(void);
   wxString GetConnectionStatusText();
+  
+  // TCP NMEA Output Methods
+  void InitializeTCPOutput();
+  void ShutdownTCPOutput();
+  bool IsTCPOutputConnected() const;
+  bool SendNMEAMessage(RESPONSE* message);
+  void ConfigureTCPOutput(const wxString& host, int port, bool enabled, bool auto_reconnect);
+  wxString GetTCPOutputStatus() const;
+  
+  // RSGML Message Generation
+  void SendGMLMessageForManualPlacement(transponder_state* state, double lat, double lon, double utc);
   
 
   int m_place_trap_manually;
@@ -476,6 +494,9 @@ private:
 
   wxSocketBase *m_tsock;
   wxIPV4address m_tconn_addr;
+  
+  // TCP NMEA Output Connection
+  NMEA_TCP_OutputConnection *m_nmea_tcp_output;
 
   DECLARE_EVENT_TABLE();
 };
