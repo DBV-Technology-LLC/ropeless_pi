@@ -1393,68 +1393,74 @@ void ropeless_pi::RenderTransponder(transponder_state *state) {
   // Render the primary instant transponder using custom bitmap
   GetCanvasPixLL(g_vp, &ab, state->predicted_lat, state->predicted_lon);
   
-  // Load custom transponder bitmap
-  static wxBitmap customBitmap;
-  if (!customBitmap.IsOk()) {
-    // Get the plugin data directory path
-    wxString pluginDir = GetPluginDataDir("ropeless_pi");
-    wxString bitmapPath = pluginDir + wxFileName::GetPathSeparator() + _T("test_xpdr.png");
+  // // Load custom transponder bitmap
+  // static wxBitmap customBitmap;
+  // if (!customBitmap.IsOk()) {
+  //   // Get the plugin data directory path
+  //   wxString pluginDir = GetPluginDataDir("ropeless_pi");
+  //   wxString bitmapPath = pluginDir + wxFileName::GetPathSeparator() + _T("test_xpdr.png");
     
-    // Try to load the bitmap
-    if (wxFileExists(bitmapPath)) {
-      customBitmap.LoadFile(bitmapPath, wxBITMAP_TYPE_PNG);
-    }
+  //   // Try to load the bitmap
+  //   if (wxFileExists(bitmapPath)) {
+  //     customBitmap.LoadFile(bitmapPath, wxBITMAP_TYPE_PNG);
+  //   }
     
-    // Fallback if bitmap doesn't load - create a simple colored square
-    if (!customBitmap.IsOk()) {
-      customBitmap = wxBitmap(circle_size * 2, circle_size * 2);
-      wxMemoryDC memDC(customBitmap);
-      memDC.SetBackground(wxBrush(rcolour));
-      memDC.Clear();
-      memDC.SetPen(wxPen(wxColour(0, 0, 0), 2));
-      memDC.DrawRectangle(2, 2, circle_size * 2 - 4, circle_size * 2 - 4);
-      memDC.SelectObject(wxNullBitmap);
-    }
-  }
+  //   // Fallback if bitmap doesn't load - create a simple colored square
+  //   if (!customBitmap.IsOk()) {
+  //     customBitmap = wxBitmap(circle_size * 2, circle_size * 2);
+  //     wxMemoryDC memDC(customBitmap);
+  //     memDC.SetBackground(wxBrush(rcolour));
+  //     memDC.Clear();
+  //     memDC.SetPen(wxPen(wxColour(0, 0, 0), 2));
+  //     memDC.DrawRectangle(2, 2, circle_size * 2 - 4, circle_size * 2 - 4);
+  //     memDC.SelectObject(wxNullBitmap);
+  //   }
+  // }
   
   // Draw the custom bitmap centered at the transponder position
-  if (customBitmap.IsOk()) {
-    int bmp_x = ab.x - customBitmap.GetWidth() / 2;
-    int bmp_y = ab.y - customBitmap.GetHeight() / 2;
-    m_oDC->DrawBitmap(customBitmap, bmp_x, bmp_y, true); // true = use transparency
-  } else {
-    // Fallback to original circle if bitmap fails
-    wxPen dpen(rcolour);
-    wxBrush dbrush(rcolour);
-    m_oDC->SetPen(dpen);
-    m_oDC->SetBrush(dbrush);
-    m_oDC->DrawCircle(ab.x, ab.y, circle_size);
-  }
+  // if (customBitmap.IsOk()) {
+  //   int bmp_x = ab.x - customBitmap.GetWidth() / 2;
+  //   int bmp_y = ab.y - customBitmap.GetHeight() / 2;
+  //   m_oDC->DrawBitmap(customBitmap, bmp_x, bmp_y, true); // true = use transparency
+  // } else {
+  //   // Fallback to original circle if bitmap fails
+  //   wxPen dpen(rcolour);
+  //   wxBrush dbrush(rcolour);
+  //   m_oDC->SetPen(dpen);
+  //   m_oDC->SetBrush(dbrush);
+  //   m_oDC->DrawCircle(ab.x, ab.y, circle_size);
+  // }
   
-  // Draw 6 evenly spaced segments around the circle
-  wxPen solidBlackPen(wxColour(0, 0, 0), 3);
-  m_oDC->SetPen(solidBlackPen);
+  wxPen dpen(rcolour);
+  wxBrush dbrush(rcolour);
+  m_oDC->SetPen(dpen);
+  m_oDC->SetBrush(dbrush);
+  m_oDC->DrawCircle(ab.x, ab.y, circle_size);
+
+  // // Draw 6 evenly spaced segments around the circle
+  // wxPen solidBlackPen(wxColour(0, 0, 0), 3);
+  // m_oDC->SetPen(solidBlackPen);
   
-  int radius = circle_size + 4;
-  int dashLength = 30;  // Each dash covers 30 degrees (360/6 = 60, so 30 dash + 30 gap)
+  // int radius = circle_size + 4;
+  // int dashLength = 30;  // Each dash covers 30 degrees (360/6 = 60, so 30 dash + 30 gap)
   
-  // Draw 6 segments spaced evenly around the circle
-  for (int i = 0; i < 6; i++) {
-    int startAngle = i * 60;  // Start every 60 degrees (0, 60, 120, 180, 240, 300)
-    int endAngle = startAngle + dashLength;  // Each dash is 30 degrees long
+  // // Draw 6 segments spaced evenly around the circle
+  // for (int i = 0; i < 10; i++) {
+  //   int startAngle = i * 60;  // Start every 60 degrees (0, 60, 120, 180, 240, 300)
+  //   int endAngle = startAngle + dashLength;  // Each dash is 30 degrees long
     
-    // Calculate start and end coordinates
-    double startRad = startAngle * M_PI / 180.0;
-    double endRad = endAngle * M_PI / 180.0;
+  //   // Calculate start and end coordinates
+  //   double startRad = startAngle * M_PI / 180.0;
+  //   double endRad = endAngle * M_PI / 180.0;
     
-    int x1 = ab.x + radius * cos(startRad);
-    int y1 = ab.y + radius * sin(startRad);
-    int x2 = ab.x + radius * cos(endRad);
-    int y2 = ab.y + radius * sin(endRad);
+  //   int x1 = ab.x + radius * cos(startRad);
+  //   int y1 = ab.y + radius * sin(startRad);
+  //   int x2 = ab.x + radius * cos(endRad);
+  //   int y2 = ab.y + radius * sin(endRad);
     
-    // Draw the segment
-    m_oDC->DrawLine(x1, y1, x2, y2, true);
-  }
+  //   // Draw the segment
+  //   m_oDC->DrawLine(x1, y1, x2, y2, true);
+  // }
 
 #if 0
     // Render the history buffer, if present
@@ -1907,10 +1913,68 @@ void ropeless_pi::SetNMEASentence(wxString &sentence) {
 
   if (m_NMEA0183.PreParse()) {
     if (m_NMEA0183.LastSentenceIDReceived == _T("RFA")) {
-      if (m_NMEA0183.Parse()) ProcessRFACapture();
+      if (m_NMEA0183.Parse()) {
+        ProcessRFACapture();
+      }
     }
     if (m_NMEA0183.LastSentenceIDReceived == _T("RLA")) {
       if (m_NMEA0183.Parse()) ProcessRLACapture();
+    }
+    if (m_NMEA0183.LastSentenceIDReceived == _T("DBS")) {
+      if (m_NMEA0183.Parse()) {
+        wxLogMessage("DBS Message Received: DeckboxID=%s, Manuf=%s, AcousticStatus=%s, CloudStatus=%s, NumDevices=%d",
+                     m_NMEA0183.Dbs.DeckboxID,
+                     m_NMEA0183.Dbs.DeckboxManuf,
+                     m_NMEA0183.Dbs.AcousticStatus,
+                     m_NMEA0183.Dbs.CloudStatus,
+                     m_NMEA0183.Dbs.NumDevices);
+      }
+    }
+    if (m_NMEA0183.LastSentenceIDReceived == _T("GML")) {
+      if (m_NMEA0183.Parse()) {
+        wxLogMessage("GML Message Received: MarkID=%d, MarkType=%d, PosStatus=%d, TrawlID=%d, TrawlNum=%d, Lat=%.6f, Lon=%.6f, Depth=%d, MfgID=%d, Mfg=%d, Ownership=%d, Source=%d, DateNum=%.6f",
+                     m_NMEA0183.Gml.MarkID,
+                     m_NMEA0183.Gml.MarkType,
+                     m_NMEA0183.Gml.PosStatus,
+                     m_NMEA0183.Gml.TrawlID,
+                     m_NMEA0183.Gml.TrawlNum,
+                     m_NMEA0183.Gml.Latitude,
+                     m_NMEA0183.Gml.Longitude,
+                     m_NMEA0183.Gml.Depth,
+                     m_NMEA0183.Gml.MfgID,
+                     m_NMEA0183.Gml.Mfg,
+                     m_NMEA0183.Gml.Ownership,
+                     m_NMEA0183.Gml.Source,
+                     m_NMEA0183.Gml.DateNum);
+      }
+    }
+    if (m_NMEA0183.LastSentenceIDReceived == _T("GMS")) {
+      if (m_NMEA0183.Parse()) {
+        wxLogMessage("GMS Message Received: MarkID=%d, ReleaseStatus=%d, Battery=%d, SurfaceRange=%d, SlantRange=%d, Bearing=%d, Tilt=%d, SeafloorTemp=%d, AirPressure=%d, DateNum=%.6f",
+                     m_NMEA0183.Gms.MarkID,
+                     m_NMEA0183.Gms.ReleaseStatus,
+                     m_NMEA0183.Gms.Battery,
+                     m_NMEA0183.Gms.SurfaceRange,
+                     m_NMEA0183.Gms.SlantRange,
+                     m_NMEA0183.Gms.Bearing,
+                     m_NMEA0183.Gms.Tilt,
+                     m_NMEA0183.Gms.SeafloorTemp,
+                     m_NMEA0183.Gms.AirPressure,
+                     m_NMEA0183.Gms.DateNum);
+      }
+    }
+    if (m_NMEA0183.LastSentenceIDReceived == _T("GMR")) {
+      if (m_NMEA0183.Parse()) {
+        wxLogMessage("GMR Message Received: CmdUID=%d, SourceID=%d, TargetID=%d, MarkID=%d, CmdType=%d, ResCode=%d, Param1=%d, Param2=%d",
+                     m_NMEA0183.Gmr.CmdUID,
+                     m_NMEA0183.Gmr.SourceID,
+                     m_NMEA0183.Gmr.TargetID,
+                     m_NMEA0183.Gmr.MarkID,
+                     m_NMEA0183.Gmr.CmdType,
+                     m_NMEA0183.Gmr.ResCode,
+                     m_NMEA0183.Gmr.Param1,
+                     m_NMEA0183.Gmr.Param2);
+      }
     }
   }
 }

@@ -141,6 +141,10 @@ NMEA0183::NMEA0183()
 */
    response_table.Append( (RESPONSE *) &Rfa );
    response_table.Append( (RESPONSE *) &Rla );
+   response_table.Append( (RESPONSE *) &Dbs );
+   response_table.Append( (RESPONSE *) &Gml );
+   response_table.Append( (RESPONSE *) &Gms );
+   response_table.Append( (RESPONSE *) &Gmr );
    sort_response_table();
    set_container_pointers();
 }

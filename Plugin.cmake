@@ -154,6 +154,14 @@ SET(SRC_NMEA0183
     src/nmea0183/rfa.hpp
     src/nmea0183/rla.cpp
     src/nmea0183/rla.hpp
+    src/nmea0183/dbs.cpp
+    src/nmea0183/dbs.hpp
+    src/nmea0183/gml.cpp
+    src/nmea0183/gml.hpp
+    src/nmea0183/gms.cpp
+    src/nmea0183/gms.hpp
+    src/nmea0183/gmr.cpp
+    src/nmea0183/gmr.hpp
 )
 
 set(SRC ${SRC_ROPELESS} ${SRC_NMEA0183} ${SRC_DATA})
