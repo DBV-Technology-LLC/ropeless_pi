@@ -37,6 +37,7 @@
 #include "config.h"
 #include "ropeless_pi.h"
 #include "RopelessDialog.h"
+#include "RopelessPrefsDialog.h"
 #include "icons.h"
 #include "Select.h"
 #include "vector2d.h"
@@ -585,7 +586,7 @@ void ropeless_pi::OnContextMenuItemCallback(int id) {
       //              mPl.isOwned);
 
       if (mPl.valid) {
-        placeTransponderManually(mPl.xpdrId, mPl.pairId, mp_lat, mp_lon, utc_d);
+        placeTransponderManually(mPl.xpdrId, mPl.pairId, mp_lat, mp_lon, utc_d, mPl.positionSource);
       }
     }
   } else if (id == m_place_trap_now) {
@@ -615,7 +616,7 @@ void ropeless_pi::OnContextMenuItemCallback(int id) {
       //              mPl.isOwned);
 
       if (mPl.valid) {
-        placeTransponderManually(mPl.xpdrId, mPl.pairId, m_ownship_lat, m_ownship_lon, utc_d);
+        placeTransponderManually(mPl.xpdrId, mPl.pairId, m_ownship_lat, m_ownship_lon, utc_d, mPl.positionSource);
       }
     }
   }
@@ -1189,6 +1190,68 @@ void ropeless_pi::populateTransponderNode(pugi::xml_node &transponderNode,
   child = transponderNode.append_child("PositionSource");
   ss.Printf("%d", state->position_source);
   child.append_child(pugi::node_pcdata).set_value(ss.c_str());
+  
+  // GML (Gear Mark Location) parameters
+  child = transponderNode.append_child("MarkType");
+  ss.Printf("%d", state->mark_type);
+  child.append_child(pugi::node_pcdata).set_value(ss.c_str());
+  
+  child = transponderNode.append_child("PosStatus");
+  ss.Printf("%d", state->pos_status);
+  child.append_child(pugi::node_pcdata).set_value(ss.c_str());
+  
+  child = transponderNode.append_child("TrawlID");
+  ss.Printf("%d", state->trawl_id);
+  child.append_child(pugi::node_pcdata).set_value(ss.c_str());
+  
+  child = transponderNode.append_child("TrawlNum");
+  ss.Printf("%d", state->trawl_num);
+  child.append_child(pugi::node_pcdata).set_value(ss.c_str());
+  
+  child = transponderNode.append_child("MfgID");
+  ss.Printf("%d", state->mfg_id);
+  child.append_child(pugi::node_pcdata).set_value(ss.c_str());
+  
+  child = transponderNode.append_child("Mfg");
+  ss.Printf("%d", state->mfg);
+  child.append_child(pugi::node_pcdata).set_value(ss.c_str());
+  
+  child = transponderNode.append_child("Ownership");
+  ss.Printf("%d", state->ownership);
+  child.append_child(pugi::node_pcdata).set_value(ss.c_str());
+  
+  child = transponderNode.append_child("Source");
+  ss.Printf("%d", state->source);
+  child.append_child(pugi::node_pcdata).set_value(ss.c_str());
+  
+  child = transponderNode.append_child("DateNum");
+  ss.Printf("%f", state->date_num);
+  child.append_child(pugi::node_pcdata).set_value(ss.c_str());
+  
+  // GMS (Gear Mark Status) parameters
+  child = transponderNode.append_child("SurfaceRange");
+  ss.Printf("%d", state->surface_range);
+  child.append_child(pugi::node_pcdata).set_value(ss.c_str());
+  
+  child = transponderNode.append_child("SlantRange");
+  ss.Printf("%d", state->slant_range);
+  child.append_child(pugi::node_pcdata).set_value(ss.c_str());
+  
+  child = transponderNode.append_child("Tilt");
+  ss.Printf("%d", state->tilt);
+  child.append_child(pugi::node_pcdata).set_value(ss.c_str());
+  
+  child = transponderNode.append_child("SeafloorTemp");
+  ss.Printf("%d", state->seafloor_temp);
+  child.append_child(pugi::node_pcdata).set_value(ss.c_str());
+  
+  child = transponderNode.append_child("AirPressure");
+  ss.Printf("%d", state->air_pressure);
+  child.append_child(pugi::node_pcdata).set_value(ss.c_str());
+  
+  child = transponderNode.append_child("GMSDateNum");
+  ss.Printf("%f", state->gms_date_num);
+  child.append_child(pugi::node_pcdata).set_value(ss.c_str());
 }
 
 void ropeless_pi::SaveTransponderStatus() {
@@ -1197,7 +1260,7 @@ void ropeless_pi::SaveTransponderStatus() {
       transponderStatusDoc.append_child("transponders");
 
   pugi::xml_node childT = transpondersNode.append_child("version");
-  childT.append_child(pugi::node_pcdata).set_value("0.0.0");
+  childT.append_child(pugi::node_pcdata).set_value("3.0.0");
   childT = transpondersNode.append_child("date");
   wxDateTime now = wxDateTime::GetTimeNow();
   wxString timeFormat = now.FormatISOCombined(' ');
@@ -1209,7 +1272,7 @@ void ropeless_pi::SaveTransponderStatus() {
     pugi::xml_node transponderNode =
         transpondersNode.append_child("transponder");
     pugi::xml_attribute version = transponderNode.append_attribute("version");
-    version.set_value("2");
+    version.set_value("3");
 
     populateTransponderNode(transponderNode, state);
   }
@@ -1224,6 +1287,12 @@ void ropeless_pi::SaveTransponderStatus() {
 bool ropeless_pi::parseTransponderNode(pugi::xml_node &transponderNode,
                                        transponder_state *state) {
   if (!strcmp(transponderNode.name(), "transponder")) {
+    // Check transponder version for backward compatibility
+    pugi::xml_attribute version_attr = transponderNode.attribute("version");
+    int transponder_version = 2; // default to version 2 if no version specified
+    if (version_attr) {
+      transponder_version = atoi(version_attr.value());
+    }
     for (pugi::xml_node child = transponderNode.first_child(); child;
          child = child.next_sibling()) {
       if (!strcmp(child.name(), "ID")) {
@@ -1278,6 +1347,64 @@ bool ropeless_pi::parseTransponderNode(pugi::xml_node &transponderNode,
       if (!strcmp(child.name(), "PositionSource")) {
         state->position_source = atoi(child.first_child().value());
       }
+      
+      // GML/GMS parameters (version 3+ only)
+      if (transponder_version >= 3) {
+        // GML (Gear Mark Location) parameters
+        if (!strcmp(child.name(), "MarkType")) {
+          state->mark_type = atoi(child.first_child().value());
+        }
+        if (!strcmp(child.name(), "PosStatus")) {
+          state->pos_status = atoi(child.first_child().value());
+        }
+        if (!strcmp(child.name(), "TrawlID")) {
+          state->trawl_id = atoi(child.first_child().value());
+        }
+        if (!strcmp(child.name(), "TrawlNum")) {
+          state->trawl_num = atoi(child.first_child().value());
+        }
+        if (!strcmp(child.name(), "MfgID")) {
+          state->mfg_id = atoi(child.first_child().value());
+        }
+        if (!strcmp(child.name(), "Mfg")) {
+          state->mfg = atoi(child.first_child().value());
+        }
+        if (!strcmp(child.name(), "Ownership")) {
+          state->ownership = atoi(child.first_child().value());
+        }
+        if (!strcmp(child.name(), "Source")) {
+          state->source = atoi(child.first_child().value());
+        }
+        if (!strcmp(child.name(), "DateNum")) {
+          wxString val(child.first_child().value());
+          double dval;
+          val.ToDouble(&dval);
+          state->date_num = dval;
+        }
+        
+        // GMS (Gear Mark Status) parameters
+        if (!strcmp(child.name(), "SurfaceRange")) {
+          state->surface_range = atoi(child.first_child().value());
+        }
+        if (!strcmp(child.name(), "SlantRange")) {
+          state->slant_range = atoi(child.first_child().value());
+        }
+        if (!strcmp(child.name(), "Tilt")) {
+          state->tilt = atoi(child.first_child().value());
+        }
+        if (!strcmp(child.name(), "SeafloorTemp")) {
+          state->seafloor_temp = atoi(child.first_child().value());
+        }
+        if (!strcmp(child.name(), "AirPressure")) {
+          state->air_pressure = atoi(child.first_child().value());
+        }
+        if (!strcmp(child.name(), "GMSDateNum")) {
+          wxString val(child.first_child().value());
+          double dval;
+          val.ToDouble(&dval);
+          state->gms_date_num = dval;
+        }
+      }
     }
   }
 
@@ -1292,12 +1419,21 @@ void ropeless_pi::LoadTransponderStatus() {
                       _T("ropeless-transponders.xml");
 
   if (!wxFileExists(fileName)) {
+    wxLogMessage("Ropeless: No existing transponder status file found");
     return;
   }
 
   bool ret = transponderStatusXML.load_file(fileName.mb_str());
 
   if (ret) {
+    // Check root version for compatibility
+    pugi::xml_node root = transponderStatusXML.first_child();
+    pugi::xml_node version_node = root.child("version");
+    wxString xml_version = "unknown";
+    if (version_node) {
+      xml_version = wxString(version_node.first_child().value());
+    }
+    wxLogMessage("Ropeless: Loading transponder status from XML version %s", xml_version);
     transponder_state state;
     pugi::xml_node transponderRoot = transponderStatusXML.first_child();
 
@@ -1396,11 +1532,31 @@ void ropeless_pi::RenderTransponder(transponder_state *state) {
   //   m_oDC->DrawCircle(ab.x, ab.y, circle_size);
   // }
   
-  wxPen dpen(rcolour);
-  wxBrush dbrush(rcolour);
-  m_oDC->SetPen(dpen);
-  m_oDC->SetBrush(dbrush);
-  m_oDC->DrawCircle(ab.x, ab.y, circle_size);
+  // Check position source and draw appropriate shape
+  if (state->position_source == ePOS_SOURCE_CLOUD) {
+    // Debug logging
+    wxLogMessage("Rendering cloud position grey dot for transponder ID: %d", state->ident);
+    
+    // Draw grey circle for cloud positions
+    wxColour greyColour(128, 128, 128, opacity); // Grey color
+    wxPen greyPen(greyColour);
+    wxBrush greyBrush(greyColour);
+    m_oDC->SetPen(greyPen);
+    m_oDC->SetBrush(greyBrush);
+    m_oDC->DrawCircle(ab.x, ab.y, circle_size);
+  } else {
+    // Debug logging for other position sources
+    wxLogMessage("Rendering circle for transponder ID: %d, position_source: %d (%s)", 
+                state->ident, state->position_source, 
+                (state->position_source < 4) ? positionSourceNames[state->position_source] : "UNKNOWN");
+    
+    // Draw regular circle for other position sources
+    wxPen dpen(rcolour);
+    wxBrush dbrush(rcolour);
+    m_oDC->SetPen(dpen);
+    m_oDC->SetBrush(dbrush);
+    m_oDC->DrawCircle(ab.x, ab.y, circle_size);
+  }
 
   // // Draw 6 evenly spaced segments around the circle
   // wxPen solidBlackPen(wxColour(0, 0, 0), 3);
@@ -1448,10 +1604,13 @@ void ropeless_pi::RenderTransponder(transponder_state *state) {
 
   // Draw an "X" over the primary target
   if (state->ident != state->ident_partner) {
-    wxPoint x1(ab.x - circle_size * .707, ab.y - circle_size * .707);
-    wxPoint x2(ab.x + circle_size * .707, ab.y + circle_size * .707);
-    wxPoint x3(ab.x - circle_size * .707, ab.y + circle_size * .707);
-    wxPoint x4(ab.x + circle_size * .707, ab.y - circle_size * .707);
+    // Use appropriate size for the "X" based on shape
+    int x_size = (state->position_source == ePOS_SOURCE_CLOUD) ? (circle_size + 2) : circle_size;
+    
+    wxPoint x1(ab.x - x_size * .707, ab.y - x_size * .707);
+    wxPoint x2(ab.x + x_size * .707, ab.y + x_size * .707);
+    wxPoint x3(ab.x - x_size * .707, ab.y + x_size * .707);
+    wxPoint x4(ab.x + x_size * .707, ab.y - x_size * .707);
 
     wxColour pColour = wxColour(0, 0, 0, opacity);
     wxPen xpen(pColour, 3);
@@ -1460,8 +1619,9 @@ void ropeless_pi::RenderTransponder(transponder_state *state) {
     m_oDC->DrawLine(x3.x, x3.y, x4.x, x4.y, true);
   }
 
-  // Display transponder number above the circle using text-to-bitmap approach
-  wxString transponderText = wxString::Format(wxT("%d"), state->ident);
+  // Display transponder number above the shape (skip for cloud positions)
+  if (state->position_source != ePOS_SOURCE_CLOUD) {
+    wxString transponderText = wxString::Format(wxT("%d"), state->ident);
   
   // Create a memory bitmap to render text
   wxFont textFont(16, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD);
@@ -1505,6 +1665,7 @@ void ropeless_pi::RenderTransponder(transponder_state *state) {
   
   // Draw the bitmap using ODDC's DrawBitmap function
   m_oDC->DrawBitmap(textBmp, bmp_x, bmp_y, false);
+  } // End of non-cloud position ID display
 }
 
 void ropeless_pi::RenderTrawlConnector(transponder_state *state1,
@@ -1520,6 +1681,63 @@ void ropeless_pi::RenderTrawlConnector(transponder_state *state1,
   wxBrush dbrush(rcolour);
 
   m_oDC->DrawLine(P1.x, P1.y, P2.x, P2.y, true);
+}
+
+void ropeless_pi::RenderVesselRangeCircle() {
+  // Only draw if we have a valid vessel position
+  if (m_ownship_lat == 0.0 && m_ownship_lon == 0.0) {
+    return;
+  }
+  
+  // Get vessel position in screen coordinates
+  wxPoint vesselPos;
+  GetCanvasPixLL(g_vp, &vesselPos, m_ownship_lat, m_ownship_lon);
+  
+  // Calculate 10 nautical miles in screen pixels
+  // 1 nautical mile = 1852 meters
+  double range_nm = 10.0;
+  double range_meters = range_nm * 1852.0;
+  
+  // Calculate a point 10nm to the east of vessel
+  double east_lat = m_ownship_lat;
+  double east_lon = m_ownship_lon + (range_meters / (111320.0 * cos(m_ownship_lat * M_PI / 180.0)));
+  
+  wxPoint eastPos;
+  GetCanvasPixLL(g_vp, &eastPos, east_lat, east_lon);
+  
+  // Calculate radius in pixels
+  int radius_pixels = abs(eastPos.x - vesselPos.x);
+  
+  // Don't draw if circle would be too small or too large
+  if (radius_pixels < 5 || radius_pixels > 2000) {
+    return;
+  }
+  
+  // Set up grey circle with no fill, just outline
+  wxColour greyColour(128, 128, 128, 180); // Semi-transparent grey
+  wxPen greyPen(greyColour, 2); // 2 pixel wide line
+  wxBrush transparentBrush(wxColour(0, 0, 0), wxBRUSHSTYLE_TRANSPARENT);
+  
+  m_oDC->SetPen(greyPen);
+  m_oDC->SetBrush(transparentBrush);
+  
+  // Draw the circle
+  m_oDC->DrawCircle(vesselPos.x, vesselPos.y, radius_pixels);
+  
+  // Optional: Add text label
+  wxFont labelFont(12, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL);
+  m_oDC->SetFont(labelFont);
+  m_oDC->SetTextForeground(greyColour);
+  
+  // Position text at top of circle
+  wxString rangeText = wxString::Format(_("10nm"));
+  wxCoord textW, textH;
+  m_oDC->GetTextExtent(rangeText, &textW, &textH);
+  
+  int text_x = vesselPos.x - textW/2;
+  int text_y = vesselPos.y - radius_pixels - textH - 5;
+  
+  m_oDC->DrawText(rangeText, text_x, text_y);
 }
 
 transponder_state *ropeless_pi::GetStateByIdent(int identTarget) {
@@ -1563,9 +1781,24 @@ wxString ropeless_pi::GetConnectionStatusText() {
 }
 
 void ropeless_pi::RenderTrawls() {
-  //  Walk the vector of transponder status
+  //  Walk the vector of transponder status  
+  static int render_log_count = 0;
+  render_log_count++;
+  
+  // Log every 100 renders to avoid spam, but always log if we have transponders
+  if (render_log_count % 100 == 0 || transponderStatus.size() > 0) {
+    wxLogMessage("RenderTrawls: Found %d transponders to render", (int)transponderStatus.size());
+  }
+  
   for (unsigned int i = 0; i < transponderStatus.size(); i++) {
     transponder_state *state = transponderStatus[i];
+    
+    // Always log cloud positions for debugging
+    if (state->position_source == ePOS_SOURCE_CLOUD || render_log_count % 100 == 0) {
+      wxLogMessage("Rendering transponder %d: ID=%d, PosSource=%d, Lat=%.6f, Lon=%.6f", 
+                   i, state->ident, state->position_source, 
+                   state->predicted_lat, state->predicted_lon);
+    }
 
     RenderTransponder(state);
 
@@ -1631,7 +1864,10 @@ bool ropeless_pi::RenderGLOverlay(wxGLContext *pcontext, PlugIn_ViewPort *vp) {
 
   // m_select->SetSelectLLRadius(selec_radius);
 
-  // Render
+  // Render vessel range circle first (behind transponders)
+  RenderVesselRangeCircle();
+  
+  // Render transponders
   RenderTrawls();
 
   return true;
@@ -1747,10 +1983,16 @@ void ropeless_pi::ProcessRFACapture(void) {
 void ropeless_pi::placeTransponderManually(int xpdrId, int pairId, double lat,
                                            double lon, double utc, int pos_source) {
   
-  //wxLogMessage("Placing Transponder Manually!");
+  wxLogMessage("Placing Transponder Manually - ID: %d, Position Source: %s (%d)", 
+               xpdrId, positionSourceNames[pos_source], pos_source);
 
   transponder_state *this_transponder_state;
   this_transponder_state = addTransponderPos(xpdrId);
+
+  if (!this_transponder_state) {
+    wxLogMessage("ERROR: Failed to create transponder state for ID: %d", xpdrId);
+    return;
+  }
 
   this_transponder_state->ident = xpdrId;
   this_transponder_state->ident_partner = pairId;
@@ -1760,6 +2002,13 @@ void ropeless_pi::placeTransponderManually(int xpdrId, int pairId, double lat,
   this_transponder_state->predicted_lat = lat;
   this_transponder_state->predicted_lon = lon;
   this_transponder_state->position_source = pos_source;
+  
+  wxLogMessage("Transponder created: ID=%d, Lat=%.6f, Lon=%.6f, PosSource=%d (%s)", 
+               this_transponder_state->ident, 
+               this_transponder_state->predicted_lat, 
+               this_transponder_state->predicted_lon,
+               this_transponder_state->position_source,
+               positionSourceNames[this_transponder_state->position_source]);
 
   this_transponder_state->range = 0;
   this_transponder_state->bearing = 0;
@@ -1919,6 +2168,39 @@ void ropeless_pi::SetNMEASentence(wxString &sentence) {
                      m_NMEA0183.Gml.Ownership,
                      m_NMEA0183.Gml.Source,
                      m_NMEA0183.Gml.DateNum);
+        
+        // Update transponder state with GML data
+        transponder_state *tstate = GetStateByIdent(m_NMEA0183.Gml.MarkID);
+        if (!tstate) {
+            tstate = addTransponderPos(m_NMEA0183.Gml.MarkID);
+        }
+        
+        if (tstate) {
+            // Update GML status parameters
+            tstate->mark_type = m_NMEA0183.Gml.MarkType;
+            tstate->pos_status = m_NMEA0183.Gml.PosStatus;
+            tstate->trawl_id = m_NMEA0183.Gml.TrawlID;
+            tstate->trawl_num = m_NMEA0183.Gml.TrawlNum;
+            tstate->mfg_id = m_NMEA0183.Gml.MfgID;
+            tstate->mfg = m_NMEA0183.Gml.Mfg;
+            tstate->ownership = m_NMEA0183.Gml.Ownership;
+            tstate->source = m_NMEA0183.Gml.Source;
+            tstate->date_num = m_NMEA0183.Gml.DateNum;
+            
+            // Update position if available
+            if (m_NMEA0183.Gml.Latitude != 0.0 && m_NMEA0183.Gml.Longitude != 0.0) {
+                tstate->predicted_lat = m_NMEA0183.Gml.Latitude;
+                tstate->predicted_lon = m_NMEA0183.Gml.Longitude;
+                tstate->position_source = (m_NMEA0183.Gml.Source == 3) ? ePOS_SOURCE_GPS : ePOS_SOURCE_ACOUSTIC;
+            }
+            
+            // Update depth if available  
+            if (m_NMEA0183.Gml.Depth > 0) {
+                tstate->depth = m_NMEA0183.Gml.Depth;
+            }
+            
+            tstate->timeStamp = wxDateTime::Now().GetTicks();
+        }
                      
         // Forward message via TCP if connected
         if (IsTCPOutputConnected()) {
@@ -1939,6 +2221,34 @@ void ropeless_pi::SetNMEASentence(wxString &sentence) {
                      m_NMEA0183.Gms.SeafloorTemp,
                      m_NMEA0183.Gms.AirPressure,
                      m_NMEA0183.Gms.DateNum);
+        
+        // Update transponder state with GMS data  
+        transponder_state *tstate = GetStateByIdent(m_NMEA0183.Gms.MarkID);
+        if (!tstate) {
+            tstate = addTransponderPos(m_NMEA0183.Gms.MarkID);
+        }
+        
+        if (tstate) {
+            // Update existing fields that map to GMS data
+            tstate->release_status = m_NMEA0183.Gms.ReleaseStatus;
+            tstate->batt_stat = m_NMEA0183.Gms.Battery;
+            tstate->bearing = m_NMEA0183.Gms.Bearing;
+            
+            // Update new GMS status parameters
+            tstate->surface_range = m_NMEA0183.Gms.SurfaceRange;
+            tstate->slant_range = m_NMEA0183.Gms.SlantRange;
+            tstate->tilt = m_NMEA0183.Gms.Tilt;
+            tstate->seafloor_temp = m_NMEA0183.Gms.SeafloorTemp;
+            tstate->air_pressure = m_NMEA0183.Gms.AirPressure;
+            tstate->gms_date_num = m_NMEA0183.Gms.DateNum;
+            
+            // Update range - use surface range as primary range
+            if (m_NMEA0183.Gms.SurfaceRange > 0) {
+                tstate->range = m_NMEA0183.Gms.SurfaceRange;
+            }
+            
+            tstate->timeStamp = wxDateTime::Now().GetTicks();
+        }
                      
         // Forward message via TCP if connected
         if (IsTCPOutputConnected()) {
@@ -2257,59 +2567,13 @@ bool ropeless_pi::MouseEventHook(wxMouseEvent &event) {
 }
 
 void ropeless_pi::ShowPreferencesDialog(wxWindow *parent) {
-#if 0
-    TenderPrefsDialog *dialog = new TenderPrefsDialog( parent, wxID_ANY, _("Ropeless_pi Preferences"), wxPoint( 20, 20), wxDefaultSize, wxDEFAULT_DIALOG_STYLE );
-    dialog->Fit();
-    wxColour cl;
-    GetGlobalColor(_T("DILG1"), &cl);
-    dialog->SetBackgroundColour(cl);
-
-    dialog->m_comboPort->SetValue(m_serialPort);
-    dialog->m_wpComboPort->SetValue(m_trackedWP);
-
-    dialog->m_comboIcon->SetValue(m_tenderIconType);
-
-    wxString val;
-
-    val.Printf(_T("%4d"), m_tenderGPS_x);
-    dialog->m_pTenderGPSOffsetX->SetValue(val);
-    val.Printf(_T("%4d"), m_tenderGPS_y);
-    dialog->m_pTenderGPSOffsetY->SetValue(val);
-    val.Printf(_T("%4d"), m_tenderLength);
-    dialog->m_pTenderLength->SetValue(val);
-    val.Printf(_T("%4d"), m_tenderWidth);
-    dialog->m_pTenderWidth->SetValue(val);
-
-    if(dialog->ShowModal() == wxID_OK)
-    {
-        m_serialPort = dialog->m_comboPort->GetValue();
-
-        m_trackedWP = dialog->m_trackedPointName;
-        m_trackedWPGUID = dialog->m_trackedPointGUID;
-
-        m_tenderIconType = dialog->m_comboIcon->GetValue();
-
-        long val;
-        wxString str;
-        str = dialog->m_pTenderGPSOffsetX->GetValue();
-        if(str.ToLong(&val)) { m_tenderGPS_x = val; }
-
-        str = dialog->m_pTenderGPSOffsetY->GetValue();
-        if(str.ToLong(&val)) { m_tenderGPS_y = val; }
-
-        str = dialog->m_pTenderLength->GetValue();
-        if(str.ToLong(&val)) { m_tenderLength = val; }
-
-        str = dialog->m_pTenderWidth->GetValue();
-        if(str.ToLong(&val)) { m_tenderWidth = val; }
-
-         SaveConfig();
-
-         setTrackedWPSelect(m_trackedWPGUID);
-
+    RopelessPrefsDialog *dialog = new RopelessPrefsDialog(parent, this);
+    
+    if(dialog->ShowModal() == wxID_OK) {
+        // Settings are saved automatically in the dialog's OnOKClick method
     }
+    
     delete dialog;
-#endif
 }
 
 void ropeless_pi::toggleTransponderRecovered(int id)

@@ -219,10 +219,30 @@ public:
     distance = 0;
     pings = 0;
     position_source = ePOS_SOURCE_USER;
+
+    // Initialize GML parameters
+    mark_type = 0;
+    pos_status = 0;
+    trawl_id = 0;
+    trawl_num = 0;
+    mfg_id = 0;
+    mfg = 0;
+    ownership = 0;
+    source = 0;
+    date_num = 0.0;
+    
+    // Initialize GMS parameters  
+    surface_range = 0;
+    slant_range = 0;
+    tilt = 0;
+    seafloor_temp = 0;
+    air_pressure = 0;
+    gms_date_num = 0.0;
   }
 
   ~transponder_state() {};
 
+  // Original fields
   int ident;
   int ident_partner;
   int color_index;
@@ -240,6 +260,26 @@ public:
   int recovered_state;
   double distance;
   int position_source;
+  
+  // GML (Gear Mark Location) status parameters
+  int mark_type;        // MarkType from GML
+  int pos_status;       // PosStatus from GML  
+  int trawl_id;         // TrawlID from GML
+  int trawl_num;        // TrawlNum from GML
+  int mfg_id;           // MfgID from GML
+  int mfg;              // Mfg from GML
+  int ownership;        // Ownership from GML
+  int source;           // Source from GML
+  double date_num;      // DateNum from GML
+  
+  // GMS (Gear Mark Status) parameters
+  int surface_range;    // SurfaceRange from GMS
+  int slant_range;      // SlantRange from GMS  
+  int tilt;             // Tilt from GMS
+  int seafloor_temp;    // SeafloorTemp from GMS
+  int air_pressure;     // AirPressure from GMS
+  double gms_date_num;  // DateNum from GMS
+  
   std::deque<transponder_state_history *> historyQ;
 };
 
@@ -390,6 +430,7 @@ private:
   void RenderTrawls();
   void RenderTrawlConnector(transponder_state *state1,
                             transponder_state *state2);
+  void RenderVesselRangeCircle();
 
   void ProcessRFACapture(void);
   void ProcessRLACapture(void);

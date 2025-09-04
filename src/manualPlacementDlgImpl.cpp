@@ -31,6 +31,7 @@
 #endif
 
 #include "manualPlacementDlgImpl.h"
+#include "ropeless_pi.h"
 
 manualPlacementDlgImpl::manualPlacementDlgImpl(wxWindow* parent, int id, const wxString& title, const wxPoint& pos, const wxSize& size, long style,
 	const wxString& latStr, const wxString& lonStr, const wxString& utcStr) : manualPlacementDlg(parent, id, title, pos, size, style)
@@ -38,12 +39,16 @@ manualPlacementDlgImpl::manualPlacementDlgImpl(wxWindow* parent, int id, const w
 	//wxLogMessage("Creating manual placement dlg impl!");
 	isOwned = true;
 	valid = false;
+	positionSource = ePOS_SOURCE_USER; // Default to user
 
 	wxLogMessage("Creating Manual Placement Dialog! @ %s",utcStr);
 
 	m_staticText7->SetLabel(latStr);
 	m_staticText8->SetLabel(lonStr);
 	m_staticText111->SetLabel(utcStr);
+	
+	// Add position source dropdown control
+	AddPositionSourceControl();
 
 }
 
@@ -76,6 +81,16 @@ void manualPlacementDlgImpl::okPlaceTransponder(wxCommandEvent& event)
 		pairId = int(pid)*ownf;
 
 		valid = true;
+	}
+	
+	// Get selected position source
+	if (m_choicePositionSource) {
+		positionSource = m_choicePositionSource->GetSelection();
+		wxLogMessage("Manual placement dialog: Selected position source = %d (%s)", 
+		             positionSource, 
+		             (positionSource < 4) ? positionSourceNames[positionSource] : "UNKNOWN");
+	} else {
+		wxLogMessage("Manual placement dialog: WARNING - m_choicePositionSource is NULL");
 	}
 
     EndModal(wxID_OK);
@@ -112,4 +127,60 @@ void manualPlacementDlgImpl::OnChar(wxKeyEvent& event) {
     else if (keyCode == WXK_RETURN || keyCode == WXK_NUMPAD_ENTER) {
         event.Skip();
     }
+}
+
+void manualPlacementDlgImpl::AddPositionSourceControl() {
+    // Get the main sizer
+    wxSizer* mainSizer = this->GetSizer();
+    if (!mainSizer) return;
+    
+    // Create a horizontal sizer for the position source controls
+    wxBoxSizer* posSourceSizer = new wxBoxSizer(wxHORIZONTAL);
+    
+    // Add label
+    wxStaticText* posSourceLabel = new wxStaticText(this, wxID_ANY, _("Position Source:"), 
+                                                   wxDefaultPosition, wxSize(100, -1), 0);
+    posSourceSizer->Add(posSourceLabel, 0, wxALL | wxALIGN_CENTER_VERTICAL, 5);
+    
+    // Create the dropdown with position source options
+    wxArrayString choices;
+    choices.Add(_("USER"));
+    choices.Add(_("CLOUD"));
+    choices.Add(_("ACOUSTIC"));
+    choices.Add(_("GPS"));
+    
+    m_choicePositionSource = new wxChoice(this, wxID_ANY, wxDefaultPosition, 
+                                         wxSize(120, -1), choices);
+    m_choicePositionSource->SetSelection(ePOS_SOURCE_USER); // Default to USER
+    
+    posSourceSizer->Add(m_choicePositionSource, 0, wxALL, 5);
+    
+    // Add spacer to right-align
+    posSourceSizer->AddStretchSpacer(1);
+    
+    // Insert the position source sizer before the button sizer
+    // Find the button sizer (it should be the last item)
+    size_t sizerCount = mainSizer->GetItemCount();
+    if (sizerCount > 0) {
+        // Insert before the last item (which should be the buttons)
+        mainSizer->Insert(sizerCount - 1, posSourceSizer, 0, wxEXPAND | wxALL, 5);
+    } else {
+        // Fallback: just add it
+        mainSizer->Add(posSourceSizer, 0, wxEXPAND | wxALL, 5);
+    }
+    
+    // Connect the event handler
+    m_choicePositionSource->Connect(wxEVT_COMMAND_CHOICE_SELECTED, 
+                                   wxCommandEventHandler(manualPlacementDlgImpl::OnPositionSourceChanged), 
+                                   NULL, this);
+    
+    // Refresh the layout
+    this->Layout();
+    this->Fit();
+}
+
+void manualPlacementDlgImpl::OnPositionSourceChanged(wxCommandEvent& event) {
+    positionSource = m_choicePositionSource->GetSelection();
+    wxLogMessage("Position source changed to: %s", 
+                positionSourceNames[positionSource]);
 }

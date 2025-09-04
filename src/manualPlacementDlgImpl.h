@@ -27,6 +27,7 @@
 #define _MANUALPLACEMENTIMPL_H_
 
 #include "manualPlacementDlg.h"
+#include <wx/choice.h>
 
 /// Implementation of the GUI functionality for Preferences dialog.
 /// To obtain \c MainConfigFrame information use \c wxFormBuilder to open \c
@@ -35,6 +36,8 @@ class manualPlacementDlgImpl : public manualPlacementDlg {
     private:
 
         void OnChar(wxKeyEvent& event);
+        void AddPositionSourceControl();
+        void OnPositionSourceChanged(wxCommandEvent& event);
 
     public:
 
@@ -47,6 +50,10 @@ class manualPlacementDlgImpl : public manualPlacementDlg {
         int xpdrId;
         int pairId;
         bool valid;
+        int positionSource;
+        
+        // Position source dropdown control
+        wxChoice* m_choicePositionSource;
         
     protected:
 
