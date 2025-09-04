@@ -527,6 +527,11 @@ void RopelessDialog::RefreshTransponderList() {
   //  Walk the vector of transponder status
   for (unsigned int i = 0; i < transponderStatus.size(); i++) {
     transponder_state *state = transponderStatus[i];
+    
+    // Skip cloud positions from list display by default
+    if (state->position_source == ePOS_SOURCE_CLOUD) {
+      continue;
+    }
 
     wxListItem item;
     item.SetId(i);
@@ -749,7 +754,7 @@ void RopelessDialog::OnManualReleaseButton(wxCommandEvent &event) {
     wxLogMessage(s1);
 
     g_ropelessPI->manualReleaseState.ident = result;
-    g_ropelessPI->SendReleaseMessage(&g_ropelessPI->manualReleaseState, eCMD_RELEASE);
+    g_ropelessPI->SendCommandMessage(&g_ropelessPI->manualReleaseState, eCMD_RELEASE);
 
   }
 }

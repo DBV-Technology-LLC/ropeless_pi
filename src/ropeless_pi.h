@@ -387,7 +387,7 @@ public:
   int m_start_sim_id, m_stop_sim_id;
 
   transponder_state *m_foundState;
-  bool SendReleaseMessage(transponder_state *state, long code);
+  bool SendCommandMessage(transponder_state *state, long code);
   void SendSyncMessage(void);
   wxString GetConnectionStatusText();
   

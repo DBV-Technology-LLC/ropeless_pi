@@ -111,7 +111,7 @@ bool NMEA_TCP_OutputConnection::Connect()
         return false;
     }
     
-    wxLogMessage("NMEA TCP Output: Connecting to %s:%d", m_host, m_port);
+    // wxLogMessage("NMEA TCP Output: Connecting to %s:%d", m_host, m_port);
     return true;
 }
 
@@ -128,7 +128,7 @@ void NMEA_TCP_OutputConnection::Disconnect()
     }
     
     m_connectionState = STATE_DISCONNECTED;
-    wxLogMessage("NMEA TCP Output: Disconnected from %s:%d", m_host, m_port);
+    // wxLogMessage("NMEA TCP Output: Disconnected from %s:%d", m_host, m_port);
 }
 
 bool NMEA_TCP_OutputConnection::IsConnected() const
@@ -247,14 +247,14 @@ void NMEA_TCP_OutputConnection::OnSocketEvent(wxSocketEvent& event)
 {
     switch (event.GetSocketEvent()) {
         case wxSOCKET_CONNECTION:
-            wxLogMessage("NMEA TCP Output: Connected to %s:%d", m_host, m_port);
+            // wxLogMessage("NMEA TCP Output: Connected to %s:%d", m_host, m_port);
             m_connectionState = STATE_CONNECTED;
             StopReconnectTimer();
             ProcessOutgoingQueue(); // Send any queued messages
             break;
             
         case wxSOCKET_LOST:
-            wxLogMessage("NMEA TCP Output: Connection lost to %s:%d", m_host, m_port);
+            // wxLogMessage("NMEA TCP Output: Connection lost to %s:%d", m_host, m_port);
             HandleConnectionError();
             break;
             
@@ -271,7 +271,7 @@ void NMEA_TCP_OutputConnection::OnSocketEvent(wxSocketEvent& event)
 void NMEA_TCP_OutputConnection::OnReconnectTimer(wxTimerEvent& event)
 {
     if (m_connectionState != STATE_CONNECTED && m_autoReconnect) {
-        wxLogMessage("NMEA TCP Output: Attempting to reconnect to %s:%d", m_host, m_port);
+        // wxLogMessage("NMEA TCP Output: Attempting to reconnect to %s:%d", m_host, m_port);
         Connect();
     }
 }

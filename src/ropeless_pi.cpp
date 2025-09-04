@@ -493,7 +493,7 @@ void ropeless_pi::OnToolbarToolCallback(int id) {
   // if (!m_buseable) return;
   if (NULL == m_pRLDialog) {
     m_pRLDialog = new RopelessDialog(
-        m_parent_window, this, -1, "Ropeless Fishing v2.3.0.2", wxDefaultPosition,
+        m_parent_window, this, -1, "Ropeless Fishing v3.0.0.0", wxDefaultPosition,
         wxDefaultSize, wxCAPTION | wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER);
     wxFont *pFont = OCPNGetFont(_T("Dialog"), 0);
     m_pRLDialog->SetFont(*pFont);
@@ -715,7 +715,7 @@ void ropeless_pi::PopupMenuHandler(wxCommandEvent &event) {
         result = -1;
       }
 
-      if (result >= 0) SendReleaseMessage(m_foundState, eCMD_RELEASE);
+      if (result >= 0) SendCommandMessage(m_foundState, eCMD_RELEASE);
 
       handled = true;
       break;
@@ -813,7 +813,7 @@ unsigned char ropeless_pi::ComputeChecksum(wxString msg) {
   return (checksum_value);
 }
 
-bool ropeless_pi::SendReleaseMessage(transponder_state *state, long code) {
+bool ropeless_pi::SendCommandMessage(transponder_state *state, long code) {
   bool ret = true;
 
   // Don't send a release if we're actively tracking a current request
@@ -824,7 +824,7 @@ bool ropeless_pi::SendReleaseMessage(transponder_state *state, long code) {
 
   if (state == NULL) 
   {
-    wxLogMessage("Error: SendReleaseMessage state = NULL");
+    wxLogMessage("Error: SendCommandMessage state = NULL");
     return false;
   }
 
@@ -1535,7 +1535,7 @@ void ropeless_pi::RenderTransponder(transponder_state *state) {
   // Check position source and draw appropriate shape
   if (state->position_source == ePOS_SOURCE_CLOUD) {
     // Debug logging
-    wxLogMessage("Rendering cloud position grey dot for transponder ID: %d", state->ident);
+    // wxLogMessage("Rendering cloud position grey dot for transponder ID: %d", state->ident);
     
     // Draw grey circle for cloud positions
     wxColour greyColour(128, 128, 128, opacity); // Grey color
@@ -1546,9 +1546,9 @@ void ropeless_pi::RenderTransponder(transponder_state *state) {
     m_oDC->DrawCircle(ab.x, ab.y, circle_size);
   } else {
     // Debug logging for other position sources
-    wxLogMessage("Rendering circle for transponder ID: %d, position_source: %d (%s)", 
-                state->ident, state->position_source, 
-                (state->position_source < 4) ? positionSourceNames[state->position_source] : "UNKNOWN");
+    // wxLogMessage("Rendering circle for transponder ID: %d, position_source: %d (%s)", 
+    //             state->ident, state->position_source, 
+    //             (state->position_source < 4) ? positionSourceNames[state->position_source] : "UNKNOWN");
     
     // Draw regular circle for other position sources
     wxPen dpen(rcolour);
@@ -1619,8 +1619,8 @@ void ropeless_pi::RenderTransponder(transponder_state *state) {
     m_oDC->DrawLine(x3.x, x3.y, x4.x, x4.y, true);
   }
 
-  // Display transponder number above the shape (skip for cloud positions)
-  if (state->position_source != ePOS_SOURCE_CLOUD) {
+  // Display transponder number above the shape (skip for cloud positions and non-owned transponders)
+  if (state->position_source != ePOS_SOURCE_CLOUD && state->ident > 0) {
     wxString transponderText = wxString::Format(wxT("%d"), state->ident);
   
   // Create a memory bitmap to render text
@@ -1693,9 +1693,9 @@ void ropeless_pi::RenderVesselRangeCircle() {
   wxPoint vesselPos;
   GetCanvasPixLL(g_vp, &vesselPos, m_ownship_lat, m_ownship_lon);
   
-  // Calculate 10 nautical miles in screen pixels
+  // Calculate 5 nautical miles in screen pixels
   // 1 nautical mile = 1852 meters
-  double range_nm = 10.0;
+  double range_nm = 5.0;
   double range_meters = range_nm * 1852.0;
   
   // Calculate a point 10nm to the east of vessel
@@ -1759,7 +1759,7 @@ bool ropeless_pi::DeleteTransponder(int id)
   for (unsigned int i = 0; i < transponderStatus.size(); i++) {
     if (transponderStatus[i]->ident == id) {
 
-      SendReleaseMessage(GetStateByIdent(id),eCMD_DELETE);
+      SendCommandMessage(GetStateByIdent(id),eCMD_DELETE);
 
       transponderStatus.erase(transponderStatus.begin() + i);
 
@@ -1773,7 +1773,7 @@ bool ropeless_pi::DeleteTransponder(int id)
 void ropeless_pi::SendSyncMessage(void)
 {
   transponder_state empty = {};
-  SendReleaseMessage(&empty,eCMD_SYNC);
+  SendCommandMessage(&empty,eCMD_SYNC);
 }
 
 wxString ropeless_pi::GetConnectionStatusText() {
@@ -1794,11 +1794,11 @@ void ropeless_pi::RenderTrawls() {
     transponder_state *state = transponderStatus[i];
     
     // Always log cloud positions for debugging
-    if (state->position_source == ePOS_SOURCE_CLOUD || render_log_count % 100 == 0) {
-      wxLogMessage("Rendering transponder %d: ID=%d, PosSource=%d, Lat=%.6f, Lon=%.6f", 
-                   i, state->ident, state->position_source, 
-                   state->predicted_lat, state->predicted_lon);
-    }
+    // if (state->position_source == ePOS_SOURCE_CLOUD || render_log_count % 100 == 0) {
+    //   wxLogMessage("Rendering transponder %d: ID=%d, PosSource=%d, Lat=%.6f, Lon=%.6f", 
+    //                i, state->ident, state->position_source, 
+    //                state->predicted_lat, state->predicted_lon);
+    // }
 
     RenderTransponder(state);
 
@@ -2383,7 +2383,7 @@ bool ropeless_pi::SaveConfig(void) {
 }
 
 void ropeless_pi::ApplyConfig(void) {
-  // UDP mode requires no special initialization - handled in SendReleaseMessage
+  // UDP mode requires no special initialization - handled in SendCommandMessage
 }
 
 bool ropeless_pi::MouseEventHook(wxMouseEvent &event) {
@@ -2590,7 +2590,7 @@ void ropeless_pi::toggleTransponderRecovered(int id)
     else if (tstate->recovered_state == eREC_DEPLOYED)
     {
       tstate->recovered_state = eREC_RECOVERED;
-      SendReleaseMessage(tstate, eCMD_RECOVER);
+      SendCommandMessage(tstate, eCMD_RECOVER);
     }
   }
   else
@@ -2606,13 +2606,13 @@ void ropeless_pi::releaseCallbackRecovered(void)
   if (tstate != NULL) 
   {   
     tstate->recovered_state = eREC_RECOVERED;
-    SendReleaseMessage(tstate, eCMD_RECOVER);
+    SendCommandMessage(tstate, eCMD_RECOVER);
   }
 }
 
 void ropeless_pi::releaseCallbackRetry(void)
 {
-  SendReleaseMessage(m_release_tim_state.ptstate, eCMD_RELEASE);
+  SendCommandMessage(m_release_tim_state.ptstate, eCMD_RELEASE);
 }
 
 // TCP NMEA Output Methods
@@ -3545,7 +3545,7 @@ void PI_EventHandler::OnEvtOCPN_NMEA(PI_OCPN_DataStreamEvent &event) {
 //     wxLogMessage(s1);
 
 //     g_ropelessPI->manualReleaseState.ident = result;
-//     g_ropelessPI->SendReleaseMessage(&g_ropelessPI->manualReleaseState, eCMD_RELEASE);
+//     g_ropelessPI->SendCommandMessage(&g_ropelessPI->manualReleaseState, eCMD_RELEASE);
 
 //   }
 // }
