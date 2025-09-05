@@ -340,8 +340,8 @@ int ropeless_pi::Init(void) {
   //    And load the configuration items
   LoadConfig();
   
-  // Initialize TCP NMEA Output
-  InitializeTCPOutput();
+  // DISABLED: Initialize TCP NMEA Output
+  // DISABLED: InitializeTCPOutput();
 
   //     m_pTrackRolloverWin = new RolloverWin( GetOCPNCanvasWindow() );
   //     m_pTrackRolloverWin->SetPosition( wxPoint( 5, 150 ) );
@@ -367,7 +367,7 @@ int ropeless_pi::Init(void) {
 #endif
 
     m_event_handler = new PI_EventHandler(this);
-    m_serialThread = NULL;
+    // DISABLED: m_serialThread = NULL;
 
     //startSerial(m_serialPort);
 
@@ -428,113 +428,82 @@ int ropeless_pi::Init(void) {
 }
 
 bool ropeless_pi::DeInit(void) {
-  wxLogMessage("Ropeless Plugin: Starting DeInit");
+  // Clear global pointer FIRST to prevent other code from accessing plugin
+  g_ropelessPI = nullptr;
   
-  // if (IsRunning())  // Timer started?
-  //   Stop();         // Stop timer
-
-  wxLogMessage("Ropeless Plugin: Stopping timers");
-  // Stop all other timers
+  // Stop all timers to prevent callbacks during shutdown
   m_simulatorTimer.Stop();
   m_releaseTimer.Stop();
   m_distanceTimer.Stop();
   m_RolloverPopupTimer.Stop();
   m_head_dog_timer.Stop();
   
-  wxLogMessage("Ropeless Plugin: Timers stopped");
-
-  // Clean up event handler
-  wxLogMessage("Ropeless Plugin: Cleaning up event handler");
-  if (m_event_handler) {
-    delete m_event_handler;
-    m_event_handler = nullptr;
+  // Disconnect ALL event handlers that reference 'this' plugin
+  try {
+    wxWindow* canvas = GetOCPNCanvasWindow();
+    if (canvas) {
+      // Disconnect popup menu event handlers to prevent callbacks to destroyed plugin
+      canvas->Disconnect(ID_TPR_RELEASE, wxEVT_COMMAND_MENU_SELECTED,
+                        wxCommandEventHandler(ropeless_pi::PopupMenuHandler), NULL, this);
+      canvas->Disconnect(ID_TPR_RECOVER, wxEVT_COMMAND_MENU_SELECTED,
+                        wxCommandEventHandler(ropeless_pi::PopupMenuHandler), NULL, this);
+      canvas->Disconnect(ID_TPR_DELETE, wxEVT_COMMAND_MENU_SELECTED,
+                        wxCommandEventHandler(ropeless_pi::PopupMenuHandler), NULL, this);
+    }
+  } catch (...) {
+    // Ignore any exceptions - canvas may already be destroyed
   }
   
-  // Clean up socket
-  wxLogMessage("Ropeless Plugin: Cleaning up socket");
-  if (m_tsock) {
-    delete m_tsock;
-    m_tsock = nullptr;
+  // Remove plugin UI elements AFTER disconnecting events
+  try {
+    RemovePlugInTool(m_leftclick_tool_id);
+    RemoveCanvasContextMenuItem(m_place_trap_manually);
+    RemoveCanvasContextMenuItem(m_place_trap_now);
+  } catch (...) {
+    // Ignore any exceptions during UI cleanup
   }
-
-  //     int tsec = 2;
-  //     while(tsec--)
-  //         wxSleep(1);
-
-  RemovePlugInTool(m_leftclick_tool_id);
-
-  // Persist control dialog size/position and clean up FIRST
-  wxLogMessage("Ropeless Plugin: Processing dialog cleanup");
+  
+  // Safely close dialogs without using potentially invalid parent windows
   if (m_pRLDialog) {
-    wxLogMessage("Ropeless Plugin: Saving dialog position/size");
-    wxPoint p = m_pRLDialog->GetPosition();
-    m_dialogPosX = p.x;
-    m_dialogPosY = p.y;
-    wxSize s = m_pRLDialog->GetSize();
-    m_dialogSizeWidth = s.x;
-    m_dialogSizeHeight = s.y;
-    
-    wxLogMessage("Ropeless Plugin: Clearing list control items");
-    // Clear the list control BEFORE destroying to prevent sort callback crashes
-    m_pRLDialog->m_pListCtrlTranponders->DeleteAllItems();
-    
-    wxLogMessage("Ropeless Plugin: Closing dialog");
-    // Properly close and destroy the dialog to prevent crashes
-    m_pRLDialog->Close(); // This will trigger OnClose which sets m_pRLDialog = NULL
-    // Don't set m_pRLDialog = nullptr here - OnClose already handles it
-    wxLogMessage("Ropeless Plugin: Dialog closed");
-  } else {
-    wxLogMessage("Ropeless Plugin: No dialog to clean up");
+    try {
+      if (m_pRLDialog->IsShown()) {
+        m_pRLDialog->Hide();  // Hide first, safer than Close()
+      }
+      m_pRLDialog->Destroy();  // Then destroy
+    } catch (...) {
+      // Ignore any exceptions during cleanup
+    }
+    m_pRLDialog = nullptr;
   }
-
-  // SAFE: Clean up transponder status vector AFTER dialog is destroyed
-  wxLogMessage("Ropeless Plugin: Cleaning up transponder vector");
-  for (auto& transponder : transponderStatus) {
-    delete transponder;
-  }
-  transponderStatus.clear();
-  wxLogMessage("Ropeless Plugin: Transponder vector cleaned");
-
-  RemoveCanvasContextMenuItem(m_place_trap_manually);
-  RemoveCanvasContextMenuItem(m_place_trap_now);
-
-  // Cleanup TCP NMEA Output
-  ShutdownTCPOutput();
-
-  SaveConfig();
-
-  SaveTransponderStatus();  // Create XML file
-
-#ifdef SHOW_DISTANCE
-  stopDistanceTimer();
-#endif
-
-  delete m_releaseDlg;
   
-  // Clean up popup window
+  if (m_releaseDlg) {
+    try {
+      if (m_releaseDlg->IsShown()) {
+        m_releaseDlg->Hide();
+      }
+      m_releaseDlg->Destroy();
+    } catch (...) {
+      // Ignore any exceptions during cleanup
+    }
+    m_releaseDlg = nullptr;
+  }
+  
+  // Clean up popup window safely
   if (popup) {
-    delete popup;
+    try {
+      if (popup->IsShown()) {
+        popup->Hide();
+      }
+      popup->Destroy();
+    } catch (...) {
+      // Ignore any exceptions during cleanup
+    }
     popup = nullptr;
   }
   
-  // Clean up thread if running
-  if (m_serialThread) {
-    // Note: Proper thread cleanup would go here if the thread was active
-    m_serialThread = nullptr;
-  }
-
-  // Clean up other allocated objects
-  if (m_select) {
-    delete m_select;
-    m_select = nullptr;
-  }
+  // Clear window pointer to prevent use of invalid parent
+  m_parent_window = nullptr;
   
-  if (m_oDC) {
-    delete m_oDC;
-    m_oDC = nullptr;
-  }
-
-  wxLogMessage("Ropeless Plugin: DeInit completed successfully");
   return true;
 }
 
