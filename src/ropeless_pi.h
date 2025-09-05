@@ -305,7 +305,7 @@ public:
 class ropeless_pi : public wxTimer, opencpn_plugin_112 {
 public:
   ropeless_pi(void *ppimgr);
-  ~ropeless_pi(void);
+  virtual ~ropeless_pi(void);
 
   //    The required PlugIn Methods
   int Init(void);

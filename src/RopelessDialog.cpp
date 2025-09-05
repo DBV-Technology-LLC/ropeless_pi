@@ -33,6 +33,7 @@
 #include <wx/imaglist.h>
 #include <wx/menu.h>
 #include <wx/msgdlg.h>
+#include <wx/notebook.h>
 #include <sstream>
 
 #include "mynumdlg.h"
@@ -90,9 +91,13 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
 
   this->SetSizeHints(wxDefaultSize, wxDefaultSize);
 
-  wxBoxSizer *bSizer2;
-  bSizer2 = new wxBoxSizer(wxVERTICAL);
+  // Create main layout (no tabs)
+  wxBoxSizer *overallSizer = new wxBoxSizer(wxVERTICAL);
+  wxBoxSizer *bSizer2 = new wxBoxSizer(wxHORIZONTAL);
 
+  // Create main content sizer (left side)
+  wxBoxSizer *mainContentSizer = new wxBoxSizer(wxVERTICAL);
+  
   long flags = wxLC_REPORT | wxLC_SINGLE_SEL | wxLC_HRULES | wxLC_VRULES |
                wxBORDER_SUNKEN;
 
@@ -100,7 +105,7 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
 
   m_pListCtrlTranponders = new OCPNListCtrl(
       this, ID_TRANSPONDER_LIST, wxDefaultPosition, wxDefaultSize, flags);
-  bSizer2->Add(m_pListCtrlTranponders, 1, wxEXPAND | wxALL, 0);
+  mainContentSizer->Add(m_pListCtrlTranponders, 1, wxEXPAND | wxALL, 0);
 
 #ifdef __ANDROID__
   wxFont *pFont = OCPNGetFont(_T("Dialog"), 0);
@@ -216,73 +221,110 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
 
   m_pListCtrlTranponders->AssignImageList(imglist, wxIMAGE_LIST_SMALL);
 
-#ifndef __ANDROID__
-  wxStaticBoxSizer *sbSizerSim = new wxStaticBoxSizer(
-      new wxStaticBox(this, wxID_ANY, _("Simulator")), wxVERTICAL);
-  bSizer2->Add(sbSizerSim, 0, wxALL | wxEXPAND, 5);
 
-  m_simTextCtrl =
-      new wxTextCtrl(this, wxID_ANY, wxEmptyString, wxDefaultPosition,
-                     wxDefaultSize, wxTE_READONLY);
-  sbSizerSim->Add(m_simTextCtrl, 0, wxEXPAND | wxALL, 5);
+  // Add main content to horizontal sizer
+  bSizer2->Add(mainContentSizer, 1, wxEXPAND | wxALL, 0);
+  
+  // Create sidebar (right side)
+  wxBoxSizer *sidebarSizer = new wxBoxSizer(wxVERTICAL);
+  
+  // Tab view for transponder info/status/position (at top of sidebar)
+  m_transponderInfoNotebook = new wxNotebook(this, wxID_ANY);
+  
+  // Info tab
+  m_infoPanel = new wxPanel(m_transponderInfoNotebook, wxID_ANY);
+  wxBoxSizer *infoSizer = new wxBoxSizer(wxVERTICAL);
+  wxStaticText *infoText = new wxStaticText(m_infoPanel, wxID_ANY, _("Transponder Info"));
+  infoSizer->Add(infoText, 0, wxALL, 5);
+  m_infoPanel->SetSizer(infoSizer);
+  m_transponderInfoNotebook->AddPage(m_infoPanel, _("Info"), true);
+  
+  // Status tab
+  m_statusPanel = new wxPanel(m_transponderInfoNotebook, wxID_ANY);
+  wxBoxSizer *statusSizer = new wxBoxSizer(wxVERTICAL);
+  wxStaticText *statusText = new wxStaticText(m_statusPanel, wxID_ANY, _("Transponder Status"));
+  statusSizer->Add(statusText, 0, wxALL, 5);
+  m_statusPanel->SetSizer(statusSizer);
+  m_transponderInfoNotebook->AddPage(m_statusPanel, _("Status"), false);
+  
+  // Position tab
+  m_positionPanel = new wxPanel(m_transponderInfoNotebook, wxID_ANY);
+  wxBoxSizer *positionSizer = new wxBoxSizer(wxVERTICAL);
+  wxStaticText *positionText = new wxStaticText(m_positionPanel, wxID_ANY, _("Transponder Position"));
+  positionSizer->Add(positionText, 0, wxALL, 5);
+  m_positionPanel->SetSizer(positionSizer);
+  m_transponderInfoNotebook->AddPage(m_positionPanel, _("Position"), false);
+  
+  sidebarSizer->Add(m_transponderInfoNotebook, 1, wxEXPAND | wxALL, 5);
+  
+  // Command buttons block
+  wxStaticBoxSizer *commandButtonsSizer = new wxStaticBoxSizer(
+      new wxStaticBox(this, wxID_ANY, _("Commands")), wxVERTICAL);
+  
+  wxBoxSizer *buttonRow1 = new wxBoxSizer(wxHORIZONTAL);
+  m_releaseButton = new wxButton(this, wxID_ANY, _("Release"), wxDefaultPosition, wxDefaultSize, 0);
+  m_recoverButton = new wxButton(this, wxID_ANY, _("Recover"), wxDefaultPosition, wxDefaultSize, 0);
+  m_deleteButton = new wxButton(this, wxID_ANY, _("Delete"), wxDefaultPosition, wxDefaultSize, 0);
+  buttonRow1->Add(m_releaseButton, 0, wxALL, 2);
+  buttonRow1->Add(m_recoverButton, 0, wxALL, 2);
+  buttonRow1->Add(m_deleteButton, 0, wxALL, 2);
+  
+  wxBoxSizer *buttonRow2 = new wxBoxSizer(wxHORIZONTAL);
+  m_muteButton = new wxButton(this, wxID_ANY, _("Mute"), wxDefaultPosition, wxDefaultSize, 0);
+  m_sidebarSyncButton = new wxButton(this, wxID_ANY, _("Sync"), wxDefaultPosition, wxDefaultSize, 0);
+  buttonRow2->Add(m_muteButton, 0, wxALL, 2);
+  buttonRow2->Add(m_sidebarSyncButton, 0, wxALL, 2);
+  
+  wxBoxSizer *buttonRow3 = new wxBoxSizer(wxHORIZONTAL);
+  m_showOnMapButton = new wxButton(this, wxID_ANY, _("Show On Map"), wxDefaultPosition, wxDefaultSize, 0);
+  m_ManualReleaseButton = new wxButton(this, wxID_ANY, _("Manual Release"), wxDefaultPosition, wxDefaultSize, 0);
+  buttonRow3->Add(m_showOnMapButton, 0, wxALL, 2);
+  buttonRow3->Add(m_ManualReleaseButton, 0, wxALL, 2);
+  m_ManualReleaseButton->Bind(wxEVT_COMMAND_BUTTON_CLICKED, &RopelessDialog::OnManualReleaseButton, this);
+  
+  commandButtonsSizer->Add(buttonRow1, 0, wxEXPAND, 0);
+  commandButtonsSizer->Add(buttonRow2, 0, wxEXPAND, 0);
+  commandButtonsSizer->Add(buttonRow3, 0, wxEXPAND, 0);
+  sidebarSizer->Add(commandButtonsSizer, 0, wxEXPAND | wxALL, 5);
+  
+  // Deckbox Status box
+  m_deckboxStatusSizer = new wxStaticBoxSizer(
+      new wxStaticBox(this, wxID_ANY, _("Deckbox Status")), wxVERTICAL);
+  m_deckboxStatusText = new wxStaticText(this, wxID_ANY, _("Status: Ready"));
+  m_deckboxStatusSizer->Add(m_deckboxStatusText, 0, wxALL | wxEXPAND, 5);
+  sidebarSizer->Add(m_deckboxStatusSizer, 0, wxEXPAND | wxALL, 5);
+  
+  // Release Status block
+  m_releaseStatusSizer = new wxStaticBoxSizer(
+      new wxStaticBox(this, wxID_ANY, _("Release Status")), wxVERTICAL);
+  m_releaseStatusText = new wxStaticText(this, wxID_ANY, _("Status: Standby"));
+  m_releaseStatusSizer->Add(m_releaseStatusText, 0, wxALL | wxEXPAND, 5);
+  sidebarSizer->Add(m_releaseStatusSizer, 0, wxEXPAND | wxALL, 5);
+  
+  // Add sidebar to main horizontal sizer
+  bSizer2->Add(sidebarSizer, 0, wxEXPAND | wxALL, 5);
+  
+  // Add table/sidebar combo to main dialog
+  overallSizer->Add(bSizer2, 1, wxEXPAND, 0);
 
-  if (wxFileExists(msgFileName)) m_simTextCtrl->SetValue(msgFileName);
-
-  wxBoxSizer *bsizersimButtons = new wxBoxSizer(wxHORIZONTAL);
-  sbSizerSim->Add(bsizersimButtons, 0, wxEXPAND, 5);
-
-  m_ChooseFileButton = new wxButton(this, wxID_ANY, _("Choose File..."),
-                                    wxDefaultPosition, wxDefaultSize, 0);
-  bsizersimButtons->Add(m_ChooseFileButton, 0, wxALL, 5);
-  m_ChooseFileButton->Bind(wxEVT_COMMAND_BUTTON_CLICKED,
-                           &RopelessDialog::OnChooseFileButton, this);
-
-  m_StopSimButton = new wxButton(this, wxID_ANY, _("Stop Sim"),
-                                 wxDefaultPosition, wxDefaultSize, 0);
-  bsizersimButtons->Add(m_StopSimButton, 0, wxALL, 5);
-  m_StopSimButton->Bind(wxEVT_COMMAND_BUTTON_CLICKED,
-                        &RopelessDialog::OnStopSimButton, this);
-
-  m_StartSimButton = new wxButton(this, wxID_ANY, _("StartSim"),
-                                  wxDefaultPosition, wxDefaultSize, 0);
-  bsizersimButtons->Add(m_StartSimButton, 0, wxALL, 5);
-  m_StartSimButton->Bind(wxEVT_COMMAND_BUTTON_CLICKED,
-                         &RopelessDialog::OnStartSimButton, this);
-
-  m_ManualReleaseButton = new wxButton(this, wxID_ANY, _("Manual Release"),
-                                       wxDefaultPosition, wxDefaultSize, 0);
-  bsizersimButtons->Add(m_ManualReleaseButton, 0, wxALL, 5);
-  m_ManualReleaseButton->Bind(wxEVT_COMMAND_BUTTON_CLICKED,
-                              &RopelessDialog::OnManualReleaseButton, this);
-
-  m_SyncButton = new wxButton(this, wxID_ANY, _("Sync"),
-                                       wxDefaultPosition, wxDefaultSize, 0);
-  bsizersimButtons->Add(m_SyncButton, 0, wxALL, 5);
-  m_SyncButton->Bind(wxEVT_COMMAND_BUTTON_CLICKED,
-                              &RopelessDialog::OnSyncButton, this);
-
-  // Connection Status Display
-  m_ConnectionStatusText = new wxStaticText( this, wxID_ANY, _("Mode: UDP"), wxDefaultPosition, wxDefaultSize, 0 );
-  m_ConnectionStatusText->Wrap( -1 );
-  bsizersimButtons->Add( m_ConnectionStatusText, 0, wxALL, 5 );
-
-  if (pParentPi->m_simulatorTimer.IsRunning()) {
-    m_StartSimButton->Hide();
-    m_StopSimButton->Show();
-  } else {
-    m_StopSimButton->Hide();
-    m_StartSimButton->Show();
-  }
-#endif
+  // Add debug box
+  wxStaticBoxSizer *debugSizer = new wxStaticBoxSizer(
+      new wxStaticBox(this, wxID_ANY, _("Debug Messages")), wxVERTICAL);
+  overallSizer->Add(debugSizer, 0, wxALL | wxEXPAND, 5);
+  
+  m_debugTextCtrl = new wxTextCtrl(this, wxID_ANY, wxEmptyString, 
+                                   wxDefaultPosition, wxSize(-1, 100), 
+                                   wxTE_MULTILINE | wxTE_READONLY | wxTE_WORDWRAP);
+  debugSizer->Add(m_debugTextCtrl, 1, wxEXPAND | wxALL, 5);
 
   m_sdbSizer1 = new wxStdDialogButtonSizer();
   m_sdbSizer1OK = new wxButton(this, wxID_OK);
   m_sdbSizer1->AddButton(m_sdbSizer1OK);
   m_sdbSizer1->Realize();
 
-  bSizer2->Add(m_sdbSizer1, 0, wxBOTTOM | wxEXPAND | wxTOP, 5);
+  overallSizer->Add(m_sdbSizer1, 0, wxBOTTOM | wxEXPAND | wxTOP, 5);
 
-  this->SetSizer(bSizer2);
+  this->SetSizer(overallSizer);
   this->Layout();
   // bSizer2->Fit( this );
 
@@ -692,41 +734,15 @@ void RopelessDialog::RefreshTransponderList() {
 }
 
 void RopelessDialog::OnChooseFileButton(wxCommandEvent &event) {
-  wxString file;
-  int response = PlatformFileSelectorDialog(
-      NULL, &file, _("Select an NMEA text file"),
-      *GetpPrivateApplicationDataLocation(), _T(""), _T("*.*"));
-
-  if (response == wxID_OK) {
-    if (::wxFileExists(file)) {
-      msgFileName = file;
-      m_simTextCtrl->SetValue(msgFileName);
-    }
-  }
+  // Simulator functionality removed
 }
 
 void RopelessDialog::OnStopSimButton(wxCommandEvent &event) {
-  SetCanvasContextMenuItemViz(pParentPi->m_start_sim_id, true);
-  SetCanvasContextMenuItemViz(pParentPi->m_stop_sim_id, false);
-
-  m_StopSimButton->Hide();
-  m_StartSimButton->Show();
-
-  pParentPi->stopSim();
-  Layout();
+  // Simulator functionality removed
 }
 
 void RopelessDialog::OnStartSimButton(wxCommandEvent &event) {
-  wxLogMessage("OnStartSimButton!");
-
-  if (::wxFileExists(msgFileName)) {
-    SetCanvasContextMenuItemViz(pParentPi->m_start_sim_id, false);
-    SetCanvasContextMenuItemViz(pParentPi->m_stop_sim_id, true);
-    m_StartSimButton->Hide();
-    m_StopSimButton->Show();
-    pParentPi->startSim();
-    Layout();
-  }
+  // Simulator functionality removed
 }
 
 void RopelessDialog::OnManualReleaseButton(wxCommandEvent &event) {
@@ -797,7 +813,10 @@ long RopelessDialog::FindItemByName(wxListCtrl* listCtrl, const wxString& name) 
 }
 
 void RopelessDialog::OnClose(wxCloseEvent &event) {
+  wxLogMessage("RopelessDialog: OnClose started");
+  
   clearHighlighted();
+  wxLogMessage("RopelessDialog: clearHighlighted completed");
 
 #ifndef __ANDROID__
   wxPoint p = GetPosition();
@@ -806,21 +825,20 @@ void RopelessDialog::OnClose(wxCloseEvent &event) {
   wxSize s = GetSize();
   pParentPi->m_dialogSizeWidth = s.x;
   pParentPi->m_dialogSizeHeight = s.y;
+  wxLogMessage("RopelessDialog: Position/size saved");
 #endif
-  // wxLogMessage("Closing Ropeless window [x]...");
-  // event.Skip();
+  
+  wxLogMessage("RopelessDialog: About to call Destroy()");
   Destroy();
+  wxLogMessage("RopelessDialog: Destroy() completed");
+  
   pParentPi->m_pRLDialog = NULL;
+  wxLogMessage("RopelessDialog: OnClose completed");
 }
 
 void RopelessDialog::OnOKClick(wxCommandEvent &event) {
   clearHighlighted();
 
-#ifndef __ANDROID__
-  m_StopSimButton->Hide();
-  m_StartSimButton->Show();
-  g_ropelessPI->stopSim();
-#endif
   Close();
 }
 

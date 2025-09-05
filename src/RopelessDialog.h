@@ -40,10 +40,13 @@
 #include <wx/textctrl.h>
 #include <wx/button.h>
 #include <wx/stattext.h>
+#include <wx/notebook.h>
+#include <wx/statbox.h>
 
 class ropeless_pi;
 class OCPNListCtrl;
 struct transponder_state;
+
 
 class RopelessDialog : public wxDialog {
 private:
@@ -67,11 +70,31 @@ public:
   wxTextCtrl *m_pTenderLength;
   wxTextCtrl *m_pTenderWidth;
 
-  wxTextCtrl *m_simTextCtrl;
-  wxButton *m_ChooseFileButton, *m_StopSimButton, *m_StartSimButton,
-      *m_ManualReleaseButton, *m_SyncButton;
+  wxButton *m_ManualReleaseButton, *m_SyncButton;
 
-  wxStaticText *m_ConnectionStatusText;
+  
+  // Sidebar components
+  wxNotebook *m_transponderInfoNotebook;
+  wxPanel *m_infoPanel;
+  wxPanel *m_statusPanel;
+  wxPanel *m_positionPanel;
+  
+  // Debug box
+  wxTextCtrl *m_debugTextCtrl;
+  
+  // Command buttons
+  wxButton *m_releaseButton;
+  wxButton *m_recoverButton;
+  wxButton *m_deleteButton;
+  wxButton *m_muteButton;
+  wxButton *m_sidebarSyncButton;
+  wxButton *m_showOnMapButton;
+  
+  // Status boxes
+  wxStaticBoxSizer *m_deckboxStatusSizer;
+  wxStaticText *m_deckboxStatusText;
+  wxStaticBoxSizer *m_releaseStatusSizer;
+  wxStaticText *m_releaseStatusText;
 
   ropeless_pi *pParentPi;
   OCPNListCtrl *m_pListCtrlTranponders;
@@ -82,7 +105,7 @@ public:
                  const wxPoint &pos = wxDefaultPosition,
                  const wxSize &size = wxDefaultSize,
                  long style = wxCAPTION | wxDEFAULT_DIALOG_STYLE);
-  ~RopelessDialog();
+  virtual ~RopelessDialog();
 
   void OnOKClick(wxCommandEvent &event);
   void OnClose(wxCloseEvent &event);
@@ -96,6 +119,7 @@ public:
   void OnTargetListColumnClicked(wxListEvent &event);
   void OnTargetRightClick(wxListEvent &event);
   void OnSyncButton(wxCommandEvent &event);
+  
 
   wxArrayInt GetSelectedItems();
   transponder_state *getXpdrFromIndex(int index);

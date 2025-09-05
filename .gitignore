@@ -2,3 +2,5 @@ build/
 cache/
 *.lnk
 *.7z
+NMEA_REV_D.md
+.claude/

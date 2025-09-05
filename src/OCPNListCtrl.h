@@ -32,7 +32,7 @@ class OCPNListCtrl : public wxListCtrl {
 public:
   OCPNListCtrl(RopelessDialog* parent, wxWindowID id, const wxPoint& pos,
                const wxSize& size, long style);
-  ~OCPNListCtrl();
+  virtual ~OCPNListCtrl();
 
   wxString OnGetItemText(long item, long column) const;
   int OnGetItemColumnImage(long item, long column) const;

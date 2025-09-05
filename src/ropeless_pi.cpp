@@ -428,10 +428,34 @@ int ropeless_pi::Init(void) {
 }
 
 bool ropeless_pi::DeInit(void) {
-  if (IsRunning())  // Timer started?
-    Stop();         // Stop timer
+  wxLogMessage("Ropeless Plugin: Starting DeInit");
+  
+  // if (IsRunning())  // Timer started?
+  //   Stop();         // Stop timer
 
-  //    delete m_event_handler;             // also diconnects serial events
+  wxLogMessage("Ropeless Plugin: Stopping timers");
+  // Stop all other timers
+  m_simulatorTimer.Stop();
+  m_releaseTimer.Stop();
+  m_distanceTimer.Stop();
+  m_RolloverPopupTimer.Stop();
+  m_head_dog_timer.Stop();
+  
+  wxLogMessage("Ropeless Plugin: Timers stopped");
+
+  // Clean up event handler
+  wxLogMessage("Ropeless Plugin: Cleaning up event handler");
+  if (m_event_handler) {
+    delete m_event_handler;
+    m_event_handler = nullptr;
+  }
+  
+  // Clean up socket
+  wxLogMessage("Ropeless Plugin: Cleaning up socket");
+  if (m_tsock) {
+    delete m_tsock;
+    m_tsock = nullptr;
+  }
 
   //     int tsec = 2;
   //     while(tsec--)
@@ -439,15 +463,37 @@ bool ropeless_pi::DeInit(void) {
 
   RemovePlugInTool(m_leftclick_tool_id);
 
-  // Persist control dialog size/position
+  // Persist control dialog size/position and clean up FIRST
+  wxLogMessage("Ropeless Plugin: Processing dialog cleanup");
   if (m_pRLDialog) {
+    wxLogMessage("Ropeless Plugin: Saving dialog position/size");
     wxPoint p = m_pRLDialog->GetPosition();
     m_dialogPosX = p.x;
     m_dialogPosY = p.y;
     wxSize s = m_pRLDialog->GetSize();
     m_dialogSizeWidth = s.x;
     m_dialogSizeHeight = s.y;
+    
+    wxLogMessage("Ropeless Plugin: Clearing list control items");
+    // Clear the list control BEFORE destroying to prevent sort callback crashes
+    m_pRLDialog->m_pListCtrlTranponders->DeleteAllItems();
+    
+    wxLogMessage("Ropeless Plugin: Closing dialog");
+    // Properly close and destroy the dialog to prevent crashes
+    m_pRLDialog->Close(); // This will trigger OnClose which sets m_pRLDialog = NULL
+    // Don't set m_pRLDialog = nullptr here - OnClose already handles it
+    wxLogMessage("Ropeless Plugin: Dialog closed");
+  } else {
+    wxLogMessage("Ropeless Plugin: No dialog to clean up");
   }
+
+  // SAFE: Clean up transponder status vector AFTER dialog is destroyed
+  wxLogMessage("Ropeless Plugin: Cleaning up transponder vector");
+  for (auto& transponder : transponderStatus) {
+    delete transponder;
+  }
+  transponderStatus.clear();
+  wxLogMessage("Ropeless Plugin: Transponder vector cleaned");
 
   RemoveCanvasContextMenuItem(m_place_trap_manually);
   RemoveCanvasContextMenuItem(m_place_trap_now);
@@ -465,7 +511,30 @@ bool ropeless_pi::DeInit(void) {
 
   delete m_releaseDlg;
   
+  // Clean up popup window
+  if (popup) {
+    delete popup;
+    popup = nullptr;
+  }
+  
+  // Clean up thread if running
+  if (m_serialThread) {
+    // Note: Proper thread cleanup would go here if the thread was active
+    m_serialThread = nullptr;
+  }
 
+  // Clean up other allocated objects
+  if (m_select) {
+    delete m_select;
+    m_select = nullptr;
+  }
+  
+  if (m_oDC) {
+    delete m_oDC;
+    m_oDC = nullptr;
+  }
+
+  wxLogMessage("Ropeless Plugin: DeInit completed successfully");
   return true;
 }
 
