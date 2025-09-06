@@ -199,8 +199,13 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
     wxBitmap tbm(imageRefSize, imageRefSize, -1);
     wxMemoryDC mdc(tbm);
     mdc.Clear();
-    wxString colorName =
-        colorTableNames[i];  // colorTableNames[state->color_index];
+    wxString colorName;
+    if (g_ropelessPI) {
+        colorName = g_ropelessPI->GetColorName(i);
+    } else {
+        // Fallback if plugin is being destroyed
+        colorName = (i == 0) ? "LIME GREEN" : "ORANGE";
+    }
     wxColour rcolour = wxTheColourDatabase->Find(colorName);
 
     if (!rcolour.IsOk()) rcolour = wxColour(255, 000, 255);

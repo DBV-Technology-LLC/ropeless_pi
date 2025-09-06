@@ -176,6 +176,7 @@ class SelectItem;
 class PI_EventHandler;
 class PI_OCP_DataStreamInput_Thread;
 class RopelessDialog;
+class RopelessPrefsDialog;
 class OCPNListCtrl;
 
 WX_DECLARE_OBJARRAY(vector2D *, ArrayOf2DPoints);
@@ -381,7 +382,16 @@ public:
   int m_tcp_port;
   bool m_tcp_enabled;
   bool m_tcp_auto_reconnect;
+  
+  // Display settings
+  bool m_colorblind_mode;
+  
+  // Debug settings
+  bool m_debug_enabled;
+  bool m_debug_show_nmea;
+  bool m_debug_show_log;
   RopelessDialog *m_pRLDialog;
+  RopelessPrefsDialog *m_pPrefsDialog;
 
   wxTimer m_simulatorTimer;
   int m_start_sim_id, m_stop_sim_id;
@@ -390,6 +400,7 @@ public:
   bool SendCommandMessage(transponder_state *state, long code);
   void SendSyncMessage(void);
   wxString GetConnectionStatusText();
+  wxString GetColorName(int color_index);
   
   // TCP NMEA Output Methods
   void InitializeTCPOutput();

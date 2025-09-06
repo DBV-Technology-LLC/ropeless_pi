@@ -148,6 +148,10 @@ WX_DEFINE_OBJARRAY(ArrayOf2DPoints);
 wxString colorTableNames[] = {"LIME GREEN",  // looks darker green
                               "ORANGE",      // looks darker red
                               "MAGENTA", "CYAN", "YELLOW"};
+
+wxString colorTableNamesColorblind[] = {"CYAN",       // colorblind-friendly cyan instead of green (owned)
+                                        "ORANGE",     // colorblind-friendly orange instead of red (non-owned)
+                                        "MAGENTA", "CYAN", "YELLOW"};
                             
 wxString msgFileName = "/home/dsr/Projects/ropeless_pi/NMEArevC_06072023.txt";
 
@@ -336,6 +340,17 @@ int ropeless_pi::Init(void) {
   m_tsock = NULL;
   m_nmea_tcp_output = NULL;
   
+  // Initialize configuration variables to default values before loading config
+  m_tcp_enabled = true;
+  m_tcp_auto_reconnect = true;
+  m_tcp_host = "localhost";
+  m_tcp_port = 4001;
+  m_colorblind_mode = false;
+  m_debug_enabled = false;
+  m_debug_show_nmea = false;
+  m_debug_show_log = false;
+  m_pRLDialog = nullptr;
+  m_pPrefsDialog = nullptr;
   
   //    And load the configuration items
   LoadConfig();
@@ -488,6 +503,19 @@ bool ropeless_pi::DeInit(void) {
     m_releaseDlg = nullptr;
   }
   
+  // Clean up preferences dialog if it exists
+  if (m_pPrefsDialog) {
+    try {
+      if (m_pPrefsDialog->IsShown()) {
+        m_pPrefsDialog->Hide();  // Hide first, safer than Close()
+      }
+      m_pPrefsDialog->Destroy();  // Then destroy
+    } catch (...) {
+      // Ignore any exceptions during cleanup
+    }
+    m_pPrefsDialog = nullptr;
+  }
+  
   // Clean up popup window safely
   if (popup) {
     try {
@@ -501,8 +529,37 @@ bool ropeless_pi::DeInit(void) {
     popup = nullptr;
   }
   
+  // Save transponder status to XML file before shutdown
+  try {
+    SaveTransponderStatus();
+    wxLogMessage("Ropeless Plugin: Transponder status saved to XML during shutdown");
+  } catch (...) {
+    wxLogMessage("Ropeless Plugin: ERROR - Failed to save transponder status to XML during shutdown");
+  }
+  
+  // Clean up TCP output connection
+  try {
+    ShutdownTCPOutput();
+  } catch (...) {
+    // Ignore any exceptions during TCP cleanup
+  }
+  
+  // Clear event handler
+  if (m_event_handler) {
+    try {
+      delete m_event_handler;
+    } catch (...) {
+      // Ignore any exceptions during cleanup
+    }
+    m_event_handler = nullptr;
+  }
+  
   // Clear window pointer to prevent use of invalid parent
   m_parent_window = nullptr;
+  
+  // Final safety - clear all dialog pointers
+  m_pRLDialog = nullptr;
+  m_releaseDlg = nullptr;
   
   return true;
 }
@@ -1510,7 +1567,7 @@ void ropeless_pi::RenderTransponder(transponder_state *state) {
   int circle_size = 10;
 
   wxPoint ab;
-  wxString colorName = colorTableNames[state->color_index];
+  wxString colorName = GetColorName(state->color_index);
   wxColour rcolour = wxTheColourDatabase->Find(colorName);
   int opacity;
 
@@ -1816,6 +1873,19 @@ void ropeless_pi::SendSyncMessage(void)
 
 wxString ropeless_pi::GetConnectionStatusText() {
   return _("Mode: UDP");
+}
+
+wxString ropeless_pi::GetColorName(int color_index) {
+  if (m_colorblind_mode) {
+    if (color_index >= 0 && color_index < COLOR_TABLE_COUNT) {
+      return colorTableNamesColorblind[color_index];
+    }
+  } else {
+    if (color_index >= 0 && color_index < COLOR_TABLE_COUNT) {
+      return colorTableNames[color_index];
+    }
+  }
+  return "MAGENTA";  // fallback color
 }
 
 void ropeless_pi::RenderTrawls() {
@@ -2361,6 +2431,14 @@ bool ropeless_pi::LoadConfig(void) {
     pConf->Read(_T( "TCP_Enabled" ), &m_tcp_enabled, tcp_enabled_default);
     pConf->Read(_T( "TCP_AutoReconnect" ), &m_tcp_auto_reconnect, tcp_auto_reconnect_default);
     
+    // Display Configuration
+    pConf->Read(_T( "Colorblind_Mode" ), &m_colorblind_mode, false);
+    
+    // Debug Configuration
+    pConf->Read(_T( "Debug_Enabled" ), &m_debug_enabled, false);
+    pConf->Read(_T( "Debug_ShowNMEA" ), &m_debug_show_nmea, false);
+    pConf->Read(_T( "Debug_ShowLog" ), &m_debug_show_log, false);
+    
     // Debug logging to see what was loaded
     wxLogMessage("TCP Config loaded - Host: %s, Port: %d, Enabled: %s, AutoReconnect: %s", 
                  m_tcp_host, m_tcp_port, 
@@ -2403,6 +2481,14 @@ bool ropeless_pi::SaveConfig(void) {
     pConf->Write(_T( "TCP_Port" ), m_tcp_port);
     pConf->Write(_T( "TCP_Enabled" ), m_tcp_enabled);
     pConf->Write(_T( "TCP_AutoReconnect" ), m_tcp_auto_reconnect);
+    
+    // Display Configuration
+    pConf->Write(_T( "Colorblind_Mode" ), m_colorblind_mode);
+    
+    // Debug Configuration
+    pConf->Write(_T( "Debug_Enabled" ), m_debug_enabled);
+    pConf->Write(_T( "Debug_ShowNMEA" ), m_debug_show_nmea);
+    pConf->Write(_T( "Debug_ShowLog" ), m_debug_show_log);
 
     // Communication mode (UDP only) - no need to save
 
@@ -2605,13 +2691,24 @@ bool ropeless_pi::MouseEventHook(wxMouseEvent &event) {
 }
 
 void ropeless_pi::ShowPreferencesDialog(wxWindow *parent) {
-    RopelessPrefsDialog *dialog = new RopelessPrefsDialog(parent, this);
-    
-    if(dialog->ShowModal() == wxID_OK) {
-        // Settings are saved automatically in the dialog's OnOKClick method
+    // Only allow one preferences dialog at a time
+    if (m_pPrefsDialog) {
+        // If dialog already exists, just bring it to front
+        m_pPrefsDialog->Raise();
+        return;
     }
     
-    delete dialog;
+    // Create the preferences dialog and track it
+    m_pPrefsDialog = new RopelessPrefsDialog(this, parent);
+    
+    // Show modal dialog
+    int result = m_pPrefsDialog->ShowModal();
+    
+    // Clean up after dialog closes
+    if (m_pPrefsDialog) {
+        m_pPrefsDialog->Destroy();
+        m_pPrefsDialog = nullptr;
+    }
 }
 
 void ropeless_pi::toggleTransponderRecovered(int id)

@@ -34,141 +34,141 @@
 #include "RopelessPrefsDialog.h"
 #include "ropeless_pi.h"
 
+#include <wx/textctrl.h>
+#include <wx/checkbox.h>
+#include <wx/spinctrl.h>
+#include <wx/statbox.h>
+#include <wx/sizer.h>
+
 enum {
-    ID_TCP_ENABLED = 1000
+    ID_TEST_CHECKBOX = 1000,
+    ID_DEBUG_ENABLED
 };
 
 wxBEGIN_EVENT_TABLE(RopelessPrefsDialog, wxDialog)
     EVT_BUTTON(wxID_OK, RopelessPrefsDialog::OnOKClick)
     EVT_BUTTON(wxID_CANCEL, RopelessPrefsDialog::OnCancelClick)
-    EVT_CLOSE(RopelessPrefsDialog::OnClose)
-    EVT_CHECKBOX(ID_TCP_ENABLED, RopelessPrefsDialog::OnTcpEnabledClick)
+    EVT_CHECKBOX(ID_TEST_CHECKBOX, RopelessPrefsDialog::OnTestCheckbox)
+    EVT_CHECKBOX(ID_DEBUG_ENABLED, RopelessPrefsDialog::OnDebugEnabledClick)
 wxEND_EVENT_TABLE()
 
-RopelessPrefsDialog::RopelessPrefsDialog(wxWindow *parent, ropeless_pi *parent_pi,
+RopelessPrefsDialog::RopelessPrefsDialog(ropeless_pi *parent_pi, wxWindow *parent,
                                        wxWindowID id, const wxString &title,
                                        const wxPoint &pos, const wxSize &size,
                                        long style)
     : wxDialog(parent, id, title, pos, size, style), m_parent_pi(parent_pi) {
     
     CreateControls();
-    SetSizer();
-    LoadSettings();
-    UpdateTcpControls();
-    
-    // Set dialog colors to match OpenCPN theme
-    wxColour cl;
-    GetGlobalColor(_T("DILG1"), &cl);
-    SetBackgroundColour(cl);
-    
     Fit();
     Centre();
 }
 
 RopelessPrefsDialog::~RopelessPrefsDialog() {
+    // Mark plugin pointer as invalid during destruction
+    m_parent_pi = nullptr;
 }
 
 void RopelessPrefsDialog::CreateControls() {
-    // TCP NMEA Output section
-    m_tcpBox = new wxStaticBox(this, wxID_ANY, _("TCP NMEA Output"));
-    
-    m_cbTcpEnabled = new wxCheckBox(this, ID_TCP_ENABLED, _("Enable TCP NMEA Output"));
-    
-    wxStaticText *hostLabel = new wxStaticText(this, wxID_ANY, _("Host:"));
-    m_tcTcpHost = new wxTextCtrl(this, wxID_ANY, wxEmptyString, wxDefaultPosition, wxSize(150, -1));
-    
-    wxStaticText *portLabel = new wxStaticText(this, wxID_ANY, _("Port:"));
-    m_scTcpPort = new wxSpinCtrl(this, wxID_ANY, wxEmptyString, wxDefaultPosition, wxSize(80, -1),
-                                wxSP_ARROW_KEYS, 1, 65535, 4001);
-    
-    m_cbTcpAutoReconnect = new wxCheckBox(this, wxID_ANY, _("Auto-reconnect on connection loss"));
-    
-    // Standard dialog buttons
-    m_sdbSizer = new wxStdDialogButtonSizer();
-    m_sdbSizerOK = new wxButton(this, wxID_OK);
-    m_sdbSizerCancel = new wxButton(this, wxID_CANCEL);
-    m_sdbSizer->AddButton(m_sdbSizerOK);
-    m_sdbSizer->AddButton(m_sdbSizerCancel);
-    m_sdbSizer->Realize();
-}
-
-void RopelessPrefsDialog::SetSizer() {
     wxBoxSizer *mainSizer = new wxBoxSizer(wxVERTICAL);
     
-    // TCP section
-    wxStaticBoxSizer *tcpSizer = new wxStaticBoxSizer(m_tcpBox, wxVERTICAL);
+    // Test checkbox (keeping it for now)
+    m_cbTest = new wxCheckBox(this, ID_TEST_CHECKBOX, _("Test checkbox (WITH event)"));
+    m_cbTest->SetValue(true);  // Set to true by default
+    mainSizer->Add(m_cbTest, 0, wxALL, 20);
     
-    tcpSizer->Add(m_cbTcpEnabled, 0, wxALL, 5);
+    // Colorblind mode checkbox - load from plugin setting
+    m_cbColorblind = new wxCheckBox(this, wxID_ANY, _("Colorblind mode"));
+    if (m_parent_pi) {
+        m_cbColorblind->SetValue(m_parent_pi->m_colorblind_mode);
+    }
+    mainSizer->Add(m_cbColorblind, 0, wxALL, 5);
     
-    // Host and port on same line
-    wxBoxSizer *hostPortSizer = new wxBoxSizer(wxHORIZONTAL);
-    hostPortSizer->Add(new wxStaticText(this, wxID_ANY, _("Host:")), 0, wxALIGN_CENTER_VERTICAL | wxALL, 5);
-    hostPortSizer->Add(m_tcTcpHost, 1, wxALL, 5);
-    hostPortSizer->Add(new wxStaticText(this, wxID_ANY, _("Port:")), 0, wxALIGN_CENTER_VERTICAL | wxALL, 5);
-    hostPortSizer->Add(m_scTcpPort, 0, wxALL, 5);
+    // Debug section
+    wxStaticBox *debugBox = new wxStaticBox(this, wxID_ANY, _("Debug Options"));
+    wxStaticBoxSizer *debugSizer = new wxStaticBoxSizer(debugBox, wxVERTICAL);
     
-    tcpSizer->Add(hostPortSizer, 0, wxEXPAND | wxALL, 5);
-    tcpSizer->Add(m_cbTcpAutoReconnect, 0, wxALL, 5);
+    m_cbDebugEnabled = new wxCheckBox(this, ID_DEBUG_ENABLED, _("Enable Debug"));
+    if (m_parent_pi) {
+        m_cbDebugEnabled->SetValue(m_parent_pi->m_debug_enabled);
+    }
+    debugSizer->Add(m_cbDebugEnabled, 0, wxALL, 5);
     
-    mainSizer->Add(tcpSizer, 0, wxEXPAND | wxALL, 10);
+    m_cbShowNMEA = new wxCheckBox(this, wxID_ANY, _("Show NMEA"));
+    if (m_parent_pi) {
+        m_cbShowNMEA->SetValue(m_parent_pi->m_debug_show_nmea);
+    }
+    debugSizer->Add(m_cbShowNMEA, 0, wxALL, 5);
     
-    // Add some spacing before buttons
-    mainSizer->AddSpacer(10);
+    m_cbShowLog = new wxCheckBox(this, wxID_ANY, _("Show Log"));
+    if (m_parent_pi) {
+        m_cbShowLog->SetValue(m_parent_pi->m_debug_show_log);
+    }
+    debugSizer->Add(m_cbShowLog, 0, wxALL, 5);
     
-    // Dialog buttons
-    mainSizer->Add(m_sdbSizer, 0, wxEXPAND | wxALL, 10);
+    mainSizer->Add(debugSizer, 0, wxEXPAND | wxALL, 10);
     
-    wxDialog::SetSizer(mainSizer);
-}
-
-void RopelessPrefsDialog::LoadSettings() {
-    if (!m_parent_pi) return;
+    // Standard dialog buttons
+    wxStdDialogButtonSizer *buttonSizer = new wxStdDialogButtonSizer();
+    wxButton *okButton = new wxButton(this, wxID_OK);
+    wxButton *cancelButton = new wxButton(this, wxID_CANCEL);
+    buttonSizer->AddButton(okButton);
+    buttonSizer->AddButton(cancelButton);
+    buttonSizer->Realize();
     
-    // Load TCP settings
-    m_cbTcpEnabled->SetValue(m_parent_pi->m_tcp_enabled);
-    m_tcTcpHost->SetValue(m_parent_pi->m_tcp_host);
-    m_scTcpPort->SetValue(m_parent_pi->m_tcp_port);
-    m_cbTcpAutoReconnect->SetValue(m_parent_pi->m_tcp_auto_reconnect);
-}
-
-void RopelessPrefsDialog::SaveSettings() {
-    if (!m_parent_pi) return;
+    mainSizer->Add(buttonSizer, 0, wxEXPAND | wxALL, 10);
     
-    // Save TCP settings
-    m_parent_pi->m_tcp_enabled = m_cbTcpEnabled->GetValue();
-    m_parent_pi->m_tcp_host = m_tcTcpHost->GetValue();
-    m_parent_pi->m_tcp_port = m_scTcpPort->GetValue();
-    m_parent_pi->m_tcp_auto_reconnect = m_cbTcpAutoReconnect->GetValue();
+    SetSizer(mainSizer);
     
-    // Configure TCP output with new settings
-    m_parent_pi->ConfigureTCPOutput(m_parent_pi->m_tcp_host, m_parent_pi->m_tcp_port, 
-                                   m_parent_pi->m_tcp_enabled, m_parent_pi->m_tcp_auto_reconnect);
-    
-    // Save to config file
-    m_parent_pi->SaveConfig();
-}
-
-void RopelessPrefsDialog::UpdateTcpControls() {
-    bool enabled = m_cbTcpEnabled->GetValue();
-    
-    m_tcTcpHost->Enable(enabled);
-    m_scTcpPort->Enable(enabled);
-    m_cbTcpAutoReconnect->Enable(enabled);
+    // Set initial debug control states
+    UpdateDebugControls();
 }
 
 void RopelessPrefsDialog::OnOKClick(wxCommandEvent &event) {
-    SaveSettings();
+    // Save all settings (except TCP which we're avoiding)
+    if (m_parent_pi) {
+        try {
+            // Save colorblind mode
+            if (m_cbColorblind) {
+                m_parent_pi->m_colorblind_mode = m_cbColorblind->GetValue();
+            }
+            
+            // Save debug settings
+            if (m_cbDebugEnabled) {
+                m_parent_pi->m_debug_enabled = m_cbDebugEnabled->GetValue();
+            }
+            if (m_cbShowNMEA) {
+                m_parent_pi->m_debug_show_nmea = m_cbShowNMEA->GetValue();
+            }
+            if (m_cbShowLog) {
+                m_parent_pi->m_debug_show_log = m_cbShowLog->GetValue();
+            }
+            
+            // Save to config file
+            m_parent_pi->SaveConfig();
+        } catch (...) {
+            // Ignore any exceptions
+        }
+    }
     EndModal(wxID_OK);
+}
+
+void RopelessPrefsDialog::OnTestCheckbox(wxCommandEvent &event) {
+    // Simple event handler - do nothing
+    // Just testing if having an event handler causes crashes
+}
+
+void RopelessPrefsDialog::UpdateDebugControls() {
+    if (!m_cbDebugEnabled || !m_cbShowNMEA || !m_cbShowLog) return;
+    
+    bool enabled = m_cbDebugEnabled->GetValue();
+    m_cbShowNMEA->Enable(enabled);
+    m_cbShowLog->Enable(enabled);
+}
+
+void RopelessPrefsDialog::OnDebugEnabledClick(wxCommandEvent &event) {
+    UpdateDebugControls();
 }
 
 void RopelessPrefsDialog::OnCancelClick(wxCommandEvent &event) {
     EndModal(wxID_CANCEL);
-}
-
-void RopelessPrefsDialog::OnClose(wxCloseEvent &event) {
-    EndModal(wxID_CANCEL);
-}
-
-void RopelessPrefsDialog::OnTcpEnabledClick(wxCommandEvent &event) {
-    UpdateTcpControls();
 }

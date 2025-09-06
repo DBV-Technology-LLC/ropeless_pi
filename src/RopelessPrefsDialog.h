@@ -35,36 +35,12 @@
 #endif
 
 #include <wx/dialog.h>
-#include <wx/textctrl.h>
-#include <wx/checkbox.h>
-#include <wx/spinctrl.h>
-#include <wx/statbox.h>
-#include <wx/sizer.h>
 
 class ropeless_pi;
 
 class RopelessPrefsDialog : public wxDialog {
-private:
-    ropeless_pi *m_parent_pi;
-    
-    // TCP NMEA Output controls
-    wxStaticBox *m_tcpBox;
-    wxCheckBox *m_cbTcpEnabled;
-    wxTextCtrl *m_tcTcpHost;
-    wxSpinCtrl *m_scTcpPort;
-    wxCheckBox *m_cbTcpAutoReconnect;
-    
-    // Standard dialog buttons
-    wxStdDialogButtonSizer *m_sdbSizer;
-    wxButton *m_sdbSizerOK;
-    wxButton *m_sdbSizerCancel;
-    
-    void CreateControls();
-    void SetSizer();
-
-protected:
 public:
-    RopelessPrefsDialog(wxWindow *parent, ropeless_pi *parent_pi, 
+    RopelessPrefsDialog(ropeless_pi *parent_pi, wxWindow *parent,
                        wxWindowID id = wxID_ANY,
                        const wxString &title = _("Ropeless Preferences"),
                        const wxPoint &pos = wxDefaultPosition,
@@ -72,14 +48,24 @@ public:
                        long style = wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER);
     ~RopelessPrefsDialog();
 
+private:
+    ropeless_pi *m_parent_pi;
+    
+    // Test checkbox
+    wxCheckBox *m_cbTest;
+    // Colorblind mode setting
+    wxCheckBox *m_cbColorblind;
+    // Debug options
+    wxCheckBox *m_cbDebugEnabled;
+    wxCheckBox *m_cbShowNMEA;
+    wxCheckBox *m_cbShowLog;
+    
+    void CreateControls();
     void OnOKClick(wxCommandEvent &event);
     void OnCancelClick(wxCommandEvent &event);
-    void OnClose(wxCloseEvent &event);
-    void OnTcpEnabledClick(wxCommandEvent &event);
-    
-    void LoadSettings();
-    void SaveSettings();
-    void UpdateTcpControls();
+    void OnTestCheckbox(wxCommandEvent &event);
+    void OnDebugEnabledClick(wxCommandEvent &event);
+    void UpdateDebugControls();
 
     DECLARE_EVENT_TABLE()
 };
