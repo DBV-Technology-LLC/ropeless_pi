@@ -30,6 +30,7 @@
 #include "OCPNListCtrl.h"
 #include <wx/sizer.h>
 #include <wx/statbox.h>
+#include <wx/statline.h>
 #include <wx/imaglist.h>
 #include <wx/menu.h>
 #include <wx/msgdlg.h>
@@ -73,6 +74,16 @@ static int CompareD(double a, double b) {
       return 0;
   }
   return 0;
+}
+
+// Helper function to convert chart scale to pixels per meter
+double ScaleToPPM(int chart_scale, const PlugIn_ViewPort &vp)
+{
+    // Calculate pixels per meter from chart scale
+    // Chart scale 1:24000 means 1 unit on screen = 24000 units in real world
+    // For proper conversion: scale_ppm = pixels_per_inch / (39.37 * chart_scale)
+    double ppi = 96.0;  // pixels per inch (standard screen DPI)
+    return ppi / (39.37 * chart_scale);  // 39.37 inches per meter
 }
 
 BEGIN_EVENT_TABLE(RopelessDialog, wxDialog)
@@ -169,21 +180,21 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
                                        wxLIST_FORMAT_CENTER, txs.x + dx * 2);
 #endif
 
-  txs = GetTextExtent("Pings");
-  m_pListCtrlTranponders->InsertColumn(tlPINGS, _("Pings"),
-                                       wxLIST_FORMAT_CENTER, txs.x + dx * 2);
+  // txs = GetTextExtent("Pings");
+  // m_pListCtrlTranponders->InsertColumn(tlPINGS, _("Pings"),
+  //                                      wxLIST_FORMAT_CENTER, txs.x + dx * 2);
 
-  txs = GetTextExtent("Depth, M");
-  m_pListCtrlTranponders->InsertColumn(tlDEPTH, _("Depth, M"),
-                                       wxLIST_FORMAT_CENTER, txs.x + dx * 2);
+  // txs = GetTextExtent("Depth, M");
+  // m_pListCtrlTranponders->InsertColumn(tlDEPTH, _("Depth, M"),
+  //                                      wxLIST_FORMAT_CENTER, txs.x + dx * 2);
 
-  txs = GetTextExtent("Temperature, C");
-  m_pListCtrlTranponders->InsertColumn(tlTEMP, _("Temperature, C"),
-                                       wxLIST_FORMAT_CENTER, txs.x + dx * 2);
+  // txs = GetTextExtent("Temperature, C");
+  // m_pListCtrlTranponders->InsertColumn(tlTEMP, _("Temperature, C"),
+  //                                      wxLIST_FORMAT_CENTER, txs.x + dx * 2);
 
-  txs = GetTextExtent("Battery %");
-  m_pListCtrlTranponders->InsertColumn(tlBATT_STAT, _("Battery %"),
-                                       wxLIST_FORMAT_CENTER, txs.x + dx * 2);
+  // txs = GetTextExtent("Battery %");
+  // m_pListCtrlTranponders->InsertColumn(tlBATT_STAT, _("Battery %"),
+  //                                      wxLIST_FORMAT_CENTER, txs.x + dx * 2);
 
   txs = GetTextExtent("Recovered Status");
   m_pListCtrlTranponders->InsertColumn(tlRECOVERED, _("Recovered Status"),
@@ -233,30 +244,103 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
   // Create sidebar (right side)
   wxBoxSizer *sidebarSizer = new wxBoxSizer(wxVERTICAL);
   
+  // Selected transponder header
+  m_selectedTransponderLabel = new wxStaticText(this, wxID_ANY, _("Transponder: None Selected"));
+  wxFont headerFont = m_selectedTransponderLabel->GetFont();
+  headerFont.SetPointSize(headerFont.GetPointSize() + 2);
+  headerFont.SetWeight(wxFONTWEIGHT_BOLD);
+  m_selectedTransponderLabel->SetFont(headerFont);
+  sidebarSizer->Add(m_selectedTransponderLabel, 0, wxALL | wxALIGN_CENTER_HORIZONTAL, 5);
+  
   // Tab view for transponder info/status/position (at top of sidebar)
   m_transponderInfoNotebook = new wxNotebook(this, wxID_ANY);
   
   // Info tab
   m_infoPanel = new wxPanel(m_transponderInfoNotebook, wxID_ANY);
   wxBoxSizer *infoSizer = new wxBoxSizer(wxVERTICAL);
-  wxStaticText *infoText = new wxStaticText(m_infoPanel, wxID_ANY, _("Transponder Info"));
-  infoSizer->Add(infoText, 0, wxALL, 5);
+  
+  // Info tab content
+  wxStaticText *infoLabel = new wxStaticText(m_infoPanel, wxID_ANY, _("Transponder Information"));
+  wxFont boldFont = infoLabel->GetFont();
+  boldFont.SetWeight(wxFONTWEIGHT_BOLD);
+  infoLabel->SetFont(boldFont);
+  infoSizer->Add(infoLabel, 0, wxALL, 5);
+  
+  infoSizer->Add(new wxStaticLine(m_infoPanel), 0, wxEXPAND | wxLEFT | wxRIGHT, 5);
+  
+  // Create info display controls
+  m_infoIdText = new wxStaticText(m_infoPanel, wxID_ANY, _("ID: ---"));
+  m_infoPartnerIdText = new wxStaticText(m_infoPanel, wxID_ANY, _("Partner ID: ---"));
+  m_infoManufacturerText = new wxStaticText(m_infoPanel, wxID_ANY, _("Manufacturer: ---"));
+  m_infoOwnershipText = new wxStaticText(m_infoPanel, wxID_ANY, _("Ownership: ---"));
+  m_infoTrawlIdText = new wxStaticText(m_infoPanel, wxID_ANY, _("Trawl ID: ---"));
+  m_infoMarkTypeText = new wxStaticText(m_infoPanel, wxID_ANY, _("Mark Type: ---"));
+  
+  infoSizer->Add(m_infoIdText, 0, wxALL, 5);
+  infoSizer->Add(m_infoPartnerIdText, 0, wxALL, 5);
+  infoSizer->Add(m_infoManufacturerText, 0, wxALL, 5);
+  infoSizer->Add(m_infoOwnershipText, 0, wxALL, 5);
+  infoSizer->Add(m_infoTrawlIdText, 0, wxALL, 5);
+  infoSizer->Add(m_infoMarkTypeText, 0, wxALL, 5);
+  
   m_infoPanel->SetSizer(infoSizer);
   m_transponderInfoNotebook->AddPage(m_infoPanel, _("Info"), true);
   
   // Status tab
   m_statusPanel = new wxPanel(m_transponderInfoNotebook, wxID_ANY);
   wxBoxSizer *statusSizer = new wxBoxSizer(wxVERTICAL);
-  wxStaticText *statusText = new wxStaticText(m_statusPanel, wxID_ANY, _("Transponder Status"));
-  statusSizer->Add(statusText, 0, wxALL, 5);
+  
+  // Status tab content
+  wxStaticText *statusLabel = new wxStaticText(m_statusPanel, wxID_ANY, _("Transponder Status"));
+  statusLabel->SetFont(boldFont);
+  statusSizer->Add(statusLabel, 0, wxALL, 5);
+  
+  statusSizer->Add(new wxStaticLine(m_statusPanel), 0, wxEXPAND | wxLEFT | wxRIGHT, 5);
+  
+  // Create status display controls
+  m_statusReleaseText = new wxStaticText(m_statusPanel, wxID_ANY, _("Release Status: ---"));
+  m_statusRecoveryText = new wxStaticText(m_statusPanel, wxID_ANY, _("Recovery Status: ---"));
+  m_statusBatteryText = new wxStaticText(m_statusPanel, wxID_ANY, _("Battery: ---%"));
+  m_statusPingsText = new wxStaticText(m_statusPanel, wxID_ANY, _("Pings: ---"));
+  m_statusLastReportText = new wxStaticText(m_statusPanel, wxID_ANY, _("Last Report: ---"));
+  m_statusPositionSourceText = new wxStaticText(m_statusPanel, wxID_ANY, _("Position Source: ---"));
+  
+  statusSizer->Add(m_statusReleaseText, 0, wxALL, 5);
+  statusSizer->Add(m_statusRecoveryText, 0, wxALL, 5);
+  statusSizer->Add(m_statusBatteryText, 0, wxALL, 5);
+  statusSizer->Add(m_statusPingsText, 0, wxALL, 5);
+  statusSizer->Add(m_statusLastReportText, 0, wxALL, 5);
+  statusSizer->Add(m_statusPositionSourceText, 0, wxALL, 5);
+  
   m_statusPanel->SetSizer(statusSizer);
   m_transponderInfoNotebook->AddPage(m_statusPanel, _("Status"), false);
   
   // Position tab
   m_positionPanel = new wxPanel(m_transponderInfoNotebook, wxID_ANY);
   wxBoxSizer *positionSizer = new wxBoxSizer(wxVERTICAL);
-  wxStaticText *positionText = new wxStaticText(m_positionPanel, wxID_ANY, _("Transponder Position"));
-  positionSizer->Add(positionText, 0, wxALL, 5);
+  
+  // Position tab content
+  wxStaticText *positionLabel = new wxStaticText(m_positionPanel, wxID_ANY, _("Transponder Position"));
+  positionLabel->SetFont(boldFont);
+  positionSizer->Add(positionLabel, 0, wxALL, 5);
+  
+  positionSizer->Add(new wxStaticLine(m_positionPanel), 0, wxEXPAND | wxLEFT | wxRIGHT, 5);
+  
+  // Create position display controls
+  m_positionLatText = new wxStaticText(m_positionPanel, wxID_ANY, _("Latitude: ---"));
+  m_positionLonText = new wxStaticText(m_positionPanel, wxID_ANY, _("Longitude: ---"));
+  m_positionRangeText = new wxStaticText(m_positionPanel, wxID_ANY, _("Range: --- m"));
+  m_positionBearingText = new wxStaticText(m_positionPanel, wxID_ANY, _("Bearing: ---°"));
+  m_positionDepthText = new wxStaticText(m_positionPanel, wxID_ANY, _("Depth: --- m"));
+  m_positionTempText = new wxStaticText(m_positionPanel, wxID_ANY, _("Temperature: ---°C"));
+  
+  positionSizer->Add(m_positionLatText, 0, wxALL, 5);
+  positionSizer->Add(m_positionLonText, 0, wxALL, 5);
+  positionSizer->Add(m_positionRangeText, 0, wxALL, 5);
+  positionSizer->Add(m_positionBearingText, 0, wxALL, 5);
+  positionSizer->Add(m_positionDepthText, 0, wxALL, 5);
+  positionSizer->Add(m_positionTempText, 0, wxALL, 5);
+  
   m_positionPanel->SetSizer(positionSizer);
   m_transponderInfoNotebook->AddPage(m_positionPanel, _("Position"), false);
   
@@ -285,6 +369,7 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
   m_ManualReleaseButton = new wxButton(this, wxID_ANY, _("Manual Release"), wxDefaultPosition, wxDefaultSize, 0);
   buttonRow3->Add(m_showOnMapButton, 0, wxALL, 2);
   buttonRow3->Add(m_ManualReleaseButton, 0, wxALL, 2);
+  m_showOnMapButton->Bind(wxEVT_COMMAND_BUTTON_CLICKED, &RopelessDialog::OnShowOnMapButton, this);
   m_ManualReleaseButton->Bind(wxEVT_COMMAND_BUTTON_CLICKED, &RopelessDialog::OnManualReleaseButton, this);
   
   commandButtonsSizer->Add(buttonRow1, 0, wxEXPAND, 0);
@@ -513,6 +598,10 @@ void RopelessDialog::OnTargetListDeselected(wxListEvent &event) {
       state->color_index = COLOR_INDEX_RED;
     }
 
+    // Clear selected transponder and update info panel
+    m_selectedTransponder = NULL;
+    UpdateTransponderInfo(NULL);
+
     RequestRefresh(GetOCPNCanvasWindow());
   }
 }
@@ -532,6 +621,10 @@ void RopelessDialog::OnTargetListSelected(wxListEvent &event) {
     transponder_state *state = getXpdrFromIndex(selectedItems[0]);
 
     state->color_index = COLOR_INDEX_GOLDEN;
+    
+    // Update selected transponder and refresh info panel
+    m_selectedTransponder = state;
+    UpdateTransponderInfo(state);
 
     RequestRefresh(GetOCPNCanvasWindow());
   }
@@ -656,28 +749,28 @@ void RopelessDialog::RefreshTransponderList() {
                                            wxLIST_AUTOSIZE_USEHEADER);
 
     // item.SetColumn(tlDEPTH);
-    wxString sdp;
-    sdp.Printf("%g", state->depth);
+    // wxString sdp;
+    // sdp.Printf("%g", state->depth);
     // item.SetText(sdp);
     // m_pListCtrlTranponders->SetItem(item);
-    m_pListCtrlTranponders->SetItem(result, tlDEPTH, sdp);
-    m_pListCtrlTranponders->SetColumnWidth(tlDEPTH, wxLIST_AUTOSIZE_USEHEADER);
+    // m_pListCtrlTranponders->SetItem(result, tlDEPTH, sdp);
+    // m_pListCtrlTranponders->SetColumnWidth(tlDEPTH, wxLIST_AUTOSIZE_USEHEADER);
 
     // item.SetColumn(tlTEMP);
-    wxString stemp;
-    stemp.Printf("%g", state->temp);
+    // wxString stemp;
+    // stemp.Printf("%g", state->temp);
     // item.SetText(stemp);
     // m_pListCtrlTranponders->SetItem(item);
-    m_pListCtrlTranponders->SetItem(result, tlTEMP, stemp);
-    m_pListCtrlTranponders->SetColumnWidth(tlTEMP, wxLIST_AUTOSIZE_USEHEADER);
+    // m_pListCtrlTranponders->SetItem(result, tlTEMP, stemp);
+    // m_pListCtrlTranponders->SetColumnWidth(tlTEMP, wxLIST_AUTOSIZE_USEHEADER);
 
     // item.SetColumn(tlPINGS);
-    wxString sping;
-    sping.Printf("%d", state->pings);
+    // wxString sping;
+    // sping.Printf("%d", state->pings);
     // item.SetText(sping);
     // m_pListCtrlTranponders->SetItem(item);
-    m_pListCtrlTranponders->SetItem(result, tlPINGS, sping);
-    m_pListCtrlTranponders->SetColumnWidth(tlPINGS, wxLIST_AUTOSIZE_USEHEADER);
+    // m_pListCtrlTranponders->SetItem(result, tlPINGS, sping);
+    // m_pListCtrlTranponders->SetColumnWidth(tlPINGS, wxLIST_AUTOSIZE_USEHEADER);
 
 #ifdef SHOW_DISTANCE
     // item.SetColumn(tlDISTANCE);
@@ -711,13 +804,13 @@ void RopelessDialog::RefreshTransponderList() {
                                            wxLIST_AUTOSIZE_USEHEADER);
 
     // item.SetColumn(tlBATT_STAT);
-    wxString sbatt;
-    sbatt.Printf("%d", state->batt_stat);
+    // wxString sbatt;
+    // sbatt.Printf("%d", state->batt_stat);
     // item.SetText(sdist);
     // m_pListCtrlTranponders->SetItem(item);
-    m_pListCtrlTranponders->SetItem(result, tlBATT_STAT, sbatt);
-    m_pListCtrlTranponders->SetColumnWidth(tlBATT_STAT,
-                                           wxLIST_AUTOSIZE_USEHEADER);
+    // m_pListCtrlTranponders->SetItem(result, tlBATT_STAT, sbatt);
+    // m_pListCtrlTranponders->SetColumnWidth(tlBATT_STAT,
+    //                                        wxLIST_AUTOSIZE_USEHEADER);
   }
 
   if (g_RopelessTargetList_sortColumn > 0)
@@ -783,6 +876,103 @@ void RopelessDialog::OnManualReleaseButton(wxCommandEvent &event) {
 void RopelessDialog::OnSyncButton(wxCommandEvent &event)
 {
   g_ropelessPI->SendSyncMessage();
+}
+
+void RopelessDialog::OnShowOnMapButton(wxCommandEvent &event)
+{
+  // Check if we have a transponder selected to zoom to
+  if (m_selectedTransponder) {
+
+    double scale_ppm = 0.1;  // Gives 1:43000 zoom level
+    
+    JumpToPosition(m_selectedTransponder->predicted_lat, 
+                   m_selectedTransponder->predicted_lon, 
+                   scale_ppm);
+    
+    wxLogMessage("Show On Map: Centering on transponder %d at lat=%.6f, lon=%.6f with scale_ppm=%.6f", 
+                 m_selectedTransponder->ident,
+                 m_selectedTransponder->predicted_lat,
+                 m_selectedTransponder->predicted_lon,
+                 scale_ppm);
+  }
+}
+
+void RopelessDialog::UpdateTransponderInfo(transponder_state *state) {
+  if (!state) {
+    // Clear all displays when no transponder is selected
+    m_selectedTransponderLabel->SetLabel(_("Transponder: None Selected"));
+    m_infoIdText->SetLabel(_("ID: ---"));
+    m_infoPartnerIdText->SetLabel(_("Partner ID: ---"));
+    m_infoManufacturerText->SetLabel(_("Manufacturer: ---"));
+    m_infoOwnershipText->SetLabel(_("Ownership: ---"));
+    m_infoTrawlIdText->SetLabel(_("Trawl ID: ---"));
+    m_infoMarkTypeText->SetLabel(_("Mark Type: ---"));
+    
+    m_statusReleaseText->SetLabel(_("Release Status: ---"));
+    m_statusRecoveryText->SetLabel(_("Recovery Status: ---"));
+    m_statusBatteryText->SetLabel(_("Battery: ---%"));
+    m_statusPingsText->SetLabel(_("Pings: ---"));
+    m_statusLastReportText->SetLabel(_("Last Report: ---"));
+    m_statusPositionSourceText->SetLabel(_("Position Source: ---"));
+    
+    m_positionLatText->SetLabel(_("Latitude: ---"));
+    m_positionLonText->SetLabel(_("Longitude: ---"));
+    m_positionRangeText->SetLabel(_("Range: --- m"));
+    m_positionBearingText->SetLabel(_("Bearing: ---°"));
+    m_positionDepthText->SetLabel(_("Depth: --- m"));
+    m_positionTempText->SetLabel(_("Temperature: ---°C"));
+  } else {
+    // Update header with selected transponder ID
+    m_selectedTransponderLabel->SetLabel(wxString::Format(_("Transponder: %d"), state->ident));
+    
+    // Update Info tab
+    m_infoIdText->SetLabel(wxString::Format(_("ID: %d"), state->ident));
+    m_infoPartnerIdText->SetLabel(wxString::Format(_("Partner ID: %d"), state->ident_partner));
+    m_infoManufacturerText->SetLabel(wxString::Format(_("Manufacturer: %d"), state->mfg));
+    m_infoOwnershipText->SetLabel(wxString::Format(_("Ownership: %d"), state->ownership));
+    m_infoTrawlIdText->SetLabel(wxString::Format(_("Trawl ID: %d"), state->trawl_id));
+    m_infoMarkTypeText->SetLabel(wxString::Format(_("Mark Type: %d"), state->mark_type));
+    
+    // Update Status tab
+    wxString releaseStatus = "";
+    if (state->release_status == -4) {
+      releaseStatus = releaseStatusNames[eRELEASE_NETWORK_ERR];
+    } else if (state->release_status == -3) {
+      releaseStatus = releaseStatusNames[eRELEASE_TIMEOUT];
+    } else if (state->release_status == -2) {
+      releaseStatus = releaseStatusNames[eRELEASE_NOT_INIT];
+    } else if (state->release_status == -1) {
+      releaseStatus = releaseStatusNames[eRELEASE_NOT_VERIFIED];
+    } else if (state->release_status == 0) {
+      releaseStatus = releaseStatusNames[eRELEASE_VERIFIED];
+    } else if (state->release_status > 0) {
+      releaseStatus = wxString::Format("%s%d", releaseStatusNames[eRELEASE_SENDING], state->release_status);
+    }
+    
+    m_statusReleaseText->SetLabel(wxString::Format(_("Release Status: %s"), releaseStatus));
+    m_statusRecoveryText->SetLabel(wxString::Format(_("Recovery Status: %s"), recoveredStrList[state->recovered_state]));
+    m_statusBatteryText->SetLabel(wxString::Format(_("Battery: %d%%"), state->batt_stat));
+    m_statusPingsText->SetLabel(wxString::Format(_("Pings: %d"), state->pings));
+    
+    // Format timestamp
+    wxDateTime ts((time_t)(state->timeStamp));
+    ts.MakeUTC();
+    m_statusLastReportText->SetLabel(wxString::Format(_("Last Report: %s"), ts.FormatISOCombined(' ')));
+    m_statusPositionSourceText->SetLabel(wxString::Format(_("Position Source: %s"), positionSourceNames[state->position_source]));
+    
+    // Update Position tab
+    m_positionLatText->SetLabel(wxString::Format(_("Latitude: %.6f"), state->predicted_lat));
+    m_positionLonText->SetLabel(wxString::Format(_("Longitude: %.6f"), state->predicted_lon));
+    m_positionRangeText->SetLabel(wxString::Format(_("Range: %.1f m"), state->range));
+    m_positionBearingText->SetLabel(wxString::Format(_("Bearing: %.1f°"), state->bearing));
+    m_positionDepthText->SetLabel(wxString::Format(_("Depth: %.1f m"), state->depth));
+    m_positionTempText->SetLabel(wxString::Format(_("Temperature: %.1f°C"), state->temp));
+  }
+  
+  // Refresh the panels to show updated text
+  m_infoPanel->Refresh();
+  m_statusPanel->Refresh();
+  m_positionPanel->Refresh();
 }
 
 

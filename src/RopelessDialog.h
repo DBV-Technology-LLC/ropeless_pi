@@ -74,6 +74,7 @@ public:
 
   
   // Sidebar components
+  wxStaticText *m_selectedTransponderLabel;
   wxNotebook *m_transponderInfoNotebook;
   wxPanel *m_infoPanel;
   wxPanel *m_statusPanel;
@@ -98,6 +99,33 @@ public:
 
   ropeless_pi *pParentPi;
   OCPNListCtrl *m_pListCtrlTranponders;
+  
+  // Selected transponder tracking
+  transponder_state *m_selectedTransponder;
+  
+  // Info tab controls
+  wxStaticText *m_infoIdText;
+  wxStaticText *m_infoPartnerIdText;
+  wxStaticText *m_infoManufacturerText;
+  wxStaticText *m_infoOwnershipText;
+  wxStaticText *m_infoTrawlIdText;
+  wxStaticText *m_infoMarkTypeText;
+  
+  // Status tab controls
+  wxStaticText *m_statusReleaseText;
+  wxStaticText *m_statusRecoveryText;
+  wxStaticText *m_statusBatteryText;
+  wxStaticText *m_statusPingsText;
+  wxStaticText *m_statusLastReportText;
+  wxStaticText *m_statusPositionSourceText;
+  
+  // Position tab controls
+  wxStaticText *m_positionLatText;
+  wxStaticText *m_positionLonText;
+  wxStaticText *m_positionRangeText;
+  wxStaticText *m_positionBearingText;
+  wxStaticText *m_positionDepthText;
+  wxStaticText *m_positionTempText;
 
   RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
                  wxWindowID id = wxID_ANY,
@@ -119,6 +147,8 @@ public:
   void OnTargetListColumnClicked(wxListEvent &event);
   void OnTargetRightClick(wxListEvent &event);
   void OnSyncButton(wxCommandEvent &event);
+  void OnShowOnMapButton(wxCommandEvent &event);
+  void UpdateTransponderInfo(transponder_state *state);
   
 
   wxArrayInt GetSelectedItems();
