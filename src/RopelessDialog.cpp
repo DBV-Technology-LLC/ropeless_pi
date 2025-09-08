@@ -101,7 +101,7 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
   SetFont(*dFont);
 
   // Set minimum size hints to ensure dialog can accommodate all content
-  this->SetSizeHints(wxSize(900, -1), wxDefaultSize);
+  //this->SetSizeHints(wxSize(900, -1), wxDefaultSize);
 
   // Create main layout (no tabs)
   wxBoxSizer *overallSizer = new wxBoxSizer(wxVERTICAL);
@@ -238,8 +238,7 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
 
   m_pListCtrlTranponders->AssignImageList(imglist, wxIMAGE_LIST_SMALL);
 
-  // Add main content to horizontal sizer and ensure it has minimum height
-  mainContentSizer->SetMinSize(-1, 400);  // Ensure table has reasonable minimum height
+  // Add main content to horizontal sizer - let sidebar drive the height
   bSizer2->Add(mainContentSizer, 1, wxEXPAND | wxALL, 0);
   
   // Create sidebar (right side)
@@ -286,7 +285,6 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
   infoSizer->Add(m_infoMarkTypeText, 0, wxALL, 5);
   
   m_infoPanel->SetSizer(infoSizer);
-  infoSizer->Fit(m_infoPanel);  // Size panel to fit its content
   m_transponderInfoNotebook->AddPage(m_infoPanel, _("Info"), true);
   
   // Status tab
@@ -317,7 +315,6 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
   statusSizer->Add(m_statusPositionSourceText, 0, wxALL, 5);
   
   m_statusPanel->SetSizer(statusSizer);
-  statusSizer->Fit(m_statusPanel);  // Size panel to fit its content
   m_transponderInfoNotebook->AddPage(m_statusPanel, _("Status"), false);
   
   // Position tab
@@ -348,14 +345,10 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
   positionSizer->Add(m_positionTempText, 0, wxALL, 5);
   
   m_positionPanel->SetSizer(positionSizer);
-  positionSizer->Fit(m_positionPanel);  // Size panel to fit its content
   m_transponderInfoNotebook->AddPage(m_positionPanel, _("Position"), false);
   
-  // Let notebook expand to match sidebar width (like Commands section)
+  // Set notebook to fixed size
   sidebarSizer->Add(m_transponderInfoNotebook, 0, wxEXPAND | wxALL, 5);
-  
-  // Force notebook to calculate its optimal size based on content
-  m_transponderInfoNotebook->Fit();
   
   // Command buttons block
   wxStaticBoxSizer *commandButtonsSizer = new wxStaticBoxSizer(
@@ -409,15 +402,8 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
   sidebarSizer->Add(m_releaseStatusSizer, 0, wxEXPAND | wxALL, 5);
   
   // Add sidebar to main horizontal sizer with proper scaling
-  // Set minimum width for sidebar to ensure all content fits, but allow it to expand
-  sidebarSizer->SetMinSize(350, -1);  // Ensure minimum width for all sidebar content
+  // Add sidebar without any size constraints
   bSizer2->Add(sidebarSizer, 0, wxEXPAND | wxALL, 5);
-  
-  // Force sidebar to calculate its minimum size based on content
-  sidebarSizer->Layout();
-  
-  // Ensure the main horizontal container is tall enough for all sidebar content
-  bSizer2->SetMinSize(-1, 500);  // Set minimum height to accommodate sidebar boxes
   
   // Add table/sidebar combo to main dialog - let it expand as needed
   overallSizer->Add(bSizer2, 1, wxEXPAND, 0);
@@ -430,12 +416,25 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
   m_debugTextCtrl = new wxTextCtrl(this, wxID_ANY, wxEmptyString, 
                                    wxDefaultPosition, wxSize(-1, 100), 
                                    wxTE_MULTILINE | wxTE_READONLY | wxTE_WORDWRAP);
-  debugSizer->Add(m_debugTextCtrl, 1, wxEXPAND | wxALL, 5);
+  debugSizer->Add(m_debugTextCtrl, 0, wxEXPAND | wxALL, 5);
   
-  // Add Clear button for debug messages
-  m_clearDebugButton = new wxButton(this, wxID_ANY, _("Clear Debug Messages"), wxDefaultPosition, wxDefaultSize, 0);
+  // Add controls for debug messages in a horizontal sizer
+  wxBoxSizer *debugControlsSizer = new wxBoxSizer(wxHORIZONTAL);
+  
+  m_clearDebugButton = new wxButton(this, wxID_ANY, _("Clear"), wxDefaultPosition, wxDefaultSize, 0);
   m_clearDebugButton->Bind(wxEVT_COMMAND_BUTTON_CLICKED, &RopelessDialog::OnClearDebugButton, this);
-  debugSizer->Add(m_clearDebugButton, 0, wxALL | wxALIGN_CENTER_HORIZONTAL, 5);
+  debugControlsSizer->Add(m_clearDebugButton, 0, wxALL, 5);
+  
+  m_showNmeaCheckbox = new wxCheckBox(this, wxID_ANY, _("Show NMEA"));
+  m_showNmeaCheckbox->SetValue(true);  // Default to checked
+  debugControlsSizer->Add(m_showNmeaCheckbox, 0, wxALL | wxALIGN_CENTER_VERTICAL, 5);
+  
+  m_showDebugCheckbox = new wxCheckBox(this, wxID_ANY, _("Show Debug"));
+  m_showDebugCheckbox->SetValue(true);  // Default to checked
+  debugControlsSizer->Add(m_showDebugCheckbox, 0, wxALL | wxALIGN_CENTER_VERTICAL, 5);
+  
+  // Left align the controls
+  debugSizer->Add(debugControlsSizer, 0, wxALL | wxALIGN_LEFT, 5);
 
   m_sdbSizer1 = new wxStdDialogButtonSizer();
   m_sdbSizer1OK = new wxButton(this, wxID_OK);
@@ -446,8 +445,8 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
 
   this->SetSizer(overallSizer);
   
-  // Size the dialog to fit its content vertically
-  this->Fit();
+  // Let dialog size automatically to fit all content
+  overallSizer->Fit(this);
   
   // Final layout to ensure everything is positioned correctly
   this->Layout();
@@ -1150,12 +1149,13 @@ void RopelessDialog::OnClose(wxCloseEvent &event) {
   wxLogMessage("RopelessDialog: clearHighlighted completed");
 
 #ifndef __ANDROID__
-  wxPoint p = GetPosition();
-  pParentPi->m_dialogPosX = p.x;
-  pParentPi->m_dialogPosY = p.y;
-  wxSize s = GetSize();
-  pParentPi->m_dialogSizeWidth = s.x;
-  pParentPi->m_dialogSizeHeight = s.y;
+  // Comment out size/position saving to let dialog always size to fit content
+  // wxPoint p = GetPosition();
+  // pParentPi->m_dialogPosX = p.x;
+  // pParentPi->m_dialogPosY = p.y;
+  // wxSize s = GetSize();
+  // pParentPi->m_dialogSizeWidth = s.x;
+  // pParentPi->m_dialogSizeHeight = s.y;
   wxLogMessage("RopelessDialog: Position/size saved");
 #endif
   

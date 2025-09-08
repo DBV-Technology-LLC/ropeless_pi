@@ -602,11 +602,12 @@ void ropeless_pi::OnToolbarToolCallback(int id) {
                           // (gtk, at least)
 
 #ifndef __ANDROID__
-  if ((m_dialogSizeWidth > 0) && (m_dialogSizeHeight > 0))
-    m_pRLDialog->SetSize(wxSize(m_dialogSizeWidth, m_dialogSizeHeight));
+  // Comment out saved size restoration to let dialog size to fit content
+  // if ((m_dialogSizeWidth > 0) && (m_dialogSizeHeight > 0))
+  //   m_pRLDialog->SetSize(wxSize(m_dialogSizeWidth, m_dialogSizeHeight));
 
-  if ((m_dialogPosX > 0) && (m_dialogPosY > 0))
-    m_pRLDialog->Move(wxPoint(m_dialogPosX, m_dialogPosY));
+  // if ((m_dialogPosX > 0) && (m_dialogPosY > 0))
+  //   m_pRLDialog->Move(wxPoint(m_dialogPosX, m_dialogPosY));
 #else
 
   wxSize parent_size = GetOCPNCanvasWindow()->GetSize();

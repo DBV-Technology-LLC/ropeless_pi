@@ -42,6 +42,7 @@
 #include <wx/stattext.h>
 #include <wx/notebook.h>
 #include <wx/statbox.h>
+#include <wx/checkbox.h>
 
 class ropeless_pi;
 class OCPNListCtrl;
@@ -83,6 +84,8 @@ public:
   // Debug box
   wxTextCtrl *m_debugTextCtrl;
   wxButton *m_clearDebugButton;
+  wxCheckBox *m_showNmeaCheckbox;
+  wxCheckBox *m_showDebugCheckbox;
   
   // Command buttons
   wxButton *m_releaseButton;
