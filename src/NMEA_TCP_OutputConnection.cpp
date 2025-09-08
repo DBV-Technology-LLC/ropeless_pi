@@ -46,31 +46,59 @@ NMEA_TCP_OutputConnection::NMEA_TCP_OutputConnection(const wxString& host, int p
     , m_messagesQueued(0)
     , m_connectionErrors(0)
 {
-    // Create timers
+    // Create timers with proper event handlers
     m_reconnectTimer = new wxTimer(this, RECONNECT_TIMER_ID);
     m_queueProcessTimer = new wxTimer(this, QUEUE_TIMER_ID);
     
-    // Start queue processing timer (process queue every 100ms)
-    m_queueProcessTimer->Start(100);
+    // DON'T start timer in constructor - let caller start it when ready
+    // m_queueProcessTimer->Start(100);
 }
 
 NMEA_TCP_OutputConnection::~NMEA_TCP_OutputConnection()
 {
-    Disconnect();
-    
-    if (m_reconnectTimer) {
-        m_reconnectTimer->Stop();
-        delete m_reconnectTimer;
-        m_reconnectTimer = nullptr;
+    // CRITICAL: Stop all timers and clear event handlers first
+    try {
+        if (m_reconnectTimer) {
+            if (m_reconnectTimer->IsRunning()) {
+                m_reconnectTimer->Stop();
+            }
+            // Clear the event handler to prevent callbacks to destroyed object
+            m_reconnectTimer->SetOwner(nullptr);
+            delete m_reconnectTimer;
+            m_reconnectTimer = nullptr;
+        }
+        
+        if (m_queueProcessTimer) {
+            if (m_queueProcessTimer->IsRunning()) {
+                m_queueProcessTimer->Stop();
+            }
+            // Clear the event handler to prevent callbacks to destroyed object  
+            m_queueProcessTimer->SetOwner(nullptr);
+            delete m_queueProcessTimer;
+            m_queueProcessTimer = nullptr;
+        }
+        
+        // Now safely disconnect socket
+        Disconnect();
+        
+        // Final queue cleanup
+        ClearQueue();
+        
+        // Force event processing to clear any pending events
+        wxSafeYield();
+        
+    } catch (...) {
+        // Force cleanup even if exceptions occur
+        if (m_reconnectTimer) {
+            try { delete m_reconnectTimer; } catch (...) {}
+            m_reconnectTimer = nullptr;
+        }
+        if (m_queueProcessTimer) {
+            try { delete m_queueProcessTimer; } catch (...) {}
+            m_queueProcessTimer = nullptr;
+        }
+        m_socket = nullptr;
     }
-    
-    if (m_queueProcessTimer) {
-        m_queueProcessTimer->Stop();
-        delete m_queueProcessTimer;
-        m_queueProcessTimer = nullptr;
-    }
-    
-    ClearQueue();
 }
 
 bool NMEA_TCP_OutputConnection::Connect()
@@ -119,16 +147,32 @@ void NMEA_TCP_OutputConnection::Disconnect()
 {
     StopReconnectTimer();
     
+    if (m_queueProcessTimer && m_queueProcessTimer->IsRunning()) {
+        m_queueProcessTimer->Stop();
+    }
+    
     if (m_socket) {
-        if (m_connectionState == STATE_CONNECTED) {
-            m_socket->Close();
+        try {
+            // Disable socket notifications first to prevent events during cleanup
+            m_socket->Notify(false);
+            m_socket->SetEventHandler(*this, wxID_ANY);  // Clear event handler
+            
+            if (m_connectionState == STATE_CONNECTED) {
+                m_socket->Close();
+            }
+            m_socket->Destroy();
+        } catch (...) {
+            // Force cleanup if socket operations fail
+            wxLogMessage("NMEA TCP Output: Exception during socket cleanup, forcing disconnect");
         }
-        m_socket->Destroy();
         m_socket = nullptr;
     }
     
+    // Clear any remaining queued messages
+    ClearQueue();
+    
     m_connectionState = STATE_DISCONNECTED;
-    // wxLogMessage("NMEA TCP Output: Disconnected from %s:%d", m_host, m_port);
+    wxLogMessage("NMEA TCP Output: Disconnected from %s:%d", m_host, m_port);
 }
 
 bool NMEA_TCP_OutputConnection::IsConnected() const
@@ -358,5 +402,12 @@ void NMEA_TCP_OutputConnection::StopReconnectTimer()
 {
     if (m_reconnectTimer) {
         m_reconnectTimer->Stop();
+    }
+}
+
+void NMEA_TCP_OutputConnection::StartQueueProcessing()
+{
+    if (m_queueProcessTimer && !m_queueProcessTimer->IsRunning()) {
+        m_queueProcessTimer->Start(100);
     }
 }

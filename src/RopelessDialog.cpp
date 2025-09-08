@@ -100,7 +100,8 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
   wxFont *dFont = OCPNGetFont(_T("Dialog"), 0);
   SetFont(*dFont);
 
-  this->SetSizeHints(wxDefaultSize, wxDefaultSize);
+  // Set minimum size hints to ensure dialog can accommodate all content
+  this->SetSizeHints(wxSize(900, -1), wxDefaultSize);
 
   // Create main layout (no tabs)
   wxBoxSizer *overallSizer = new wxBoxSizer(wxVERTICAL);
@@ -237,8 +238,8 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
 
   m_pListCtrlTranponders->AssignImageList(imglist, wxIMAGE_LIST_SMALL);
 
-
-  // Add main content to horizontal sizer
+  // Add main content to horizontal sizer and ensure it has minimum height
+  mainContentSizer->SetMinSize(-1, 400);  // Ensure table has reasonable minimum height
   bSizer2->Add(mainContentSizer, 1, wxEXPAND | wxALL, 0);
   
   // Create sidebar (right side)
@@ -268,14 +269,15 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
   
   infoSizer->Add(new wxStaticLine(m_infoPanel), 0, wxEXPAND | wxLEFT | wxRIGHT, 5);
   
-  // Create info display controls
-  m_infoIdText = new wxStaticText(m_infoPanel, wxID_ANY, _("ID: ---"));
-  m_infoPartnerIdText = new wxStaticText(m_infoPanel, wxID_ANY, _("Partner ID: ---"));
-  m_infoManufacturerText = new wxStaticText(m_infoPanel, wxID_ANY, _("Manufacturer: ---"));
-  m_infoOwnershipText = new wxStaticText(m_infoPanel, wxID_ANY, _("Ownership: ---"));
-  m_infoTrawlIdText = new wxStaticText(m_infoPanel, wxID_ANY, _("Trawl ID: ---"));
-  m_infoMarkTypeText = new wxStaticText(m_infoPanel, wxID_ANY, _("Mark Type: ---"));
+  // Create info display controls with text wrapping support
+  m_infoIdText = new wxStaticText(m_infoPanel, wxID_ANY, _("ID: ---"), wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_MIDDLE);
+  m_infoPartnerIdText = new wxStaticText(m_infoPanel, wxID_ANY, _("Partner ID: ---"), wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_MIDDLE);
+  m_infoManufacturerText = new wxStaticText(m_infoPanel, wxID_ANY, _("Manufacturer: ---"), wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_MIDDLE);
+  m_infoOwnershipText = new wxStaticText(m_infoPanel, wxID_ANY, _("Ownership: ---"), wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_MIDDLE);
+  m_infoTrawlIdText = new wxStaticText(m_infoPanel, wxID_ANY, _("Trawl ID: ---"), wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_MIDDLE);
+  m_infoMarkTypeText = new wxStaticText(m_infoPanel, wxID_ANY, _("Mark Type: ---"), wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_MIDDLE);
   
+  // Add controls and let them size to their content
   infoSizer->Add(m_infoIdText, 0, wxALL, 5);
   infoSizer->Add(m_infoPartnerIdText, 0, wxALL, 5);
   infoSizer->Add(m_infoManufacturerText, 0, wxALL, 5);
@@ -284,6 +286,7 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
   infoSizer->Add(m_infoMarkTypeText, 0, wxALL, 5);
   
   m_infoPanel->SetSizer(infoSizer);
+  infoSizer->Fit(m_infoPanel);  // Size panel to fit its content
   m_transponderInfoNotebook->AddPage(m_infoPanel, _("Info"), true);
   
   // Status tab
@@ -297,14 +300,15 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
   
   statusSizer->Add(new wxStaticLine(m_statusPanel), 0, wxEXPAND | wxLEFT | wxRIGHT, 5);
   
-  // Create status display controls
-  m_statusReleaseText = new wxStaticText(m_statusPanel, wxID_ANY, _("Release Status: ---"));
-  m_statusRecoveryText = new wxStaticText(m_statusPanel, wxID_ANY, _("Recovery Status: ---"));
-  m_statusBatteryText = new wxStaticText(m_statusPanel, wxID_ANY, _("Battery: ---%"));
-  m_statusPingsText = new wxStaticText(m_statusPanel, wxID_ANY, _("Pings: ---"));
-  m_statusLastReportText = new wxStaticText(m_statusPanel, wxID_ANY, _("Last Report: ---"));
-  m_statusPositionSourceText = new wxStaticText(m_statusPanel, wxID_ANY, _("Position Source: ---"));
+  // Create status display controls with text wrapping support
+  m_statusReleaseText = new wxStaticText(m_statusPanel, wxID_ANY, _("Release Status: ---"), wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_MIDDLE);
+  m_statusRecoveryText = new wxStaticText(m_statusPanel, wxID_ANY, _("Recovery Status: ---"), wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_MIDDLE);
+  m_statusBatteryText = new wxStaticText(m_statusPanel, wxID_ANY, _("Battery: ---%"), wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_MIDDLE);
+  m_statusPingsText = new wxStaticText(m_statusPanel, wxID_ANY, _("Pings: ---"), wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_MIDDLE);
+  m_statusLastReportText = new wxStaticText(m_statusPanel, wxID_ANY, _("Last Report: ---"), wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_MIDDLE);
+  m_statusPositionSourceText = new wxStaticText(m_statusPanel, wxID_ANY, _("Position Source: ---"), wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_MIDDLE);
   
+  // Add controls and let them size to their content
   statusSizer->Add(m_statusReleaseText, 0, wxALL, 5);
   statusSizer->Add(m_statusRecoveryText, 0, wxALL, 5);
   statusSizer->Add(m_statusBatteryText, 0, wxALL, 5);
@@ -313,6 +317,7 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
   statusSizer->Add(m_statusPositionSourceText, 0, wxALL, 5);
   
   m_statusPanel->SetSizer(statusSizer);
+  statusSizer->Fit(m_statusPanel);  // Size panel to fit its content
   m_transponderInfoNotebook->AddPage(m_statusPanel, _("Status"), false);
   
   // Position tab
@@ -326,14 +331,15 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
   
   positionSizer->Add(new wxStaticLine(m_positionPanel), 0, wxEXPAND | wxLEFT | wxRIGHT, 5);
   
-  // Create position display controls
-  m_positionLatText = new wxStaticText(m_positionPanel, wxID_ANY, _("Latitude: ---"));
-  m_positionLonText = new wxStaticText(m_positionPanel, wxID_ANY, _("Longitude: ---"));
-  m_positionRangeText = new wxStaticText(m_positionPanel, wxID_ANY, _("Range: --- m"));
-  m_positionBearingText = new wxStaticText(m_positionPanel, wxID_ANY, _("Bearing: ---°"));
-  m_positionDepthText = new wxStaticText(m_positionPanel, wxID_ANY, _("Depth: --- m"));
-  m_positionTempText = new wxStaticText(m_positionPanel, wxID_ANY, _("Temperature: ---°C"));
+  // Create position display controls with text wrapping support
+  m_positionLatText = new wxStaticText(m_positionPanel, wxID_ANY, _("Latitude: ---"), wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_MIDDLE);
+  m_positionLonText = new wxStaticText(m_positionPanel, wxID_ANY, _("Longitude: ---"), wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_MIDDLE);
+  m_positionRangeText = new wxStaticText(m_positionPanel, wxID_ANY, _("Range: --- m"), wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_MIDDLE);
+  m_positionBearingText = new wxStaticText(m_positionPanel, wxID_ANY, _("Bearing: ---°"), wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_MIDDLE);
+  m_positionDepthText = new wxStaticText(m_positionPanel, wxID_ANY, _("Depth: --- m"), wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_MIDDLE);
+  m_positionTempText = new wxStaticText(m_positionPanel, wxID_ANY, _("Temperature: ---°C"), wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_MIDDLE);
   
+  // Add controls and let them size to their content
   positionSizer->Add(m_positionLatText, 0, wxALL, 5);
   positionSizer->Add(m_positionLonText, 0, wxALL, 5);
   positionSizer->Add(m_positionRangeText, 0, wxALL, 5);
@@ -342,9 +348,14 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
   positionSizer->Add(m_positionTempText, 0, wxALL, 5);
   
   m_positionPanel->SetSizer(positionSizer);
+  positionSizer->Fit(m_positionPanel);  // Size panel to fit its content
   m_transponderInfoNotebook->AddPage(m_positionPanel, _("Position"), false);
   
-  sidebarSizer->Add(m_transponderInfoNotebook, 1, wxEXPAND | wxALL, 5);
+  // Let notebook expand to match sidebar width (like Commands section)
+  sidebarSizer->Add(m_transponderInfoNotebook, 0, wxEXPAND | wxALL, 5);
+  
+  // Force notebook to calculate its optimal size based on content
+  m_transponderInfoNotebook->Fit();
   
   // Command buttons block
   wxStaticBoxSizer *commandButtonsSizer = new wxStaticBoxSizer(
@@ -369,6 +380,7 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
   m_ManualReleaseButton = new wxButton(this, wxID_ANY, _("Manual Release"), wxDefaultPosition, wxDefaultSize, 0);
   buttonRow3->Add(m_showOnMapButton, 0, wxALL, 2);
   buttonRow3->Add(m_ManualReleaseButton, 0, wxALL, 2);
+  m_sidebarSyncButton->Bind(wxEVT_COMMAND_BUTTON_CLICKED, &RopelessDialog::OnSyncButton, this);
   m_showOnMapButton->Bind(wxEVT_COMMAND_BUTTON_CLICKED, &RopelessDialog::OnShowOnMapButton, this);
   m_ManualReleaseButton->Bind(wxEVT_COMMAND_BUTTON_CLICKED, &RopelessDialog::OnManualReleaseButton, this);
   
@@ -380,24 +392,37 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
   // Deckbox Status box
   m_deckboxStatusSizer = new wxStaticBoxSizer(
       new wxStaticBox(this, wxID_ANY, _("Deckbox Status")), wxVERTICAL);
-  m_deckboxStatusText = new wxStaticText(this, wxID_ANY, _("Status: Ready"));
+  m_deckboxStatusText = new wxStaticText(this, wxID_ANY, _("Status: Ready"), wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_MIDDLE);
   m_deckboxStatusSizer->Add(m_deckboxStatusText, 0, wxALL | wxEXPAND, 5);
+  
+  // Add TCP Connection status line with text wrapping
+  m_tcpConnectionStatusText = new wxStaticText(this, wxID_ANY, _("TCP Connection: Disconnected"), wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_MIDDLE);
+  m_deckboxStatusSizer->Add(m_tcpConnectionStatusText, 0, wxALL | wxEXPAND, 5);
+  
   sidebarSizer->Add(m_deckboxStatusSizer, 0, wxEXPAND | wxALL, 5);
   
   // Release Status block
   m_releaseStatusSizer = new wxStaticBoxSizer(
       new wxStaticBox(this, wxID_ANY, _("Release Status")), wxVERTICAL);
-  m_releaseStatusText = new wxStaticText(this, wxID_ANY, _("Status: Standby"));
+  m_releaseStatusText = new wxStaticText(this, wxID_ANY, _("Status: Standby"), wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_MIDDLE);
   m_releaseStatusSizer->Add(m_releaseStatusText, 0, wxALL | wxEXPAND, 5);
   sidebarSizer->Add(m_releaseStatusSizer, 0, wxEXPAND | wxALL, 5);
   
-  // Add sidebar to main horizontal sizer
+  // Add sidebar to main horizontal sizer with proper scaling
+  // Set minimum width for sidebar to ensure all content fits, but allow it to expand
+  sidebarSizer->SetMinSize(350, -1);  // Ensure minimum width for all sidebar content
   bSizer2->Add(sidebarSizer, 0, wxEXPAND | wxALL, 5);
   
-  // Add table/sidebar combo to main dialog
+  // Force sidebar to calculate its minimum size based on content
+  sidebarSizer->Layout();
+  
+  // Ensure the main horizontal container is tall enough for all sidebar content
+  bSizer2->SetMinSize(-1, 500);  // Set minimum height to accommodate sidebar boxes
+  
+  // Add table/sidebar combo to main dialog - let it expand as needed
   overallSizer->Add(bSizer2, 1, wxEXPAND, 0);
 
-  // Add debug box
+  // Add debug box with proper sizing
   wxStaticBoxSizer *debugSizer = new wxStaticBoxSizer(
       new wxStaticBox(this, wxID_ANY, _("Debug Messages")), wxVERTICAL);
   overallSizer->Add(debugSizer, 0, wxALL | wxEXPAND, 5);
@@ -406,6 +431,11 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
                                    wxDefaultPosition, wxSize(-1, 100), 
                                    wxTE_MULTILINE | wxTE_READONLY | wxTE_WORDWRAP);
   debugSizer->Add(m_debugTextCtrl, 1, wxEXPAND | wxALL, 5);
+  
+  // Add Clear button for debug messages
+  m_clearDebugButton = new wxButton(this, wxID_ANY, _("Clear Debug Messages"), wxDefaultPosition, wxDefaultSize, 0);
+  m_clearDebugButton->Bind(wxEVT_COMMAND_BUTTON_CLICKED, &RopelessDialog::OnClearDebugButton, this);
+  debugSizer->Add(m_clearDebugButton, 0, wxALL | wxALIGN_CENTER_HORIZONTAL, 5);
 
   m_sdbSizer1 = new wxStdDialogButtonSizer();
   m_sdbSizer1OK = new wxButton(this, wxID_OK);
@@ -415,14 +445,51 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
   overallSizer->Add(m_sdbSizer1, 0, wxBOTTOM | wxEXPAND | wxTOP, 5);
 
   this->SetSizer(overallSizer);
+  
+  // Size the dialog to fit its content vertically
+  this->Fit();
+  
+  // Final layout to ensure everything is positioned correctly
   this->Layout();
-  // bSizer2->Fit( this );
-
+  
   this->Centre(wxBOTH);
+  
+  // Update initial TCP connection status
+  UpdateTCPConnectionStatus();
 
 }
 
 RopelessDialog::~RopelessDialog() {
+  // Disconnect all event handlers to prevent crashes during shutdown
+  try {
+    // Disconnect list control events (using old Connect/Disconnect style)
+    if (m_pListCtrlTranponders) {
+      m_pListCtrlTranponders->Disconnect(wxEVT_COMMAND_LIST_ITEM_RIGHT_CLICK,
+        wxListEventHandler(RopelessDialog::OnTargetRightClick), NULL, this);
+      m_pListCtrlTranponders->Disconnect(wxEVT_COMMAND_LIST_COL_CLICK,
+        wxListEventHandler(RopelessDialog::OnTargetListColumnClicked), NULL, this);
+      m_pListCtrlTranponders->Disconnect(wxEVT_LIST_ITEM_SELECTED,
+        wxListEventHandler(RopelessDialog::OnTargetListSelected), NULL, this);
+      m_pListCtrlTranponders->Disconnect(wxEVT_LIST_ITEM_DESELECTED,
+        wxListEventHandler(RopelessDialog::OnTargetListDeselected), NULL, this);
+    }
+    
+    // Unbind button events (using newer Bind/Unbind style)
+    if (m_sidebarSyncButton) {
+      m_sidebarSyncButton->Unbind(wxEVT_COMMAND_BUTTON_CLICKED, &RopelessDialog::OnSyncButton, this);
+    }
+    if (m_showOnMapButton) {
+      m_showOnMapButton->Unbind(wxEVT_COMMAND_BUTTON_CLICKED, &RopelessDialog::OnShowOnMapButton, this);
+    }
+    if (m_ManualReleaseButton) {
+      m_ManualReleaseButton->Unbind(wxEVT_COMMAND_BUTTON_CLICKED, &RopelessDialog::OnManualReleaseButton, this);
+    }
+    if (m_clearDebugButton) {
+      m_clearDebugButton->Unbind(wxEVT_COMMAND_BUTTON_CLICKED, &RopelessDialog::OnClearDebugButton, this);
+    }
+  } catch (...) {
+    // Ignore any exceptions during cleanup - dialog may already be destroyed
+  }
 
   // delete m_pSerialArray;
 }
@@ -829,6 +896,9 @@ void RopelessDialog::RefreshTransponderList() {
   m_pListCtrlTranponders->Refresh(false);
 #endif
 
+  // Update TCP connection status periodically
+  UpdateTCPConnectionStatus();
+
 }
 
 void RopelessDialog::OnChooseFileButton(wxCommandEvent &event) {
@@ -875,7 +945,33 @@ void RopelessDialog::OnManualReleaseButton(wxCommandEvent &event) {
 
 void RopelessDialog::OnSyncButton(wxCommandEvent &event)
 {
+  wxLogMessage("OnSyncButton called - starting sync process");
+  
+  // Send the original sync message
   g_ropelessPI->SendSyncMessage();
+  
+  // Also send a GMR NMEA string for sync command
+  wxString gmr_sentence = "$ECGMR,1,0,0,0,2,0,0,0*5E";  // Sync command GMR
+  
+  // Send via TCP connection directly
+  bool tcp_sent = g_ropelessPI->SendRawNMEA(gmr_sentence);
+  
+  // Also send via OpenCPN's NMEA buffer as backup
+  PushNMEABuffer(gmr_sentence);
+  
+  // Display the sent GMR message in debug output
+  if (tcp_sent) {
+    AddDebugMessage("--> TCP: " + gmr_sentence);
+  } else {
+    AddDebugMessage("--> TCP FAILED: " + gmr_sentence);
+  }
+  AddDebugMessage("--> OpenCPN: " + gmr_sentence);
+  
+  // Also add a simple test message to verify the debug text control is working
+  AddDebugMessage("Sync button clicked - test message");
+  
+  wxLogMessage("Sync button: Sent sync message via TCP (%s) and OpenCPN NMEA buffer", 
+               tcp_sent ? "success" : "failed");
 }
 
 void RopelessDialog::OnShowOnMapButton(wxCommandEvent &event)
@@ -895,6 +991,33 @@ void RopelessDialog::OnShowOnMapButton(wxCommandEvent &event)
                  m_selectedTransponder->predicted_lon,
                  scale_ppm);
   }
+}
+
+void RopelessDialog::OnClearDebugButton(wxCommandEvent &event)
+{
+  m_debugTextCtrl->Clear();
+  wxLogMessage("Debug messages cleared by user");
+}
+
+void RopelessDialog::AddDebugMessage(const wxString &message)
+{
+  wxLogMessage("AddDebugMessage called with: %s", message);
+  
+  if (!m_debugTextCtrl) {
+    wxLogMessage("ERROR: m_debugTextCtrl is NULL!");
+    return;
+  }
+  
+  // Add timestamp to the message
+  wxDateTime now = wxDateTime::Now();
+  wxString timestampedMessage = wxString::Format("[%s] %s\n", 
+                                                  now.FormatISOTime(), 
+                                                  message);
+  
+  // Append to debug text control
+  m_debugTextCtrl->AppendText(timestampedMessage);
+  
+  wxLogMessage("Debug message added to text control");
 }
 
 void RopelessDialog::UpdateTransponderInfo(transponder_state *state) {
@@ -973,6 +1096,19 @@ void RopelessDialog::UpdateTransponderInfo(transponder_state *state) {
   m_infoPanel->Refresh();
   m_statusPanel->Refresh();
   m_positionPanel->Refresh();
+}
+
+void RopelessDialog::UpdateTCPConnectionStatus()
+{
+  wxString statusText = _("TCP Connection: ");
+  
+  if (pParentPi && pParentPi->IsTCPOutputConnected()) {
+    statusText += _("Connected");
+  } else {
+    statusText += _("Disconnected");
+  }
+  
+  m_tcpConnectionStatusText->SetLabel(statusText);
 }
 
 

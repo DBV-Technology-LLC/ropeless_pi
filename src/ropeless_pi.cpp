@@ -343,7 +343,7 @@ int ropeless_pi::Init(void) {
   // Initialize configuration variables to default values before loading config
   m_tcp_enabled = true;
   m_tcp_auto_reconnect = true;
-  m_tcp_host = "localhost";
+  m_tcp_host = "127.0.0.1";
   m_tcp_port = 4001;
   m_colorblind_mode = false;
   m_debug_enabled = false;
@@ -355,8 +355,8 @@ int ropeless_pi::Init(void) {
   //    And load the configuration items
   LoadConfig();
   
-  // DISABLED: Initialize TCP NMEA Output
-  // DISABLED: InitializeTCPOutput();
+  // Initialize TCP NMEA Output to 127.0.0.1:4001
+  InitializeTCPOutput();
 
   //     m_pTrackRolloverWin = new RolloverWin( GetOCPNCanvasWindow() );
   //     m_pTrackRolloverWin->SetPosition( wxPoint( 5, 150 ) );
@@ -766,6 +766,11 @@ void ropeless_pi::PopupMenuHandler(wxCommandEvent &event) {
 
       wxLogMessage(snt.Sentence);
       PushNMEABuffer(snt.Sentence);
+      
+      // Display sent NMEA message in debug window
+      if (m_pRLDialog) {
+        m_pRLDialog->AddDebugMessage("--> " + snt.Sentence.Trim());
+      }
 
       handled = true;
       break;
@@ -2086,6 +2091,11 @@ void ropeless_pi::ProcessRFACapture(void) {
   m_NMEA0183.Rmc.Write(rmc_sentence);
 
   PushNMEABuffer(rmc_sentence.Sentence);
+  
+  // Display sent NMEA message in debug window
+  if (m_pRLDialog) {
+    m_pRLDialog->AddDebugMessage("--> " + rmc_sentence.Sentence.Trim());
+  }
 }
 
 void ropeless_pi::placeTransponderManually(int xpdrId, int pairId, double lat,
@@ -2235,6 +2245,11 @@ void ropeless_pi::SetNMEASentence(wxString &sentence) {
   m_NMEA0183 << sentence;
 
   wxLogMessage(sentence);
+  
+  // Display NMEA message in debug window if dialog is open
+  if (m_pRLDialog) {
+    m_pRLDialog->AddDebugMessage("<-- " + sentence.Trim());
+  }
 
   if (m_NMEA0183.PreParse()) {
     if (m_NMEA0183.LastSentenceIDReceived == _T("RFA")) {
@@ -2422,7 +2437,7 @@ bool ropeless_pi::LoadConfig(void) {
     pConf->Read(_T( "TrackedPoint" ), &m_trackedWPGUID);
 
     // TCP NMEA Output Configuration
-    pConf->Read(_T( "TCP_Host" ), &m_tcp_host, _T("localhost"));
+    pConf->Read(_T( "TCP_Host" ), &m_tcp_host, _T("127.0.0.1"));
     pConf->Read(_T( "TCP_Port" ), &m_tcp_port, 4001);
     
     // Read boolean values more explicitly
@@ -2762,6 +2777,9 @@ void ropeless_pi::InitializeTCPOutput() {
         m_nmea_tcp_output = new NMEA_TCP_OutputConnection(m_tcp_host, m_tcp_port);
         m_nmea_tcp_output->SetAutoReconnect(m_tcp_auto_reconnect);
         
+        // Start queue processing after object is fully constructed
+        m_nmea_tcp_output->StartQueueProcessing();
+        
         // Attempt initial connection
         m_nmea_tcp_output->Connect();
         wxLogMessage("NMEA TCP Output: TCP client initialized and connecting...");
@@ -2775,10 +2793,22 @@ void ropeless_pi::InitializeTCPOutput() {
 
 void ropeless_pi::ShutdownTCPOutput() {
     if (m_nmea_tcp_output) {
-        m_nmea_tcp_output->Disconnect();
-        delete m_nmea_tcp_output;
-        m_nmea_tcp_output = nullptr;
-        wxLogMessage("NMEA TCP Output: Connection shutdown");
+        try {
+            wxLogMessage("NMEA TCP Output: Shutting down TCP connection...");
+            
+            // Ensure we don't try to use TCP connection during shutdown
+            NMEA_TCP_OutputConnection* temp_tcp = m_nmea_tcp_output;
+            m_nmea_tcp_output = nullptr;  // Null pointer FIRST to prevent further use
+            
+            // Now safely destroy the object
+            temp_tcp->Disconnect();
+            delete temp_tcp;
+            
+            wxLogMessage("NMEA TCP Output: Connection shutdown completed");
+        } catch (...) {
+            wxLogMessage("NMEA TCP Output: Exception during TCP shutdown, forcing cleanup");
+            m_nmea_tcp_output = nullptr;
+        }
     }
 }
 
@@ -2791,7 +2821,30 @@ bool ropeless_pi::SendNMEAMessage(RESPONSE* message) {
         return false;
     }
     
+    // Create sentence for logging before sending
+    SENTENCE sentence;
+    if (message->Write(sentence)) {
+        // Display sent NMEA message in debug window
+        if (m_pRLDialog) {
+            m_pRLDialog->AddDebugMessage("--> " + sentence.Sentence.Trim());
+        }
+    }
+    
     return m_nmea_tcp_output->SendNMEAMessage(message);
+}
+
+bool ropeless_pi::SendRawNMEA(const wxString& nmea_sentence) {
+    if (!m_nmea_tcp_output) {
+        return false;
+    }
+    
+    if (!m_nmea_tcp_output->IsConnected()) {
+        wxLogMessage("TCP Output: Not connected, attempting to send: %s", nmea_sentence);
+        return false;
+    }
+    
+    wxLogMessage("TCP Output: Sending raw NMEA: %s", nmea_sentence);
+    return m_nmea_tcp_output->SendRawNMEA(nmea_sentence);
 }
 
 void ropeless_pi::ConfigureTCPOutput(const wxString& host, int port, bool enabled, bool auto_reconnect) {

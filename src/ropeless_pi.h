@@ -407,6 +407,7 @@ public:
   void ShutdownTCPOutput();
   bool IsTCPOutputConnected() const;
   bool SendNMEAMessage(RESPONSE* message);
+  bool SendRawNMEA(const wxString& nmea_sentence);
   void ConfigureTCPOutput(const wxString& host, int port, bool enabled, bool auto_reconnect);
   wxString GetTCPOutputStatus() const;
   

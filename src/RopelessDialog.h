@@ -82,6 +82,7 @@ public:
   
   // Debug box
   wxTextCtrl *m_debugTextCtrl;
+  wxButton *m_clearDebugButton;
   
   // Command buttons
   wxButton *m_releaseButton;
@@ -94,6 +95,7 @@ public:
   // Status boxes
   wxStaticBoxSizer *m_deckboxStatusSizer;
   wxStaticText *m_deckboxStatusText;
+  wxStaticText *m_tcpConnectionStatusText;
   wxStaticBoxSizer *m_releaseStatusSizer;
   wxStaticText *m_releaseStatusText;
 
@@ -148,7 +150,10 @@ public:
   void OnTargetRightClick(wxListEvent &event);
   void OnSyncButton(wxCommandEvent &event);
   void OnShowOnMapButton(wxCommandEvent &event);
+  void OnClearDebugButton(wxCommandEvent &event);
   void UpdateTransponderInfo(transponder_state *state);
+  void AddDebugMessage(const wxString &message);
+  void UpdateTCPConnectionStatus();
   
 
   wxArrayInt GetSelectedItems();

@@ -78,6 +78,7 @@ public:
     void SetPort(int port) { m_port = port; }
     void SetReconnectInterval(int seconds) { m_reconnectInterval = seconds; }
     void SetAutoReconnect(bool enable) { m_autoReconnect = enable; }
+    void StartQueueProcessing();
     
     wxString GetHost() const { return m_host; }
     int GetPort() const { return m_port; }
