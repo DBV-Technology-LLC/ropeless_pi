@@ -97,10 +97,16 @@ public:
   
   // Status boxes
   wxStaticBoxSizer *m_deckboxStatusSizer;
-  wxStaticText *m_deckboxStatusText;
-  wxStaticText *m_tcpConnectionStatusText;
+  wxStaticText *m_connectionStatusText;
+  wxStaticText *m_deviceIdStatusText;
+  wxStaticText *m_acousticStatusText;
+  wxStaticText *m_cloudStatusText;
   wxStaticBoxSizer *m_releaseStatusSizer;
   wxStaticText *m_releaseStatusText;
+  
+  // Release Status buttons (moved from transponderReleaseDlg)
+  wxButton *m_markRecoveredButton;
+  wxButton *m_retryReleaseButton;
 
   ropeless_pi *pParentPi;
   OCPNListCtrl *m_pListCtrlTranponders;
@@ -154,9 +160,21 @@ public:
   void OnSyncButton(wxCommandEvent &event);
   void OnShowOnMapButton(wxCommandEvent &event);
   void OnClearDebugButton(wxCommandEvent &event);
+  void OnMarkRecoveredButton(wxCommandEvent &event);
+  void OnRetryReleaseButton(wxCommandEvent &event);
+  void OnReleaseButton(wxCommandEvent &event);
+  void OnRecoverButton(wxCommandEvent &event);
+  void OnDeleteButton(wxCommandEvent &event);
+  void OnMuteButton(wxCommandEvent &event);
   void UpdateTransponderInfo(transponder_state *state);
   void AddDebugMessage(const wxString &message);
+  void DebugMessage(const wxString &message, bool alsoLog = true);
   void UpdateTCPConnectionStatus();
+  void UpdateDeviceIdStatus(const wxString &deviceId);
+  void UpdateAcousticStatus(const wxString &acousticStatus);
+  void UpdateCloudStatus(const wxString &cloudStatus);
+  void ShowReleaseStatusButtons(bool show);
+  void UpdateReleaseStatusInfo(int transponder_id, const wxString &status);
   
 
   wxArrayInt GetSelectedItems();

@@ -55,6 +55,11 @@ private:
     wxCheckBox *m_cbTest;
     // Colorblind mode setting
     wxCheckBox *m_cbColorblind;
+    // TCP NMEA Output settings
+    wxCheckBox *m_cbTCPEnabled;
+    wxCheckBox *m_cbTCPAutoReconnect;
+    wxTextCtrl *m_tcTCPHost;
+    wxSpinCtrl *m_scTCPPort;
     // Debug options
     wxCheckBox *m_cbDebugEnabled;
     wxCheckBox *m_cbShowNMEA;
@@ -64,8 +69,10 @@ private:
     void OnOKClick(wxCommandEvent &event);
     void OnCancelClick(wxCommandEvent &event);
     void OnTestCheckbox(wxCommandEvent &event);
+    void OnTCPEnabledClick(wxCommandEvent &event);
     void OnDebugEnabledClick(wxCommandEvent &event);
     void UpdateDebugControls();
+    void UpdateTCPControls();
 
     DECLARE_EVENT_TABLE()
 };

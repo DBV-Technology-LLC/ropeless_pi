@@ -38,6 +38,8 @@ class manualPlacementDlgImpl : public manualPlacementDlg {
         void OnChar(wxKeyEvent& event);
         void AddPositionSourceControl();
         void OnPositionSourceChanged(wxCommandEvent& event);
+        void AddDeviceTypeControl();
+        void OnDeviceTypeChanged(wxCommandEvent& event);
 
     public:
 
@@ -51,9 +53,13 @@ class manualPlacementDlgImpl : public manualPlacementDlg {
         int pairId;
         bool valid;
         int positionSource;
+        int deviceType;
         
         // Position source dropdown control
         wxChoice* m_choicePositionSource;
+        
+        // Device type dropdown control
+        wxChoice* m_choiceDeviceType;
         
     protected:
 

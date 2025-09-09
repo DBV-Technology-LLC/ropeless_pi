@@ -50,7 +50,7 @@
 #include "mynumdlg.h"
 #include "myokdlg.h"
 #include "manualPlacementDlgImpl.h"
-#include "transponderReleaseDlgImpl.h"
+// #include "transponderReleaseDlgImpl.h"  // Functionality moved to RopelessDialog
 #include "haversine.h"
 //#include "graphics.h"
 
@@ -104,6 +104,7 @@ PlugIn_ViewPort g_ovp;
 double g_Var;  // assummed or calculated variation
 
 NMEA0183 g_NMEA0183;  // Used to parse NMEA Sentences
+deckbox_status g_deckboxStatus;  // Global deckbox status
 double gLat, gLon, gSog, gCog, gHdt, gHdm, gVar;
 bool ll_valid;
 bool pos_valid;
@@ -491,17 +492,18 @@ bool ropeless_pi::DeInit(void) {
     m_pRLDialog = nullptr;
   }
   
-  if (m_releaseDlg) {
-    try {
-      if (m_releaseDlg->IsShown()) {
-        m_releaseDlg->Hide();
-      }
-      m_releaseDlg->Destroy();
-    } catch (...) {
-      // Ignore any exceptions during cleanup
-    }
-    m_releaseDlg = nullptr;
-  }
+  // m_releaseDlg cleanup removed - functionality moved to RopelessDialog
+  // if (m_releaseDlg) {
+  //   try {
+  //     if (m_releaseDlg->IsShown()) {
+  //       m_releaseDlg->Hide();
+  //     }
+  //     m_releaseDlg->Destroy();
+  //   } catch (...) {
+  //     // Ignore any exceptions during cleanup
+  //   }
+  //   m_releaseDlg = nullptr;
+  // }
   
   // Clean up preferences dialog if it exists
   if (m_pPrefsDialog) {
@@ -559,7 +561,7 @@ bool ropeless_pi::DeInit(void) {
   
   // Final safety - clear all dialog pointers
   m_pRLDialog = nullptr;
-  m_releaseDlg = nullptr;
+  // m_releaseDlg = nullptr;  // Functionality moved to RopelessDialog
   
   return true;
 }
@@ -766,7 +768,9 @@ void ropeless_pi::PopupMenuHandler(wxCommandEvent &event) {
       m_NMEA0183.Gll.Write(snt);
 
       wxLogMessage(snt.Sentence);
-      PushNMEABuffer(snt.Sentence);
+
+      // TODO: Make this an option to 
+      //PushNMEABuffer(snt.Sentence);
       
       // Display sent NMEA message in debug window
       if (m_pRLDialog) {
@@ -899,7 +903,12 @@ unsigned char ropeless_pi::ComputeChecksum(wxString msg) {
   unsigned char checksum_value = 0;
 
   char str_ascii[101];
-  strncpy(str_ascii, (const char *)msg.mb_str(), 99);
+  const char* mb_str = (const char *)msg.mb_str();
+  if (!mb_str) {
+    wxLogMessage("ERROR: ComputeChecksum received NULL mb_str");
+    return 0;
+  }
+  strncpy(str_ascii, mb_str, 99);
   str_ascii[100] = '\0';
 
   int string_length = strlen(str_ascii);
@@ -940,6 +949,23 @@ bool ropeless_pi::SendCommandMessage(transponder_state *state, long code) {
   payload += pl1;
 
   // Send via TCP output client!
+  if (IsTCPOutputConnected()) {
+    ret = SendRawNMEA(payload);
+    if (ret) {
+      if (m_pRLDialog) {
+        m_pRLDialog->DebugMessage(wxString::Format("Command sent via TCP: %s", payload));
+      }
+    } else {
+      if (m_pRLDialog) {
+        m_pRLDialog->DebugMessage(wxString::Format("Failed to send command via TCP: %s", payload));
+      }
+    }
+  } else {
+    if (m_pRLDialog) {
+      m_pRLDialog->DebugMessage(wxString::Format("TCP Output not connected, cannot send command: %s", payload));
+    }
+    ret = false;
+  }
 
 
   // // Send via UDP
@@ -990,10 +1016,13 @@ bool ropeless_pi::SendCommandMessage(transponder_state *state, long code) {
 
   if (code == eCMD_RELEASE)
   {
+    wxLogMessage("SendCommandMessage: Processing RELEASE command for ID %d, ret=%s", state->ident, ret ? "true" : "false");
     if (ret != false) {
       state->release_status = -5;
       m_release_tim_state.ptstate = state;
+      wxLogMessage("SendCommandMessage: About to call startReleaseTimer()");
       startReleaseTimer();
+      wxLogMessage("SendCommandMessage: startReleaseTimer() completed");
     } 
     else{
       state->release_status = -4;
@@ -1001,8 +1030,9 @@ bool ropeless_pi::SendCommandMessage(transponder_state *state, long code) {
       stopReleaseTimer();
 
       wxLogMessage("Release request failed!");
+      wxLogMessage("SendCommandMessage: About to call updateReleaseDialog(true)");
       updateReleaseDialog(true);
-
+      wxLogMessage("SendCommandMessage: updateReleaseDialog(true) completed");
     }
   }
 
@@ -1011,14 +1041,15 @@ bool ropeless_pi::SendCommandMessage(transponder_state *state, long code) {
 
 void ropeless_pi::updateReleaseDialog(bool show)
 {
-  if (NULL == m_releaseDlg) {
-
-    m_releaseDlg = new transponderReleaseDlgImpl(
-        m_parent_window, this, -1, "Transponder Release Status", wxDefaultPosition,
-        wxDefaultSize, wxCAPTION | wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER);
-
-    wxFont *pFont = OCPNGetFont(_T("Dialog"), 0);
-    m_releaseDlg->SetFont(*pFont);
+  // Functionality moved to RopelessDialog Release Status section
+  // if (NULL == m_releaseDlg) {
+  //   m_releaseDlg = new transponderReleaseDlgImpl(...);
+  //   wxFont *pFont = OCPNGetFont(_T("Dialog"), 0);
+  //   m_releaseDlg->SetFont(*pFont);
+  // }
+  
+  if (!m_pRLDialog) {
+    return;  // Main dialog not available
   }
 
   int rlsNum;
@@ -1070,29 +1101,18 @@ void ropeless_pi::updateReleaseDialog(bool show)
   }
 
   rid.Printf("%s%s", releaseStatusNames[rlsNum],appendStr);
-  m_releaseDlg->updateStatus(rid);
+  
+  // Update the Release Status section in the main dialog instead of separate dialog
+  wxLogMessage("updateReleaseDialog: About to call UpdateReleaseStatusInfo for ID %d with status '%s'", state->ident, rid);
+  m_pRLDialog->UpdateReleaseStatusInfo(state->ident, rid);
+  wxLogMessage("updateReleaseDialog: UpdateReleaseStatusInfo completed");
 
   if (state->release_status != -5 && state->release_status <= 0)
   {
     m_release_tim_state.timer_state = 0;
-    m_releaseDlg->showButtons();
   }
-  else
-  {
-    m_releaseDlg->hideButtons();
-  }
-
-  if (state->release_status > 0)
-  {
-    m_releaseDlg->Show(m_releaseDlg->IsShown());
-  }
-  else
-  {
-    m_releaseDlg->Show(true);
-  }
-
-  m_releaseDlg->updateID(m_release_tim_state.ptstate->ident);
-  m_releaseDlg->Layout();
+  
+  // No need to show/hide separate dialog - functionality is now in main dialog
 }
 
 void ropeless_pi::startReleaseTimer(void){
@@ -1794,9 +1814,9 @@ void ropeless_pi::RenderVesselRangeCircle() {
   wxPoint vesselPos;
   GetCanvasPixLL(g_vp, &vesselPos, m_ownship_lat, m_ownship_lon);
   
-  // Calculate 5 nautical miles in screen pixels
+  // Calculate 1 nautical miles in screen pixels
   // 1 nautical mile = 1852 meters
-  double range_nm = 5.0;
+  double range_nm = 1.0;
   double range_meters = range_nm * 1852.0;
   
   // Calculate a point 10nm to the east of vessel
@@ -1899,10 +1919,10 @@ void ropeless_pi::RenderTrawls() {
   static int render_log_count = 0;
   render_log_count++;
   
-  // Log every 100 renders to avoid spam, but always log if we have transponders
-  if (render_log_count % 100 == 0 || transponderStatus.size() > 0) {
-    wxLogMessage("RenderTrawls: Found %d transponders to render", (int)transponderStatus.size());
-  }
+  // // Log every 100 renders to avoid spam, but always log if we have transponders
+  // if (render_log_count % 100 == 0 || transponderStatus.size() > 0) {
+  //   wxLogMessage("RenderTrawls: Found %d transponders to render", (int)transponderStatus.size());
+  // }
   
   for (unsigned int i = 0; i < transponderStatus.size(); i++) {
     transponder_state *state = transponderStatus[i];
@@ -2091,7 +2111,8 @@ void ropeless_pi::ProcessRFACapture(void) {
   SENTENCE rmc_sentence;
   m_NMEA0183.Rmc.Write(rmc_sentence);
 
-  PushNMEABuffer(rmc_sentence.Sentence);
+  // TODO: Remove this in favor of separate GPS pos source?
+  //PushNMEABuffer(rmc_sentence.Sentence);
   
   // Display sent NMEA message in debug window
   if (m_pRLDialog) {
@@ -2242,7 +2263,10 @@ void ropeless_pi::SetNMEASentence(wxString &sentence) {
     return;
   }
 
-  printf("%s\n", sentence.ToStdString().c_str());
+  // Debug: Log the source of this NMEA sentence
+  printf("RECEIVED NMEA: %s\n", sentence.ToStdString().c_str());
+  wxLogMessage("RECEIVED NMEA from OpenCPN: %s", sentence);
+  
   m_NMEA0183 << sentence;
 
   wxLogMessage(sentence);
@@ -2270,9 +2294,28 @@ void ropeless_pi::SetNMEASentence(wxString &sentence) {
                      m_NMEA0183.Dbs.CloudStatus,
                      m_NMEA0183.Dbs.NumDevices);
         
+        // Update global deckbox status
+        g_deckboxStatus.UpdateFromDBS(m_NMEA0183.Dbs);
+        
+        // Update UI if dialog is open
+        if (m_pRLDialog) {
+          m_pRLDialog->UpdateDeviceIdStatus(m_NMEA0183.Dbs.DeckboxID);
+          m_pRLDialog->UpdateAcousticStatus(m_NMEA0183.Dbs.AcousticStatus);
+          m_pRLDialog->UpdateCloudStatus(m_NMEA0183.Dbs.CloudStatus);
+        }
+        
         // Forward message via TCP if connected
         if (IsTCPOutputConnected()) {
-          SendNMEAMessage(&m_NMEA0183.Dbs);
+          // Create a completely fresh DBS message to avoid any shared state
+          DBS fresh_dbs;
+          fresh_dbs.DeckboxID = m_NMEA0183.Dbs.DeckboxID;
+          fresh_dbs.DeckboxManuf = m_NMEA0183.Dbs.DeckboxManuf;
+          fresh_dbs.AcousticStatus = m_NMEA0183.Dbs.AcousticStatus;
+          fresh_dbs.CloudStatus = m_NMEA0183.Dbs.CloudStatus;
+          fresh_dbs.NumDevices = m_NMEA0183.Dbs.NumDevices;
+          
+          wxLogMessage("SENDING DBS via TCP: DeckboxID=%s", fresh_dbs.DeckboxID);
+          //SendNMEAMessage(&fresh_dbs);
         }
       }
     }
@@ -2823,6 +2866,7 @@ bool ropeless_pi::SendNMEAMessage(RESPONSE* message) {
     }
     
     // Create sentence for logging before sending
+    // NOTE: Don't use the main m_NMEA0183 parser for outgoing messages
     SENTENCE sentence;
     if (message->Write(sentence)) {
         // Display sent NMEA message in debug window
@@ -2840,11 +2884,12 @@ bool ropeless_pi::SendRawNMEA(const wxString& nmea_sentence) {
     }
     
     if (!m_nmea_tcp_output->IsConnected()) {
-        wxLogMessage("TCP Output: Not connected, attempting to send: %s", nmea_sentence);
+        if (m_pRLDialog) {
+            m_pRLDialog->DebugMessage(wxString::Format("TCP Output: Not connected, attempting to send: %s", nmea_sentence));
+        }
         return false;
     }
     
-    wxLogMessage("TCP Output: Sending raw NMEA: %s", nmea_sentence);
     return m_nmea_tcp_output->SendRawNMEA(nmea_sentence);
 }
 

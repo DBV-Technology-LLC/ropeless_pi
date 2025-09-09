@@ -40,6 +40,7 @@ manualPlacementDlgImpl::manualPlacementDlgImpl(wxWindow* parent, int id, const w
 	isOwned = true;
 	valid = false;
 	positionSource = ePOS_SOURCE_USER; // Default to user
+	deviceType = 0; // Default to RSI - MTA
 
 	wxLogMessage("Creating Manual Placement Dialog! @ %s",utcStr);
 
@@ -49,6 +50,9 @@ manualPlacementDlgImpl::manualPlacementDlgImpl(wxWindow* parent, int id, const w
 	
 	// Add position source dropdown control
 	AddPositionSourceControl();
+	
+	// Add device type dropdown control
+	AddDeviceTypeControl();
 
 }
 
@@ -91,6 +95,16 @@ void manualPlacementDlgImpl::okPlaceTransponder(wxCommandEvent& event)
 		             (positionSource < 4) ? positionSourceNames[positionSource] : "UNKNOWN");
 	} else {
 		wxLogMessage("Manual placement dialog: WARNING - m_choicePositionSource is NULL");
+	}
+	
+	// Get selected device type
+	if (m_choiceDeviceType) {
+		deviceType = m_choiceDeviceType->GetSelection();
+		wxString deviceTypeName = (deviceType == 0) ? "RSI - MTA" : "UNKNOWN";
+		wxLogMessage("Manual placement dialog: Selected device type = %d (%s)", 
+		             deviceType, deviceTypeName);
+	} else {
+		wxLogMessage("Manual placement dialog: WARNING - m_choiceDeviceType is NULL");
 	}
 
     EndModal(wxID_OK);
@@ -183,4 +197,57 @@ void manualPlacementDlgImpl::OnPositionSourceChanged(wxCommandEvent& event) {
     positionSource = m_choicePositionSource->GetSelection();
     wxLogMessage("Position source changed to: %s", 
                 positionSourceNames[positionSource]);
+}
+
+void manualPlacementDlgImpl::AddDeviceTypeControl() {
+    // Get the main sizer
+    wxSizer* mainSizer = this->GetSizer();
+    if (!mainSizer) return;
+    
+    // Create a horizontal sizer for the device type controls
+    wxBoxSizer* deviceTypeSizer = new wxBoxSizer(wxHORIZONTAL);
+    
+    // Add label
+    wxStaticText* deviceTypeLabel = new wxStaticText(this, wxID_ANY, _("Device Type:"), 
+                                                    wxDefaultPosition, wxSize(100, -1), 0);
+    deviceTypeSizer->Add(deviceTypeLabel, 0, wxALL | wxALIGN_CENTER_VERTICAL, 5);
+    
+    // Create the dropdown with device type options
+    wxArrayString choices;
+    choices.Add(_("RSI - MTA"));
+    
+    m_choiceDeviceType = new wxChoice(this, wxID_ANY, wxDefaultPosition, 
+                                     wxSize(120, -1), choices);
+    m_choiceDeviceType->SetSelection(0); // Default to RSI - MTA
+    
+    deviceTypeSizer->Add(m_choiceDeviceType, 0, wxALL, 5);
+    
+    // Add spacer to right-align
+    deviceTypeSizer->AddStretchSpacer(1);
+    
+    // Insert the device type sizer before the button sizer
+    // Find the button sizer (it should be the last item)
+    size_t sizerCount = mainSizer->GetItemCount();
+    if (sizerCount > 0) {
+        // Insert before the last item (which should be the buttons)
+        mainSizer->Insert(sizerCount - 1, deviceTypeSizer, 0, wxEXPAND | wxALL, 5);
+    } else {
+        // Fallback: just add it
+        mainSizer->Add(deviceTypeSizer, 0, wxEXPAND | wxALL, 5);
+    }
+    
+    // Connect the event handler
+    m_choiceDeviceType->Connect(wxEVT_COMMAND_CHOICE_SELECTED, 
+                               wxCommandEventHandler(manualPlacementDlgImpl::OnDeviceTypeChanged), 
+                               NULL, this);
+    
+    // Refresh the layout
+    this->Layout();
+    this->Fit();
+}
+
+void manualPlacementDlgImpl::OnDeviceTypeChanged(wxCommandEvent& event) {
+    deviceType = m_choiceDeviceType->GetSelection();
+    wxString deviceTypeName = (deviceType == 0) ? "RSI - MTA" : "UNKNOWN";
+    wxLogMessage("Device type changed to: %s", deviceTypeName);
 }

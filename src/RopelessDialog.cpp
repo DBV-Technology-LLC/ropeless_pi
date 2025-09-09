@@ -373,6 +373,13 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
   m_ManualReleaseButton = new wxButton(this, wxID_ANY, _("Manual Release"), wxDefaultPosition, wxDefaultSize, 0);
   buttonRow3->Add(m_showOnMapButton, 0, wxALL, 2);
   buttonRow3->Add(m_ManualReleaseButton, 0, wxALL, 2);
+  
+  // Bind command buttons to send GMR commands for selected transponder
+  m_releaseButton->Bind(wxEVT_COMMAND_BUTTON_CLICKED, &RopelessDialog::OnReleaseButton, this);
+  m_recoverButton->Bind(wxEVT_COMMAND_BUTTON_CLICKED, &RopelessDialog::OnRecoverButton, this);
+  m_deleteButton->Bind(wxEVT_COMMAND_BUTTON_CLICKED, &RopelessDialog::OnDeleteButton, this);
+  m_muteButton->Bind(wxEVT_COMMAND_BUTTON_CLICKED, &RopelessDialog::OnMuteButton, this);
+  
   m_sidebarSyncButton->Bind(wxEVT_COMMAND_BUTTON_CLICKED, &RopelessDialog::OnSyncButton, this);
   m_showOnMapButton->Bind(wxEVT_COMMAND_BUTTON_CLICKED, &RopelessDialog::OnShowOnMapButton, this);
   m_ManualReleaseButton->Bind(wxEVT_COMMAND_BUTTON_CLICKED, &RopelessDialog::OnManualReleaseButton, this);
@@ -385,20 +392,46 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
   // Deckbox Status box
   m_deckboxStatusSizer = new wxStaticBoxSizer(
       new wxStaticBox(this, wxID_ANY, _("Deckbox Status")), wxVERTICAL);
-  m_deckboxStatusText = new wxStaticText(this, wxID_ANY, _("Status: Ready"), wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_MIDDLE);
-  m_deckboxStatusSizer->Add(m_deckboxStatusText, 0, wxALL | wxEXPAND, 5);
   
-  // Add TCP Connection status line with text wrapping
-  m_tcpConnectionStatusText = new wxStaticText(this, wxID_ANY, _("TCP Connection: Disconnected"), wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_MIDDLE);
-  m_deckboxStatusSizer->Add(m_tcpConnectionStatusText, 0, wxALL | wxEXPAND, 5);
+  m_connectionStatusText = new wxStaticText(this, wxID_ANY, _("Connection: Disconnected"), wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_MIDDLE);
+  m_deckboxStatusSizer->Add(m_connectionStatusText, 0, wxALL | wxEXPAND, 5);
+  
+  m_deviceIdStatusText = new wxStaticText(this, wxID_ANY, _("Device ID: Unknown"), wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_MIDDLE);
+  m_deckboxStatusSizer->Add(m_deviceIdStatusText, 0, wxALL | wxEXPAND, 5);
+  
+  m_acousticStatusText = new wxStaticText(this, wxID_ANY, _("Acoustic: Unknown"), wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_MIDDLE);
+  m_deckboxStatusSizer->Add(m_acousticStatusText, 0, wxALL | wxEXPAND, 5);
+  
+  m_cloudStatusText = new wxStaticText(this, wxID_ANY, _("Cloud: Unknown"), wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_MIDDLE);
+  m_deckboxStatusSizer->Add(m_cloudStatusText, 0, wxALL | wxEXPAND, 5);
   
   sidebarSizer->Add(m_deckboxStatusSizer, 0, wxEXPAND | wxALL, 5);
   
-  // Release Status block
+  // Release Status block (merged from transponderReleaseDlg functionality)
   m_releaseStatusSizer = new wxStaticBoxSizer(
       new wxStaticBox(this, wxID_ANY, _("Release Status")), wxVERTICAL);
   m_releaseStatusText = new wxStaticText(this, wxID_ANY, _("Status: Standby"), wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_MIDDLE);
   m_releaseStatusSizer->Add(m_releaseStatusText, 0, wxALL | wxEXPAND, 5);
+  
+  // Release action buttons commented out per request
+  // wxBoxSizer *releaseButtonSizer = new wxBoxSizer(wxHORIZONTAL);
+  // m_markRecoveredButton = new wxButton(this, wxID_ANY, _("Mark Recovered"), wxDefaultPosition, wxDefaultSize, 0);
+  // m_retryReleaseButton = new wxButton(this, wxID_ANY, _("Retry"), wxDefaultPosition, wxDefaultSize, 0);
+  // 
+  // m_markRecoveredButton->Bind(wxEVT_COMMAND_BUTTON_CLICKED, &RopelessDialog::OnMarkRecoveredButton, this);
+  // m_retryReleaseButton->Bind(wxEVT_COMMAND_BUTTON_CLICKED, &RopelessDialog::OnRetryReleaseButton, this);
+  // 
+  // releaseButtonSizer->Add(m_markRecoveredButton, 0, wxALL, 2);
+  // releaseButtonSizer->Add(m_retryReleaseButton, 0, wxALL, 2);
+  // m_releaseStatusSizer->Add(releaseButtonSizer, 0, wxALL | wxALIGN_CENTER_HORIZONTAL, 5);
+  // 
+  // // Initially hide the buttons
+  // ShowReleaseStatusButtons(false);
+  
+  // Initialize button pointers to NULL since they're commented out
+  m_markRecoveredButton = NULL;
+  m_retryReleaseButton = NULL;
+  
   sidebarSizer->Add(m_releaseStatusSizer, 0, wxEXPAND | wxALL, 5);
   
   // Add sidebar to main horizontal sizer with proper scaling
@@ -456,6 +489,8 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
   // Update initial TCP connection status
   UpdateTCPConnectionStatus();
 
+  m_selectedTransponder = NULL;
+
 }
 
 RopelessDialog::~RopelessDialog() {
@@ -485,6 +520,24 @@ RopelessDialog::~RopelessDialog() {
     }
     if (m_clearDebugButton) {
       m_clearDebugButton->Unbind(wxEVT_COMMAND_BUTTON_CLICKED, &RopelessDialog::OnClearDebugButton, this);
+    }
+    if (m_markRecoveredButton) {
+      m_markRecoveredButton->Unbind(wxEVT_COMMAND_BUTTON_CLICKED, &RopelessDialog::OnMarkRecoveredButton, this);
+    }
+    if (m_retryReleaseButton) {
+      m_retryReleaseButton->Unbind(wxEVT_COMMAND_BUTTON_CLICKED, &RopelessDialog::OnRetryReleaseButton, this);
+    }
+    if (m_releaseButton) {
+      m_releaseButton->Unbind(wxEVT_COMMAND_BUTTON_CLICKED, &RopelessDialog::OnReleaseButton, this);
+    }
+    if (m_recoverButton) {
+      m_recoverButton->Unbind(wxEVT_COMMAND_BUTTON_CLICKED, &RopelessDialog::OnRecoverButton, this);
+    }
+    if (m_deleteButton) {
+      m_deleteButton->Unbind(wxEVT_COMMAND_BUTTON_CLICKED, &RopelessDialog::OnDeleteButton, this);
+    }
+    if (m_muteButton) {
+      m_muteButton->Unbind(wxEVT_COMMAND_BUTTON_CLICKED, &RopelessDialog::OnMuteButton, this);
     }
   } catch (...) {
     // Ignore any exceptions during cleanup - dialog may already be destroyed
@@ -943,11 +996,9 @@ void RopelessDialog::OnManualReleaseButton(wxCommandEvent &event) {
 }
 
 void RopelessDialog::OnSyncButton(wxCommandEvent &event)
-{
-  wxLogMessage("OnSyncButton called - starting sync process");
-  
+{  
   // Send the original sync message
-  g_ropelessPI->SendSyncMessage();
+  //g_ropelessPI->SendSyncMessage();
   
   // Also send a GMR NMEA string for sync command
   wxString gmr_sentence = "$ECGMR,1,0,0,0,2,0,0,0*5E";  // Sync command GMR
@@ -955,22 +1006,15 @@ void RopelessDialog::OnSyncButton(wxCommandEvent &event)
   // Send via TCP connection directly
   bool tcp_sent = g_ropelessPI->SendRawNMEA(gmr_sentence);
   
-  // Also send via OpenCPN's NMEA buffer as backup
-  PushNMEABuffer(gmr_sentence);
-  
+  // TODO: make loopback an option for these sent tcp messages
+  //PushNMEABuffer(gmr_sentence);
+
   // Display the sent GMR message in debug output
   if (tcp_sent) {
-    AddDebugMessage("--> TCP: " + gmr_sentence);
+    AddDebugMessage("-->" + gmr_sentence);
   } else {
-    AddDebugMessage("--> TCP FAILED: " + gmr_sentence);
+    DebugMessage("xxx TCP FAILED: " + gmr_sentence);
   }
-  AddDebugMessage("--> OpenCPN: " + gmr_sentence);
-  
-  // Also add a simple test message to verify the debug text control is working
-  AddDebugMessage("Sync button clicked - test message");
-  
-  wxLogMessage("Sync button: Sent sync message via TCP (%s) and OpenCPN NMEA buffer", 
-               tcp_sent ? "success" : "failed");
 }
 
 void RopelessDialog::OnShowOnMapButton(wxCommandEvent &event)
@@ -995,12 +1039,12 @@ void RopelessDialog::OnShowOnMapButton(wxCommandEvent &event)
 void RopelessDialog::OnClearDebugButton(wxCommandEvent &event)
 {
   m_debugTextCtrl->Clear();
-  wxLogMessage("Debug messages cleared by user");
+  //wxLogMessage("Debug messages cleared by user");
 }
 
 void RopelessDialog::AddDebugMessage(const wxString &message)
 {
-  wxLogMessage("AddDebugMessage called with: %s", message);
+  //wxLogMessage("AddDebugMessage called with: %s", message);
   
   if (!m_debugTextCtrl) {
     wxLogMessage("ERROR: m_debugTextCtrl is NULL!");
@@ -1013,10 +1057,19 @@ void RopelessDialog::AddDebugMessage(const wxString &message)
                                                   now.FormatISOTime(), 
                                                   message);
   
+  // TODO: Enforce a max length here?
+
   // Append to debug text control
   m_debugTextCtrl->AppendText(timestampedMessage);
   
-  wxLogMessage("Debug message added to text control");
+}
+
+void RopelessDialog::DebugMessage(const wxString &message, bool alsoLog)
+{
+  AddDebugMessage(message);
+  if (alsoLog) {
+    wxLogMessage(message);
+  }
 }
 
 void RopelessDialog::UpdateTransponderInfo(transponder_state *state) {
@@ -1099,15 +1152,56 @@ void RopelessDialog::UpdateTransponderInfo(transponder_state *state) {
 
 void RopelessDialog::UpdateTCPConnectionStatus()
 {
-  wxString statusText = _("TCP Connection: ");
+  wxString statusText = _("Connection: ");
   
   if (pParentPi && pParentPi->IsTCPOutputConnected()) {
-    statusText += _("Connected");
+    statusText += wxString::FromUTF8("✓ ") + _("Connected");
+    m_connectionStatusText->SetForegroundColour(wxColour(0, 128, 0));
   } else {
-    statusText += _("Disconnected");
+    statusText += wxString::FromUTF8("✗ ") + _("Disconnected");
+    m_connectionStatusText->SetForegroundColour(wxColour(192, 0, 0));
   }
   
-  m_tcpConnectionStatusText->SetLabel(statusText);
+  m_connectionStatusText->SetLabel(statusText);
+}
+
+void RopelessDialog::UpdateDeviceIdStatus(const wxString &deviceId)
+{
+  wxString statusText = _("Device ID: ");
+  
+  if (!deviceId.IsEmpty()) {
+    statusText += deviceId;
+  } else {
+    statusText += _("Unknown");
+  }
+  
+  m_deviceIdStatusText->SetLabel(statusText);
+}
+
+void RopelessDialog::UpdateAcousticStatus(const wxString &acousticStatus)
+{
+  wxString statusText = _("Acoustic: ");
+  
+  if (!acousticStatus.IsEmpty()) {
+    statusText += acousticStatus;
+  } else {
+    statusText += _("Unknown");
+  }
+  
+  m_acousticStatusText->SetLabel(statusText);
+}
+
+void RopelessDialog::UpdateCloudStatus(const wxString &cloudStatus)
+{
+  wxString statusText = _("Cloud: ");
+  
+  if (!cloudStatus.IsEmpty()) {
+    statusText += cloudStatus;
+  } else {
+    statusText += _("Unknown");
+  }
+  
+  m_cloudStatusText->SetLabel(statusText);
 }
 
 
@@ -1143,12 +1237,11 @@ long RopelessDialog::FindItemByName(wxListCtrl* listCtrl, const wxString& name) 
 }
 
 void RopelessDialog::OnClose(wxCloseEvent &event) {
-  wxLogMessage("RopelessDialog: OnClose started");
   
   clearHighlighted();
-  wxLogMessage("RopelessDialog: clearHighlighted completed");
 
 #ifndef __ANDROID__
+  // TODO: Fix this later
   // Comment out size/position saving to let dialog always size to fit content
   // wxPoint p = GetPosition();
   // pParentPi->m_dialogPosX = p.x;
@@ -1156,14 +1249,14 @@ void RopelessDialog::OnClose(wxCloseEvent &event) {
   // wxSize s = GetSize();
   // pParentPi->m_dialogSizeWidth = s.x;
   // pParentPi->m_dialogSizeHeight = s.y;
-  wxLogMessage("RopelessDialog: Position/size saved");
+  // wxLogMessage("RopelessDialog: Position/size saved");
 #endif
   
-  wxLogMessage("RopelessDialog: About to call Destroy()");
   Destroy();
-  wxLogMessage("RopelessDialog: Destroy() completed");
   
   pParentPi->m_pRLDialog = NULL;
+
+  // Log this in case we crash during close
   wxLogMessage("RopelessDialog: OnClose completed");
 }
 
@@ -1211,4 +1304,97 @@ static int wxCALLBACK wxListCompareFunction(wxIntPtr item1, wxIntPtr item2,
     default:
       return 0;
   }
+}
+
+// Command button event handlers - send GMR commands for selected transponder
+void RopelessDialog::OnReleaseButton(wxCommandEvent &event) {
+
+  wxLogMessage("OnReleaseButton!");
+
+  if (!m_selectedTransponder) {
+    DebugMessage("No transponder selected for Release command");
+    return;
+  }
+  
+  if (pParentPi) {
+    pParentPi->SendCommandMessage(m_selectedTransponder, eCMD_RELEASE);
+    DebugMessage(wxString::Format("Sent RELEASE command for transponder %d", m_selectedTransponder->ident));
+  }
+}
+
+void RopelessDialog::OnRecoverButton(wxCommandEvent &event) {
+  if (!m_selectedTransponder) {
+    DebugMessage("No transponder selected for Recover command");
+    return;
+  }
+  
+  if (pParentPi) {
+    pParentPi->SendCommandMessage(m_selectedTransponder, eCMD_RECOVER);
+    DebugMessage(wxString::Format("Sent RECOVER command for transponder %d", m_selectedTransponder->ident));
+  }
+}
+
+void RopelessDialog::OnDeleteButton(wxCommandEvent &event) {
+  if (!m_selectedTransponder) {
+    DebugMessage("No transponder selected for Delete command");
+    return;
+  }
+  
+  if (pParentPi) {
+    pParentPi->SendCommandMessage(m_selectedTransponder, eCMD_DELETE);
+    DebugMessage(wxString::Format("Sent DELETE command for transponder %d", m_selectedTransponder->ident));
+  }
+}
+
+void RopelessDialog::OnMuteButton(wxCommandEvent &event) {
+  if (!m_selectedTransponder) {
+    DebugMessage("No transponder selected for Mute command");
+    return;
+  }
+  
+  // Note: Mute functionality may need different implementation
+  // For now, just log that mute was requested
+  DebugMessage(wxString::Format("MUTE requested for transponder %d (implementation needed)", m_selectedTransponder->ident));
+}
+
+// Release Status functions (moved from transponderReleaseDlg)
+void RopelessDialog::OnMarkRecoveredButton(wxCommandEvent &event) {
+  if (pParentPi) {
+    pParentPi->releaseCallbackRecovered();
+    ShowReleaseStatusButtons(false);  // Hide buttons after action
+  }
+}
+
+void RopelessDialog::OnRetryReleaseButton(wxCommandEvent &event) {
+  if (pParentPi) {
+    pParentPi->releaseCallbackRetry();
+  }
+}
+
+void RopelessDialog::ShowReleaseStatusButtons(bool show) {
+  if (m_markRecoveredButton) {
+    m_markRecoveredButton->Show(show);
+  }
+  if (m_retryReleaseButton) {
+    m_retryReleaseButton->Show(show);
+  }
+  
+  // Refresh layout to accommodate button visibility changes
+  m_releaseStatusSizer->Layout();
+  Layout();
+}
+
+void RopelessDialog::UpdateReleaseStatusInfo(int transponder_id, const wxString &status) {
+  wxLogMessage("UpdateReleaseStatusInfo: Starting for ID %d with status '%s'", transponder_id, status);
+  
+  wxString statusText = wxString::Format(_("ID: %d - %s"), transponder_id, status);
+  wxLogMessage("UpdateReleaseStatusInfo: About to call SetLabel");
+  m_releaseStatusText->SetLabel(statusText);
+  wxLogMessage("UpdateReleaseStatusInfo: SetLabel completed");
+  
+  // Show buttons when there's an active release status
+  bool showButtons = !status.Contains(_("Standby")) && !status.Contains(_("Ready"));
+  wxLogMessage("UpdateReleaseStatusInfo: About to call ShowReleaseStatusButtons(%s)", showButtons ? "true" : "false");
+  ShowReleaseStatusButtons(showButtons);
+  wxLogMessage("UpdateReleaseStatusInfo: ShowReleaseStatusButtons completed");
 }

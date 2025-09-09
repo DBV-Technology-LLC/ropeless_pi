@@ -64,7 +64,7 @@
 #include <deque>
 #include <wx/socket.h>
 
-#include "transponderReleaseDlgImpl.h"
+// #include "transponderReleaseDlgImpl.h"  // Functionality moved to RopelessDialog
 
 #define EPL_TOOL_POSITION -1  // Request default positioning of toolbar tool
 
@@ -284,6 +284,36 @@ public:
   std::deque<transponder_state_history *> historyQ;
 };
 
+struct deckbox_status {
+public:
+  deckbox_status() {
+    deckboxID.Clear();
+    deckboxManuf.Clear();  
+    acousticStatus.Clear();
+    cloudStatus.Clear();
+    numDevices = 0;
+    connectionStatus = false;
+    lastUpdateTime = wxDateTime::Now();
+  }
+  
+  wxString deckboxID;
+  wxString deckboxManuf;
+  wxString acousticStatus;
+  wxString cloudStatus;
+  int numDevices;
+  bool connectionStatus;
+  wxDateTime lastUpdateTime;
+  
+  void UpdateFromDBS(const DBS& dbs) {
+    deckboxID = dbs.DeckboxID;
+    deckboxManuf = dbs.DeckboxManuf;
+    acousticStatus = dbs.AcousticStatus;
+    cloudStatus = dbs.CloudStatus;
+    numDevices = dbs.NumDevices;
+    lastUpdateTime = wxDateTime::Now();
+  }
+};
+
 class release_timer_state{
 public:
 
@@ -421,7 +451,7 @@ public:
   wxTimer m_releaseTimer;
   wxTimer m_distanceTimer;
 
-  transponderReleaseDlgImpl *m_releaseDlg = NULL;
+  // transponderReleaseDlgImpl *m_releaseDlg = NULL;  // Functionality moved to RopelessDialog
 
   release_timer_state m_release_tim_state;
 
