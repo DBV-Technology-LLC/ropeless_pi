@@ -103,43 +103,44 @@ NMEA_TCP_OutputConnection::~NMEA_TCP_OutputConnection()
 
 bool NMEA_TCP_OutputConnection::Connect()
 {
-    if (m_connectionState == STATE_CONNECTED || m_connectionState == STATE_CONNECTING) {
-        return m_connectionState == STATE_CONNECTED;
+    if (m_connectionState == STATE_CONNECTED) {
+        return true;
     }
-    
-    // Clean up existing socket
-    if (m_socket) {
-        m_socket->Destroy();
-        m_socket = nullptr;
+
+    // Always ensure a socket exists
+    if (!m_socket || m_connectionState == STATE_ERROR) {
+        if (m_socket) {
+            m_socket->Destroy();
+            m_socket = nullptr;
+        }
+
+        m_socket = new wxSocketClient(wxSOCKET_NOWAIT);
+        m_socket->SetEventHandler(*this, SOCKET_ID);
+        m_socket->SetNotify(wxSOCKET_CONNECTION_FLAG | wxSOCKET_LOST_FLAG | wxSOCKET_OUTPUT_FLAG);
+        m_socket->Notify(true);
     }
-    
-    // Create new socket
-    m_socket = new wxSocketClient(wxSOCKET_NOWAIT);
-    m_socket->SetEventHandler(*this, SOCKET_ID);
-    m_socket->SetNotify(wxSOCKET_CONNECTION_FLAG | wxSOCKET_LOST_FLAG | wxSOCKET_OUTPUT_FLAG);
-    m_socket->Notify(true);
-    
-    // Create address
+
+    // Build address
     wxIPV4address addr;
     if (!addr.Hostname(m_host) || !addr.Service(m_port)) {
-        wxLogError("NMEA TCP Output: Invalid host/port: %s:%d", m_host, m_port);
+        wxLogError("NMEA TCP Output: Invalid host/port: %s:%d", m_host.mb_str(), m_port);
         m_connectionState = STATE_ERROR;
         m_connectionErrors++;
+        if (m_socket) { m_socket->Destroy(); m_socket = nullptr; }
         return false;
     }
-    
+
     // Attempt connection
     m_connectionState = STATE_CONNECTING;
-    bool result = m_socket->Connect(addr, false); // Non-blocking connect
-    
+    bool result = m_socket->Connect(addr, false); // Non-blocking
+
     if (!result && m_socket->LastError() != wxSOCKET_WOULDBLOCK) {
-        wxLogError("NMEA TCP Output: Connection failed to %s:%d - Error: %d", 
-                   m_host, m_port, m_socket->LastError());
+        wxLogError("NMEA TCP Output: Connection failed to %s:%d - Error: %d",
+                   m_host.mb_str(), m_port, m_socket->LastError());
         HandleConnectionError();
         return false;
     }
-    
-    // wxLogMessage("NMEA TCP Output: Connecting to %s:%d", m_host, m_port);
+
     return true;
 }
 
@@ -185,47 +186,6 @@ bool NMEA_TCP_OutputConnection::IsConnecting() const
     return m_connectionState == STATE_CONNECTING;
 }
 
-bool NMEA_TCP_OutputConnection::SendNMEAMessage(RESPONSE* nmea_message)
-{
-    if (!nmea_message) {
-        return false;
-    }
-    
-    // Create sentence and write message to it
-    SENTENCE sentence;
-    if (!nmea_message->Write(sentence)) {
-        wxLogError("NMEA TCP Output: Failed to write message to sentence");
-        return false;
-    }
-    
-    // Send the sentence
-    return SendRawNMEA(sentence.Sentence);
-}
-
-bool NMEA_TCP_OutputConnection::SendDBS(const DBS& dbs_msg)
-{
-    DBS dbs_copy = dbs_msg;  // Make a copy since Write() is not const
-    return SendNMEAMessage(&dbs_copy);
-}
-
-bool NMEA_TCP_OutputConnection::SendGML(const GML& gml_msg)
-{
-    GML gml_copy = gml_msg;  // Make a copy since Write() is not const
-    return SendNMEAMessage(&gml_copy);
-}
-
-bool NMEA_TCP_OutputConnection::SendGMS(const GMS& gms_msg)
-{
-    GMS gms_copy = gms_msg;  // Make a copy since Write() is not const
-    return SendNMEAMessage(&gms_copy);
-}
-
-bool NMEA_TCP_OutputConnection::SendGMR(const GMR& gmr_msg)
-{
-    GMR gmr_copy = gmr_msg;  // Make a copy since Write() is not const
-    return SendNMEAMessage(&gmr_copy);
-}
-
 bool NMEA_TCP_OutputConnection::SendRawNMEA(const wxString& nmea_sentence)
 {
     if (nmea_sentence.IsEmpty()) {
@@ -244,24 +204,32 @@ bool NMEA_TCP_OutputConnection::SendRawNMEA(const wxString& nmea_sentence)
         }
     }
     
+    wxLogMessage("Connection state = " + m_connectionState);
+
+    // Try to establish connection if not connected
+    if (!IsConnected() && m_autoReconnect) {
+
+        // Force a re-connect here. but the state won't change due to non block connect
+        // will have to retry once connection is up
+        Connect();
+
+        return false;
+    }
+
+    wxLogMessage("Connected sending to queue!");
+
+
     // Add to queue
-    {
-        wxMutexLocker lock(m_queueMutex);
-        
-        // Check queue size limit
-        if (m_messageQueue.size() >= MAX_QUEUE_SIZE) {
-            wxLogWarning("NMEA TCP Output: Message queue full, dropping oldest message");
-            m_messageQueue.pop();
-        }
-        
-        m_messageQueue.push(message);
-        m_messagesQueued++;
+    wxMutexLocker lock(m_queueMutex);
+    
+    // Check queue size limit
+    if (m_messageQueue.size() >= MAX_QUEUE_SIZE) {
+        wxLogWarning("NMEA TCP Output: Message queue full, dropping oldest message");
+        m_messageQueue.pop();
     }
     
-    // Try to establish connection if not connected
-    if (!IsConnected() && !IsConnecting() && m_autoReconnect) {
-        Connect();
-    }
+    m_messageQueue.push(message);
+    m_messagesQueued++;
     
     return true;
 }

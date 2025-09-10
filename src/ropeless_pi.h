@@ -153,11 +153,15 @@ enum {
 };
 
 enum {
-  eCMD_RELEASE = 0,
-  eCMD_RECOVER = 1,
-  eCMD_SYNC = 2,
-  eCMD_DELETE = 3,
-  eCMD_DEPLOYED = 4,
+  eCMD_RESPONSE = 0,
+  eCMD_DELETE = 1,
+  eCMD_RECOVER = 2,
+  eCMD_LOST = 3,
+  eCMD_MUTE = 4,
+  eCMD_SYNC = 5,
+  eCMD_RANGE = 6,
+  eCMD_INTERROGATE = 7,
+  eCMD_RELEASE = 8
 };
 
 const wxString releaseStatusNames[] = {"TIMEOUT", "SENDING...", "VERIFIED", "NOT VERIFIED", "FAILED", "---", "NETWORK ERROR", "CONNECTING..."};
@@ -420,6 +424,8 @@ public:
   bool m_debug_enabled;
   bool m_debug_show_nmea;
   bool m_debug_show_log;
+  bool m_loopbackNMEATx;
+
   RopelessDialog *m_pRLDialog;
   RopelessPrefsDialog *m_pPrefsDialog;
 
@@ -436,14 +442,16 @@ public:
   void InitializeTCPOutput();
   void ShutdownTCPOutput();
   bool IsTCPOutputConnected() const;
-  bool SendNMEAMessage(RESPONSE* message);
-  bool SendRawNMEA(const wxString& nmea_sentence);
+  bool SendNMEAMessageTCP(RESPONSE* message);
+  bool SendRawNMEATCP(const wxString& nmea_sentence);
   void ConfigureTCPOutput(const wxString& host, int port, bool enabled, bool auto_reconnect);
   wxString GetTCPOutputStatus() const;
   
   // RSGML Message Generation
   void SendGMLMessageForManualPlacement(transponder_state* state, double lat, double lon, double utc);
   
+  // Global Debug Message Function
+  void GlobalDebugMessage(const wxString& message, bool alsoLog = true);
 
   int m_place_trap_manually;
   int m_place_trap_now;
@@ -502,7 +510,10 @@ private:
   int m_show_id;
   int m_hide_id;
 
-  NMEA0183 m_NMEA0183;  // Used to parse NMEA Sentences
+  NMEA0183 m_NMEA0183;     // Used to parse incoming NMEA Sentences
+  NMEA0183 m_NMEA0183_tx;  // outgoing NMEA sentences
+
+
   // FFU
   int m_config_version;
   wxString m_VDO_accumulator;
@@ -586,6 +597,9 @@ private:
 
   DECLARE_EVENT_TABLE();
 };
+
+// Global debug message function accessible from anywhere
+void GlobalRopelessDebugMessage(const wxString& message, bool alsoLog = true);
 
 //      An event handler to manage timer ticks, and the like
 class PI_EventHandler : public wxEvtHandler {

@@ -84,17 +84,13 @@ public:
     int GetPort() const { return m_port; }
     bool GetAutoReconnect() const { return m_autoReconnect; }
     
-    /**
-     * Send NMEA messages using built-in NMEA classes
-     */
-    bool SendNMEAMessage(RESPONSE* nmea_message);
-    bool SendDBS(const DBS& dbs_msg);
-    bool SendGML(const GML& gml_msg);
-    bool SendGMS(const GMS& gms_msg);
-    bool SendGMR(const GMR& gmr_msg);
+    // /**
+    //  * Send NMEA messages using built-in NMEA classes
+    //  */
+    // bool SendNMEAMessage(RESPONSE* nmea_message);
     
     /**
-     * Send raw NMEA sentence
+     * Send raw NMEA sentence given string
      */
     bool SendRawNMEA(const wxString& nmea_sentence);
     
@@ -147,13 +143,13 @@ private:
     // Message queue (thread-safe)
     mutable wxMutex m_queueMutex;
     std::queue<wxString> m_messageQueue;
-    static const size_t MAX_QUEUE_SIZE = 1000;
+    static const size_t MAX_QUEUE_SIZE = 128;
     
     // Statistics
     unsigned long m_messagesSent;
     unsigned long m_messagesQueued;
     unsigned long m_connectionErrors;
-    
+        
     // Socket event IDs
     enum {
         SOCKET_ID = 1000,

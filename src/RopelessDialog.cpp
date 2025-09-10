@@ -985,35 +985,11 @@ void RopelessDialog::OnManualReleaseButton(wxCommandEvent &event) {
   }
 
   if (result >= 0) {
-    wxString s1;
-    s1.Printf("Manual Release Req for ID: %d", result);
-    wxLogMessage(s1);
+    wxLogMessage("Manual Release Req for ID: %d", result);
 
     g_ropelessPI->manualReleaseState.ident = result;
     g_ropelessPI->SendCommandMessage(&g_ropelessPI->manualReleaseState, eCMD_RELEASE);
 
-  }
-}
-
-void RopelessDialog::OnSyncButton(wxCommandEvent &event)
-{  
-  // Send the original sync message
-  //g_ropelessPI->SendSyncMessage();
-  
-  // Also send a GMR NMEA string for sync command
-  wxString gmr_sentence = "$ECGMR,1,0,0,0,2,0,0,0*5E";  // Sync command GMR
-  
-  // Send via TCP connection directly
-  bool tcp_sent = g_ropelessPI->SendRawNMEA(gmr_sentence);
-  
-  // TODO: make loopback an option for these sent tcp messages
-  //PushNMEABuffer(gmr_sentence);
-
-  // Display the sent GMR message in debug output
-  if (tcp_sent) {
-    AddDebugMessage("-->" + gmr_sentence);
-  } else {
-    DebugMessage("xxx TCP FAILED: " + gmr_sentence);
   }
 }
 
@@ -1306,10 +1282,17 @@ static int wxCALLBACK wxListCompareFunction(wxIntPtr item1, wxIntPtr item2,
   }
 }
 
-// Command button event handlers - send GMR commands for selected transponder
-void RopelessDialog::OnReleaseButton(wxCommandEvent &event) {
+void RopelessDialog::OnSyncButton(wxCommandEvent &event)
+{  
+  // don't need a selected transponder for the Sync command
+  transponder_state empty = {};
 
-  wxLogMessage("OnReleaseButton!");
+  if (pParentPi) {
+    pParentPi->SendCommandMessage(&empty, eCMD_SYNC);
+  }
+}
+
+void RopelessDialog::OnReleaseButton(wxCommandEvent &event) {
 
   if (!m_selectedTransponder) {
     DebugMessage("No transponder selected for Release command");
@@ -1318,7 +1301,7 @@ void RopelessDialog::OnReleaseButton(wxCommandEvent &event) {
   
   if (pParentPi) {
     pParentPi->SendCommandMessage(m_selectedTransponder, eCMD_RELEASE);
-    DebugMessage(wxString::Format("Sent RELEASE command for transponder %d", m_selectedTransponder->ident));
+    //DebugMessage(wxString::Format("Sent RELEASE command for transponder %d", m_selectedTransponder->ident));
   }
 }
 
@@ -1330,11 +1313,14 @@ void RopelessDialog::OnRecoverButton(wxCommandEvent &event) {
   
   if (pParentPi) {
     pParentPi->SendCommandMessage(m_selectedTransponder, eCMD_RECOVER);
-    DebugMessage(wxString::Format("Sent RECOVER command for transponder %d", m_selectedTransponder->ident));
+    //DebugMessage(wxString::Format("Sent RECOVER command for transponder %d", m_selectedTransponder->ident));
   }
 }
 
 void RopelessDialog::OnDeleteButton(wxCommandEvent &event) {
+
+  wxLogMessage("On Delete button");
+
   if (!m_selectedTransponder) {
     DebugMessage("No transponder selected for Delete command");
     return;
@@ -1342,7 +1328,7 @@ void RopelessDialog::OnDeleteButton(wxCommandEvent &event) {
   
   if (pParentPi) {
     pParentPi->SendCommandMessage(m_selectedTransponder, eCMD_DELETE);
-    DebugMessage(wxString::Format("Sent DELETE command for transponder %d", m_selectedTransponder->ident));
+    //DebugMessage(wxString::Format("Sent DELETE command for transponder %d", m_selectedTransponder->ident));
   }
 }
 
@@ -1352,16 +1338,28 @@ void RopelessDialog::OnMuteButton(wxCommandEvent &event) {
     return;
   }
   
-  // Note: Mute functionality may need different implementation
-  // For now, just log that mute was requested
-  DebugMessage(wxString::Format("MUTE requested for transponder %d (implementation needed)", m_selectedTransponder->ident));
+  if (pParentPi) {
+    pParentPi->SendCommandMessage(m_selectedTransponder, eCMD_MUTE);
+    //DebugMessage(wxString::Format("Sent DELETE command for transponder %d", m_selectedTransponder->ident));
+  }
 }
 
 // Release Status functions (moved from transponderReleaseDlg)
 void RopelessDialog::OnMarkRecoveredButton(wxCommandEvent &event) {
+
+  if (!m_selectedTransponder) {
+    DebugMessage("No transponder selected for Recover command");
+    return;
+  }
+  
   if (pParentPi) {
-    pParentPi->releaseCallbackRecovered();
-    ShowReleaseStatusButtons(false);  // Hide buttons after action
+
+    // TODO: Handle Recovered update in UI
+    //pParentPi->releaseCallbackRecovered();
+    //ShowReleaseStatusButtons(false);  // Hide buttons after action
+
+    //pParentPi->SendCommandMessage(m_selectedTransponder, eCMD_RECOVER);
+    //DebugMessage(wxString::Format("Sent DELETE command for transponder %d", m_selectedTransponder->ident));
   }
 }
 
