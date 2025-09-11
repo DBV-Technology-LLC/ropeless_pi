@@ -976,34 +976,7 @@ bool ropeless_pi::SendCommandMessage(transponder_state *state, long code) {
   // Send NMEA message via TCP!
   SendNMEAMessageTCP(&gmr_msg);
 
-  // // Validate TCP output pointer before using
-  // if (!m_nmea_tcp_output) {
-  //   return false;
-  // }
-  
-  // // Send via TCP output client using GMR message
-  // if (IsTCPOutputConnected()) {
-  //   try {
-  //     ret = m_nmea_tcp_output->SendNMEAMessage(&gmr_msg);
-  //     wxLogMessage("SendGMR completed, result: %s", ret ? "success" : "failed");
-      
-  //     if (ret) {
-  //       GlobalRopelessDebugMessage(wxString::Format("GMR command sent via TCP: CmdType=%ld, MarkID=%d", code, state->ident));
-  //     } else {
-  //       GlobalRopelessDebugMessage(wxString::Format("xxx Failed to send GMR command via TCP: CmdType=%ld, MarkID=%d", code, state->ident));
-  //     }
-  //   } catch (...) {
-  //     wxLogMessage("EXCEPTION occurred in SendGMR!");
-  //     GlobalRopelessDebugMessage("EXCEPTION: Error sending GMR command");
-  //     ret = false;
-  //   }
-  // } else {
-  //   wxLogMessage("TCP not connected - connection state: %s", 
-  //                m_nmea_tcp_output ? "TCP object exists but not connected" : "TCP object is NULL");
-  //   GlobalRopelessDebugMessage(wxString::Format("xxx TCP Output not connected, cannot send GMR command: CmdType=%ld, MarkID=%d", code, state->ident));
-  //   ret = false;
-  // }
-
+  // TODO: Track status of release requestsNo 
   // if (code == eCMD_RELEASE)
   // {
   //   wxLogMessage("SendCommandMessage: Processing RELEASE command for ID %d, ret=%s", state->ident, ret ? "true" : "false");
@@ -1147,12 +1120,39 @@ void ropeless_pi::stopDistanceTimer() { m_distanceTimer.Stop(); }
 void ropeless_pi::ProcessDistanceTimerEvent(wxTimerEvent &event) {
 
   //TODO: Only calculate this when dialog is opened or on button press to save processing time?
-  if (m_pRLDialog != NULL) {
-    for (unsigned int i = 0; i < transponderStatus.size(); i++) {
-      transponder_state* t = transponderStatus[i];
+  for (unsigned int i = 0; i < transponderStatus.size(); i++) {
+    transponder_state* t = transponderStatus[i];
+
+    if (t->predicted_lat > 90.0 || t->predicted_lon > 180.0) {
+      t->distance = -1.0;
+    }
+    else{
       t->distance = haversineDistance(m_ownship_lat,m_ownship_lon,t->predicted_lat,t->predicted_lon);
     }
 
+    double distnmi = t->distance / 1852.0;
+
+    if (t->position_source == ePOS_SOURCE_CLOUD)
+    {
+      if (distnmi > 2.0)
+      {
+        wxLogMessage("Deleting Cloud transponder outside 2nmi! Ident: " + t->ident);
+        DeleteTransponder(t->ident);
+      }
+      else if (distnmi > 1.0 && t->hide_pos == false)
+      {
+        wxLogMessage("Hiding cloud transponder!");
+        t->hide_pos = true;
+      }
+      else if (distnmi < 1.0 && t->hide_pos == true)
+      {
+        wxLogMessage("Showing Transponder!");
+        t->hide_pos = false;
+      }
+    }
+  }
+
+  if (m_pRLDialog != NULL) {
     // Refresh the list to show the updated distances
     m_pRLDialog->RefreshTransponderList();
   }
@@ -1581,6 +1581,16 @@ void ropeless_pi::LoadTransponderStatus() {
 }
 
 void ropeless_pi::RenderTransponder(transponder_state *state) {
+
+  // don't render if the lat lon are invalid pos 999.00000
+  if (state->predicted_lat > 90.0 || state->predicted_lon > 180.0)
+  {
+    //wxLogMessage("Invalid lat/lon for transpoder state: " + state->ident);
+    return;
+  }
+
+  if (state->hide_pos == true) return;
+
   int circle_size = 10;
 
   wxPoint ab;
@@ -1782,6 +1792,9 @@ void ropeless_pi::RenderTransponder(transponder_state *state) {
 
 void ropeless_pi::RenderTrawlConnector(transponder_state *state1,
                                        transponder_state *state2) {
+
+  if (state1->hide_pos == true || state2->hide_pos == true) return;
+  
   wxPoint P1, P2;
   GetCanvasPixLL(g_vp, &P1, state1->predicted_lat, state1->predicted_lon);
   GetCanvasPixLL(g_vp, &P2, state2->predicted_lat, state2->predicted_lon);
@@ -1796,6 +1809,7 @@ void ropeless_pi::RenderTrawlConnector(transponder_state *state1,
 }
 
 void ropeless_pi::RenderVesselRangeCircle() {
+
   // Only draw if we have a valid vessel position
   if (m_ownship_lat == 0.0 && m_ownship_lon == 0.0) {
     return;
@@ -1910,8 +1924,13 @@ void ropeless_pi::RenderTrawls() {
     //                state->predicted_lat, state->predicted_lon);
     // }
 
+    // Decide if we have to render this transponder here since we don't want to draw the trawl connector
+    //if (state->hide_pos == true) return;
+
+    // Show transponder on screen
     RenderTransponder(state);
 
+    // Draw line to transponder partner if necessary
     if (state->ident_partner != state->ident) {
       transponder_state *statePartner = GetStateByIdent(state->ident_partner);
       if (statePartner) {
@@ -2335,7 +2354,6 @@ void ropeless_pi::SetNMEASentence(wxString &sentence) {
         
         if (tstate) {
             // Update GML status parameters
-            //tstate->ident = m_NMEA0183.Gml.MarkID;
             tstate->mark_type = m_NMEA0183.Gml.MarkType;
             tstate->pos_status = m_NMEA0183.Gml.PosStatus;
             tstate->trawl_id = m_NMEA0183.Gml.TrawlID;
@@ -2384,6 +2402,7 @@ void ropeless_pi::SetNMEASentence(wxString &sentence) {
         // Update transponder state with GMS data  
         transponder_state *tstate = GetStateByIdent(m_NMEA0183.Gms.MarkID);
         if (!tstate) {
+            wxLogMessage("Couldn't find Transponder Ident. Creating new...");
             tstate = addTransponderPos(m_NMEA0183.Gms.MarkID);
         }
         

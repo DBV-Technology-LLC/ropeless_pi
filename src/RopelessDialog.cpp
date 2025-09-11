@@ -847,13 +847,14 @@ void RopelessDialog::RefreshTransponderList() {
 
     rid.Printf("%s%s", releaseStatusNames[rlsNum],appendStr);
 
-    // wxListItem testItem;
-    // testItem.SetId(i);
-    // testItem.SetColumn(1);
-    // testItem.SetBackgroundColour(*wxGREEN);
-    // m_pListCtrlTranponders->SetItem(testItem);
+    // Set green color for "Released" status
+    if (rlsNum == eRELEASE_VERIFIED) {
+        wxListItem releaseItem;
 
-    m_pListCtrlTranponders->SetItem(result, tlRELEASE_STATUS, rid);
+        m_pListCtrlTranponders->SetItem(releaseItem);
+    } else {
+        m_pListCtrlTranponders->SetItem(result, tlRELEASE_STATUS, rid);
+    }
     m_pListCtrlTranponders->SetColumnWidth(tlRELEASE_STATUS,
                                            wxLIST_AUTOSIZE_USEHEADER);
 
@@ -894,7 +895,12 @@ void RopelessDialog::RefreshTransponderList() {
 #ifdef SHOW_DISTANCE
     // item.SetColumn(tlDISTANCE);
     wxString sdist;
-    sdist = wxString::Format(wxT("%.*f"), 2, state->distance);
+    if (state->distance > 0){
+      sdist = wxString::Format(wxT("%.*f"), 2, state->distance);
+    }
+    else {
+      sdist = wxString::Format("N/A");
+    }
     // wxString sdist;
     // sdist.Printf("%g", state->distance);
     // item.SetText(sdist);
@@ -1000,10 +1006,19 @@ void RopelessDialog::OnShowOnMapButton(wxCommandEvent &event)
 
     double scale_ppm = 0.1;  // Gives 1:43000 zoom level
     
+    // check if position is valid
+    if (m_selectedTransponder->predicted_lat > 90.0 || m_selectedTransponder->predicted_lon > 180.0)
+    {
+      //wxLogMessage("Invalid lat/lon for transpoder state: " + state->ident);
+      return;
+    }
+
     JumpToPosition(m_selectedTransponder->predicted_lat, 
                    m_selectedTransponder->predicted_lon, 
                    scale_ppm);
     
+    GetOCPNCanvasWindow()->Refresh(true);
+
     wxLogMessage("Show On Map: Centering on transponder %d at lat=%.6f, lon=%.6f with scale_ppm=%.6f", 
                  m_selectedTransponder->ident,
                  m_selectedTransponder->predicted_lat,

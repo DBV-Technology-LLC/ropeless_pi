@@ -51,6 +51,8 @@ class GML : public RESPONSE
       ** Data
       */
 
+      static constexpr double INVALID_LATLON = 999.0;
+
       int MarkID;           // 0-8 enum
       int MarkType;         // enum
       int PosStatus;        // 0-5 enum
@@ -73,6 +75,10 @@ class GML : public RESPONSE
       virtual bool Parse( const SENTENCE& sentence );
       virtual bool Write( SENTENCE& sentence );
 
+      bool HasValidPosition() const {
+        return !(Latitude == INVALID_LATLON || Longitude == INVALID_LATLON);
+      }
+      
       /*
       ** Operators
       */

@@ -109,8 +109,19 @@ bool GML::Parse( const SENTENCE& sentence )
    PosStatus  = sentence.Integer( 3 );
    TrawlID    = sentence.Integer( 4 );
    TrawlNum   = sentence.Integer( 5 );
-   Latitude   = sentence.Double( 6 );
-   Longitude  = sentence.Double( 7 );
+
+    // Check for missing latitude
+    if (sentence.Field(6).IsEmpty())
+        Latitude = INVALID_LATLON;
+    else
+        Latitude = sentence.Double(6);
+
+    // Check for missing longitude
+    if (sentence.Field(7).IsEmpty())
+        Longitude = INVALID_LATLON;
+    else
+        Longitude = sentence.Double(7);
+
    Depth      = sentence.Integer( 8 );
    MfgID      = sentence.Integer( 9 );
    Mfg        = sentence.Integer( 10 );

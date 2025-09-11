@@ -164,7 +164,7 @@ enum {
   eCMD_RELEASE = 8
 };
 
-const wxString releaseStatusNames[] = {"TIMEOUT", "SENDING...", "VERIFIED", "NOT VERIFIED", "FAILED", "---", "NETWORK ERROR", "CONNECTING..."};
+const wxString releaseStatusNames[] = {"TIMEOUT", "SENDING...", "Released", "NOT VERIFIED", "FAILED", "---", "NETWORK ERROR", "CONNECTING..."};
 const wxString recoveredStrList[] = {"DEPLOYED","RECOVERED"};
 const wxString positionSourceNames[] = {"USER", "CLOUD", "ACOUSTIC", "GPS"};
 const wxString commModeNames[] = {"UDP Broadcast"};
@@ -243,6 +243,11 @@ public:
     seafloor_temp = 0;
     air_pressure = 0;
     gms_date_num = 0.0;
+
+    predicted_lat = 999.0;
+    predicted_lon = 999.0;
+    hide_pos = false;
+    
   }
 
   ~transponder_state() {};
@@ -266,6 +271,8 @@ public:
   double distance;
   int position_source;
   
+  bool hide_pos;
+
   // GML (Gear Mark Location) status parameters
   int mark_type;        // MarkType from GML
   int pos_status;       // PosStatus from GML  
