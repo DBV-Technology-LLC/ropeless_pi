@@ -171,9 +171,9 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
   m_pListCtrlTranponders->InsertColumn(tlTIMESTAMP, _("LastReportTime (UTC)"),
                                        wxLIST_FORMAT_CENTER, txs.x + dx * 2);
 
-  txs = GetTextExtent("Range, M");
-  m_pListCtrlTranponders->InsertColumn(tlRANGE, _("Range, M"),
-                                       wxLIST_FORMAT_CENTER, txs.x + dx * 2);
+  // txs = GetTextExtent("Range, M");
+  // m_pListCtrlTranponders->InsertColumn(tlRANGE, _("Range, M"),
+  //                                     wxLIST_FORMAT_CENTER, txs.x + dx * 2);
 
 #ifdef SHOW_DISTANCE
   txs = GetTextExtent("Distance, M");
@@ -920,13 +920,13 @@ void RopelessDialog::RefreshTransponderList() {
                                            wxLIST_AUTOSIZE_USEHEADER);
 
     // item.SetColumn(tlRANGE);
-    wxString srng;
-    srng.Printf("%g", state->range);
+    // wxString srng;
+    // srng.Printf("%g", state->range);
     // item.SetText(sdist);
     // m_pListCtrlTranponders->SetItem(item);
-    m_pListCtrlTranponders->SetItem(result, tlRANGE, srng);
-    m_pListCtrlTranponders->SetColumnWidth(tlRANGE,
-                                           wxLIST_AUTOSIZE_USEHEADER);
+    // m_pListCtrlTranponders->SetItem(result, tlRANGE, srng);
+    // m_pListCtrlTranponders->SetColumnWidth(tlRANGE,
+    //                                        wxLIST_AUTOSIZE_USEHEADER);
 
     // item.SetColumn(tlBATT_STAT);
     // wxString sbatt;
@@ -956,6 +956,10 @@ void RopelessDialog::RefreshTransponderList() {
 
   // Update TCP connection status periodically
   UpdateTCPConnectionStatus();
+  
+  // Refit the dialog to accommodate the properly sized list control columns
+  GetSizer()->Fit(this);
+  Layout();
 
 }
 
@@ -1282,9 +1286,9 @@ int wxCALLBACK wxListCompareFunction(wxIntPtr item1, wxIntPtr item2,
       return (CompareD((double)tS2->ident, (double)tS1->ident));
       break;
 
-    case tlRANGE:
-      return (CompareD(tS2->range, tS1->range));
-      break;
+    // case tlRANGE:
+    //   return (CompareD(tS2->range, tS1->range));
+    //   break;
 
     case tlICON:
     case tlRELEASE_STATUS:

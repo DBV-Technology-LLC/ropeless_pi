@@ -4,14 +4,14 @@ Binary: opencpn-build-deps
 Architecture: all
 Version: 1.0
 Checksums-Md5:
- 6f645a355754a57865209f56417a5b27 2302 opencpn-build-deps_1.0_all.deb
+ 5391c32578ff607e4e4997f31ffdb1ce 2296 opencpn-build-deps_1.0_all.deb
 Checksums-Sha1:
- be828398bc50200c77d4cf819ad1c28ecdb64eec 2302 opencpn-build-deps_1.0_all.deb
+ c61adafeffc8c6457800918dcc7895a5bd94d6ef 2296 opencpn-build-deps_1.0_all.deb
 Checksums-Sha256:
- 9c841dbf92cdd01256d3a10592006536a111667308bc3c3041c636cc60dd4294 2302 opencpn-build-deps_1.0_all.deb
+ 3170fa8e585914358123ee935f92137a1375aea5a6d913c1a7e0d5a1adb614d0 2296 opencpn-build-deps_1.0_all.deb
 Build-Origin: Ubuntu
 Build-Architecture: amd64
-Build-Date: Thu, 11 Sep 2025 15:18:07 -0400
+Build-Date: Fri, 12 Sep 2025 10:09:55 -0400
 Build-Tainted-By:
  merged-usr-via-aliased-dirs
 Installed-Build-Depends:
@@ -173,4 +173,4 @@ Environment:
  DEB_BUILD_OPTIONS="parallel=8"
  DEB_BUILD_PROFILES="noudeb"
  LANG="en_US.UTF-8"
- SOURCE_DATE_EPOCH="1757618286"
+ SOURCE_DATE_EPOCH="1757686194"
