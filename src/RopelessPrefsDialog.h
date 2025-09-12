@@ -52,24 +52,27 @@ public:
 private:
     ropeless_pi *m_parent_pi;
     
-    // Test checkbox
-    wxCheckBox *m_cbTest;
     // Colorblind mode setting
     wxCheckBox *m_cbColorblind;
     // TCP NMEA Output settings
     wxCheckBox *m_cbTCPEnabled;
     wxCheckBox *m_cbTCPAutoReconnect;
     wxTextCtrl *m_tcTCPHost;
-    wxSpinCtrl *m_scTCPPort;
-    // Debug options
+    wxTextCtrl *m_tcTCPPort;
+    // Advanced options
     wxCheckBox *m_cbDebugEnabled;
-    wxCheckBox *m_cbShowNMEA;
-    wxCheckBox *m_cbShowLog;
+    wxCheckBox *m_cbSimulationEnabled;
+    // Display options
+    wxCheckBox *m_cbShowNonOwned;
+    wxCheckBox *m_cbShowCloud;
+    wxCheckBox *m_cbHideRecovered;
+    wxCheckBox *m_cbTimeoutCloud;
+    wxTextCtrl *m_tcCloudRadius;
     
     void CreateControls();
     void OnOKClick(wxCommandEvent &event);
     void OnCancelClick(wxCommandEvent &event);
-    void OnTestCheckbox(wxCommandEvent &event);
+    void OnDefaultSettingsClick(wxCommandEvent &event);
     void OnTCPEnabledClick(wxCommandEvent &event);
     void OnDebugEnabledClick(wxCommandEvent &event);
     void UpdateDebugControls();

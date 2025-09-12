@@ -473,6 +473,9 @@ public:
   void releaseCallbackRecovered(void);
   void releaseCallbackRetry(void);
   void releaseCallbackExit(void);
+  
+  bool ConfirmAndDeleteTransponder(int id);
+  bool ConfirmAndReleaseTransponder(transponder_state* state);
 
 private:
   bool LoadConfig(void);

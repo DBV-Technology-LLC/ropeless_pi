@@ -773,77 +773,15 @@ void ropeless_pi::PopupMenuHandler(wxCommandEvent &event) {
     }
 
     case ID_TPR_RELEASE: {
-      wxString msg("Send Release to Transponder: ");
-      wxString msg1;
-      msg1.Printf("%d\n", m_foundState->ident);
-      msg += msg1;
-
-      long result = -1;
-      myNumberEntryDialog dialog;
-      myOkDialog okDialog;
-
-      if (m_foundState->ident > 0) {
-
-#ifdef __ANDROID__
-        wxFont *pFont = OCPNGetFont(_T("Dialog"), 0);
-        okDialog.SetFont(*pFont);
-#endif
-
-        okDialog.Create(GetOCPNCanvasWindow(), msg, "Ropeless Plugin Message",
-                        0, 0, 100000, wxDefaultPosition);
-
-        if (okDialog.ShowModal() == wxID_OK) {result = 1;}
-       
-      } 
-      else {
-
-#ifdef __ANDROID__
-        wxFont *pFont = OCPNGetFont(_T("Dialog"), 0);
-        dialog.SetFont(*pFont);
-#endif
-
-        dialog.Create(GetOCPNCanvasWindow(), msg, "Enter Release Code",
-                      "Ropeless Plugin Message", 0, 0, 100000,
-                      wxDefaultPosition);
-
-        if (dialog.ShowModal() == wxID_OK) result = dialog.GetValue();
-
-        result = -1;
-      }
-
-      if (result >= 0) SendCommandMessage(m_foundState, eCMD_RELEASE);
+      
+      ConfirmAndReleaseTransponder(g_ropelessPI->m_foundState);
 
       handled = true;
       break;
     }
 
     case ID_TPR_DELETE: {
-      wxString msg("Delete Transponder: ");
-      wxString msg1;
-      msg1.Printf("%d\n", g_ropelessPI->m_foundState->ident);
-      msg += msg1;
-
-      long result = -1;
-      myOkDialog dialog2;
-
-#ifdef __ANDROID__
-      wxFont *pFont = OCPNGetFont(_T("Dialog"), 0);
-      dialog2.SetFont(*pFont);
-#endif
-
-      dialog2.Create(GetOCPNCanvasWindow(), msg, "Ropeless Plugin Message", 0,
-                     0, 100000, wxDefaultPosition);
-
-      wxLogMessage("Deleting Transponder!");
-
-      if (dialog2.ShowModal() == wxID_OK) {
-
-        DeleteTransponder(g_ropelessPI->m_foundState->ident);
-
-        SendCommandMessage(m_foundState, eCMD_RELEASE);
-
-        //m_pRLDialog->RefreshTransponderList();
-      }
+      ConfirmAndDeleteTransponder(g_ropelessPI->m_foundState->ident);
       handled = true;
       break;
     }
@@ -1893,6 +1831,85 @@ bool ropeless_pi::DeleteTransponder(int id)
     }
   }
 
+  return false;
+}
+
+bool ropeless_pi::ConfirmAndDeleteTransponder(int id)
+{
+  wxString msg("Delete Transponder: ");
+  wxString msg1;
+  msg1.Printf("%d\n", id);
+  msg += msg1;
+
+  myOkDialog dialog2;
+
+#ifdef __ANDROID__
+  wxFont *pFont = OCPNGetFont(_T("Dialog"), 0);
+  dialog2.SetFont(*pFont);
+#endif
+
+  dialog2.Create(GetOCPNCanvasWindow(), msg, "Ropeless Plugin Message", 0,
+                 0, 100000, wxDefaultPosition);
+
+  wxLogMessage("Deleting Transponder!");
+
+  if (dialog2.ShowModal() == wxID_OK) {
+    if (DeleteTransponder(id)) {
+      SendCommandMessage(GetStateByIdent(id), eCMD_RELEASE);
+      return true;
+    }
+  }
+  
+  return false;
+}
+
+bool ropeless_pi::ConfirmAndReleaseTransponder(transponder_state* state)
+{
+  if (!state) return false;
+  
+  wxString msg("Send Release to Transponder: ");
+  wxString msg1;
+  msg1.Printf("%d\n", state->ident);
+  msg += msg1;
+
+  long result = -1;
+  myNumberEntryDialog dialog;
+  myOkDialog okDialog;
+
+  if (state->ident > 0) {
+
+#ifdef __ANDROID__
+    wxFont *pFont = OCPNGetFont(_T("Dialog"), 0);
+    okDialog.SetFont(*pFont);
+#endif
+
+    okDialog.Create(GetOCPNCanvasWindow(), msg, "Ropeless Plugin Message",
+                    0, 0, 100000, wxDefaultPosition);
+
+    if (okDialog.ShowModal() == wxID_OK) {result = 1;}
+   
+  } 
+  else {
+
+#ifdef __ANDROID__
+    wxFont *pFont = OCPNGetFont(_T("Dialog"), 0);
+    dialog.SetFont(*pFont);
+#endif
+
+    dialog.Create(GetOCPNCanvasWindow(), msg, "Enter Release Code",
+                  "Ropeless Plugin Message", 0, 0, 100000,
+                  wxDefaultPosition);
+
+    if (dialog.ShowModal() == wxID_OK) result = dialog.GetValue();
+
+    result = -1;
+  }
+
+  if (result >= 0) {
+    SendCommandMessage(state, eCMD_RELEASE);
+    return true;
+  }
+  
   return false;
 }
 

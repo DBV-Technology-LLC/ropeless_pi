@@ -1434,8 +1434,7 @@ void RopelessDialog::OnReleaseButton(wxCommandEvent &event) {
   }
   
   if (pParentPi) {
-    pParentPi->SendCommandMessage(m_selectedTransponder, eCMD_RELEASE);
-    //DebugMessage(wxString::Format("Sent RELEASE command for transponder %d", m_selectedTransponder->ident));
+    pParentPi->ConfirmAndReleaseTransponder(m_selectedTransponder);
   }
 }
 
@@ -1461,8 +1460,7 @@ void RopelessDialog::OnDeleteButton(wxCommandEvent &event) {
   }
   
   if (pParentPi) {
-    pParentPi->SendCommandMessage(m_selectedTransponder, eCMD_DELETE);
-    //DebugMessage(wxString::Format("Sent DELETE command for transponder %d", m_selectedTransponder->ident));
+    pParentPi->ConfirmAndDeleteTransponder(m_selectedTransponder->ident);
   }
 }
 
