@@ -1,5 +1,5 @@
 Format: 1.8
-Date: Tue, 28 May 2024 16:07:30 -0400
+Date: Thu, 11 Sep 2025 15:18:06 -0400
 Source: opencpn-build-deps
 Binary: opencpn-build-deps
 Built-For-Profiles: noudeb
@@ -7,8 +7,8 @@ Architecture: all
 Version: 1.0
 Distribution: unstable
 Urgency: low
-Maintainer: Equivs Dummy Package Generator <cvincent@Ubuntu-22.04.2.myguest.virtualbox.org>
-Changed-By: Equivs Dummy Package Generator <cvincent@Ubuntu-22.04.2.myguest.virtualbox.org>
+Maintainer: Equivs Dummy Package Generator <rsi-16@rsi16-Dell-15-DC15255>
+Changed-By: Equivs Dummy Package Generator <rsi-16@rsi16-Dell-15-DC15255>
 Description:
  opencpn-build-deps - build-dependencies for opencpn
 Changes:
@@ -16,11 +16,11 @@ Changes:
  .
    * First version
 Checksums-Sha1:
- de79289e355669af5ea909c22cfe203ce59a0142 2316 opencpn-build-deps_1.0_all.deb
- bbbb1c1bf4481109690c6b34727b9303c34a8b15 5815 opencpn-build-deps_1.0_amd64.buildinfo
+ be828398bc50200c77d4cf819ad1c28ecdb64eec 2302 opencpn-build-deps_1.0_all.deb
+ 6a5d3f67f8ea2d6bfa50204b0cc3c731ef6a72dc 5796 opencpn-build-deps_1.0_amd64.buildinfo
 Checksums-Sha256:
- 49739d1ddf58370154b4793b18bfe99856c64f72604ed01b608276cf3e0570e0 2316 opencpn-build-deps_1.0_all.deb
- 91fb7005869983649e3efba9bd634eed3120091ffd2274dd9643ece90506a595 5815 opencpn-build-deps_1.0_amd64.buildinfo
+ 9c841dbf92cdd01256d3a10592006536a111667308bc3c3041c636cc60dd4294 2302 opencpn-build-deps_1.0_all.deb
+ ec890db78a6b50c01e8801cff3c9fe6d04c2c9a1f42ba2dfdc9eb1e2dfb7c51b 5796 opencpn-build-deps_1.0_amd64.buildinfo
 Files:
- 805aea6d31f4c2c6df20d064c9b6002b 2316 devel optional opencpn-build-deps_1.0_all.deb
- 85025d1c23d9c6f45b05dfc2e98ff74d 5815 devel optional opencpn-build-deps_1.0_amd64.buildinfo
+ 6f645a355754a57865209f56417a5b27 2302 devel optional opencpn-build-deps_1.0_all.deb
+ 9a1804fc95ebcf97a13c691abefcbaa4 5796 devel optional opencpn-build-deps_1.0_amd64.buildinfo

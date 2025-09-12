@@ -112,15 +112,12 @@
 enum {
   tlICON = 0,
   tlIDENT,
-  tlTIMESTAMP,
   tlRELEASE_STATUS,
+  tlTIMESTAMP,
   tlRANGE,
   tlDISTANCE,
-  tlPINGS,
-  tlDEPTH,
-  tlTEMP,
-  tlBATT_STAT,
   tlRECOVERED
+  // Removed columns: tlPINGS, tlDEPTH, tlTEMP, tlBATT_STAT
 };  // Transponder list Columns;
 
 enum {

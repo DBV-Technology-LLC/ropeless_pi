@@ -35,6 +35,7 @@
 #endif
 
 #include <wx/dialog.h>
+#include <wx/spinctrl.h>
 
 class ropeless_pi;
 

@@ -1257,8 +1257,8 @@ void RopelessDialog::OnOKClick(wxCommandEvent &event) {
   Close();
 }
 
-static int wxCALLBACK wxListCompareFunction(wxIntPtr item1, wxIntPtr item2,
-                                            wxIntPtr sortData) {
+int wxCALLBACK wxListCompareFunction(wxIntPtr item1, wxIntPtr item2,
+                                     wxIntPtr sortData) {
   std::vector<transponder_state *> *v = &transponderStatus;  // reinterpret_cast<std::vector<transponder_state
                                                              // *>*>(sortData);
 
@@ -1288,10 +1288,7 @@ static int wxCALLBACK wxListCompareFunction(wxIntPtr item1, wxIntPtr item2,
 
     case tlICON:
     case tlRELEASE_STATUS:
-    case tlPINGS:
-    case tlDEPTH:
-    case tlTEMP:
-    case tlBATT_STAT:
+    // Removed columns: tlPINGS, tlDEPTH, tlTEMP, tlBATT_STAT
     default:
       return 0;
   }

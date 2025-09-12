@@ -52,7 +52,7 @@ cd "$BUILD_DIR"
 
 # Configure with cmake for Ubuntu 22.04
 echo "Configuring build with cmake for Ubuntu 22.04..."
-cmake -DOCPN_TARGET_TUPLE='ubuntu-wx32;22.04;x86_64' ..
+cmake -DOCPN_TARGET_TUPLE='ubuntu-wx32-x86_64;22.04;x86_64' ..
 
 # Build the tarball
 echo "Building tarball..."
