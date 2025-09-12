@@ -2760,6 +2760,22 @@ bool ropeless_pi::MouseEventHook(wxMouseEvent &event) {
   return bret;
 }
 
+bool ropeless_pi::KeyboardEventHook(wxKeyEvent &event) {
+  // Commented out for now - accelerator table approach is working
+  // // Check if we have the Ropeless dialog open
+  // if (m_pRLDialog) {
+  //   // Check for Ctrl+M hotkey
+  //   if (event.ControlDown() && event.GetKeyCode() == 'M') {
+  //     wxLogMessage("Plugin KeyboardEventHook: Ctrl+M pressed!");
+  //     wxCommandEvent cmdEvent(wxEVT_COMMAND_BUTTON_CLICKED);
+  //     m_pRLDialog->OnShowOnMapButton(cmdEvent);
+  //     return true;  // Event consumed
+  //   }
+  // }
+  
+  return false;  // Event not consumed, pass it on
+}
+
 void ropeless_pi::ShowPreferencesDialog(wxWindow *parent) {
     // Only allow one preferences dialog at a time
     if (m_pPrefsDialog) {

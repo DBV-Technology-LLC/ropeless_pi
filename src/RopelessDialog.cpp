@@ -88,7 +88,9 @@ double ScaleToPPM(int chart_scale, const PlugIn_ViewPort &vp)
 
 BEGIN_EVENT_TABLE(RopelessDialog, wxDialog)
 EVT_BUTTON(wxID_OK, RopelessDialog::OnOKClick)
+EVT_BUTTON(wxID_HELP, RopelessDialog::OnHelpClick)
 EVT_CLOSE(RopelessDialog::OnClose)
+EVT_KEY_DOWN(RopelessDialog::OnKeyDown)
 END_EVENT_TABLE()
 
 RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
@@ -471,7 +473,9 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
 
   m_sdbSizer1 = new wxStdDialogButtonSizer();
   m_sdbSizer1OK = new wxButton(this, wxID_OK);
+  m_sdbSizer1Help = new wxButton(this, wxID_HELP, _("Help"));
   m_sdbSizer1->AddButton(m_sdbSizer1OK);
+  m_sdbSizer1->AddButton(m_sdbSizer1Help);
   m_sdbSizer1->Realize();
 
   overallSizer->Add(m_sdbSizer1, 0, wxBOTTOM | wxEXPAND | wxTOP, 5);
@@ -485,6 +489,30 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
   this->Layout();
   
   this->Centre(wxBOTH);
+  
+  // Enable key events for the dialog
+  this->SetCanFocus(true);
+  
+  // Set up accelerator table for hotkeys
+  wxAcceleratorEntry entries[7];
+  entries[0].Set(wxACCEL_CTRL, (int)'S', wxID_HIGHEST + 1);  // Show On Map
+  entries[1].Set(wxACCEL_CTRL, (int)'R', wxID_HIGHEST + 2);  // Release
+  entries[2].Set(wxACCEL_CTRL, (int)'D', wxID_HIGHEST + 3);  // Delete
+  entries[3].Set(wxACCEL_CTRL, (int)'O', wxID_HIGHEST + 4);  // Recover
+  entries[4].Set(wxACCEL_CTRL, (int)'A', wxID_HIGHEST + 5);  // Manual Release
+  entries[5].Set(wxACCEL_CTRL, (int)'Y', wxID_HIGHEST + 6);  // Sync
+  entries[6].Set(wxACCEL_CTRL, (int)'M', wxID_HIGHEST + 7);  // Mute
+  wxAcceleratorTable accel(7, entries);
+  this->SetAcceleratorTable(accel);
+  
+  // Bind the accelerator events
+  this->Bind(wxEVT_MENU, &RopelessDialog::OnShowOnMapAccelerator, this, wxID_HIGHEST + 1);
+  this->Bind(wxEVT_MENU, &RopelessDialog::OnReleaseAccelerator, this, wxID_HIGHEST + 2);
+  this->Bind(wxEVT_MENU, &RopelessDialog::OnDeleteAccelerator, this, wxID_HIGHEST + 3);
+  this->Bind(wxEVT_MENU, &RopelessDialog::OnRecoverAccelerator, this, wxID_HIGHEST + 4);
+  this->Bind(wxEVT_MENU, &RopelessDialog::OnManualReleaseAccelerator, this, wxID_HIGHEST + 5);
+  this->Bind(wxEVT_MENU, &RopelessDialog::OnSyncAccelerator, this, wxID_HIGHEST + 6);
+  this->Bind(wxEVT_MENU, &RopelessDialog::OnMuteAccelerator, this, wxID_HIGHEST + 7);
   
   // Update initial TCP connection status
   UpdateTCPConnectionStatus();
@@ -539,6 +567,15 @@ RopelessDialog::~RopelessDialog() {
     if (m_muteButton) {
       m_muteButton->Unbind(wxEVT_COMMAND_BUTTON_CLICKED, &RopelessDialog::OnMuteButton, this);
     }
+    
+    // Unbind accelerator events
+    this->Unbind(wxEVT_MENU, &RopelessDialog::OnShowOnMapAccelerator, this, wxID_HIGHEST + 1);
+    this->Unbind(wxEVT_MENU, &RopelessDialog::OnReleaseAccelerator, this, wxID_HIGHEST + 2);
+    this->Unbind(wxEVT_MENU, &RopelessDialog::OnDeleteAccelerator, this, wxID_HIGHEST + 3);
+    this->Unbind(wxEVT_MENU, &RopelessDialog::OnRecoverAccelerator, this, wxID_HIGHEST + 4);
+    this->Unbind(wxEVT_MENU, &RopelessDialog::OnManualReleaseAccelerator, this, wxID_HIGHEST + 5);
+    this->Unbind(wxEVT_MENU, &RopelessDialog::OnSyncAccelerator, this, wxID_HIGHEST + 6);
+    this->Unbind(wxEVT_MENU, &RopelessDialog::OnMuteAccelerator, this, wxID_HIGHEST + 7);
   } catch (...) {
     // Ignore any exceptions during cleanup - dialog may already be destroyed
   }
@@ -1253,6 +1290,87 @@ void RopelessDialog::OnClose(wxCloseEvent &event) {
 
   // Log this in case we crash during close
   wxLogMessage("RopelessDialog: OnClose completed");
+}
+
+void RopelessDialog::OnKeyDown(wxKeyEvent &event) {
+  wxLogMessage("On key down!");
+
+  if (event.ControlDown() && event.GetKeyCode() == 'M') {
+    wxLogMessage("M key down!");
+    
+    wxCommandEvent cmdEvent(wxEVT_COMMAND_BUTTON_CLICKED);
+    OnShowOnMapButton(cmdEvent);
+  } else {
+    event.Skip();
+  }
+}
+
+void RopelessDialog::OnShowOnMapAccelerator(wxCommandEvent &event) {
+  wxLogMessage("Accelerator Ctrl+S (Show On Map) pressed!");
+  wxCommandEvent cmdEvent(wxEVT_COMMAND_BUTTON_CLICKED);
+  OnShowOnMapButton(cmdEvent);
+}
+
+void RopelessDialog::OnReleaseAccelerator(wxCommandEvent &event) {
+  wxLogMessage("Accelerator Ctrl+R (Release) pressed!");
+  wxCommandEvent cmdEvent(wxEVT_COMMAND_BUTTON_CLICKED);
+  OnReleaseButton(cmdEvent);
+}
+
+void RopelessDialog::OnDeleteAccelerator(wxCommandEvent &event) {
+  wxLogMessage("Accelerator Ctrl+D (Delete) pressed!");
+  wxCommandEvent cmdEvent(wxEVT_COMMAND_BUTTON_CLICKED);
+  OnDeleteButton(cmdEvent);
+}
+
+void RopelessDialog::OnRecoverAccelerator(wxCommandEvent &event) {
+  wxLogMessage("Accelerator Ctrl+O (Recover) pressed!");
+  wxCommandEvent cmdEvent(wxEVT_COMMAND_BUTTON_CLICKED);
+  OnRecoverButton(cmdEvent);
+}
+
+void RopelessDialog::OnManualReleaseAccelerator(wxCommandEvent &event) {
+  wxLogMessage("Accelerator Ctrl+A (Manual Release) pressed!");
+  wxCommandEvent cmdEvent(wxEVT_COMMAND_BUTTON_CLICKED);
+  OnManualReleaseButton(cmdEvent);
+}
+
+void RopelessDialog::OnSyncAccelerator(wxCommandEvent &event) {
+  wxLogMessage("Accelerator Ctrl+Y (Sync) pressed!");
+  wxCommandEvent cmdEvent(wxEVT_COMMAND_BUTTON_CLICKED);
+  OnSyncButton(cmdEvent);
+}
+
+void RopelessDialog::OnMuteAccelerator(wxCommandEvent &event) {
+  wxLogMessage("Accelerator Ctrl+M (Mute) pressed!");
+  wxCommandEvent cmdEvent(wxEVT_COMMAND_BUTTON_CLICKED);
+  OnMuteButton(cmdEvent);
+}
+
+void RopelessDialog::OnHelpClick(wxCommandEvent &event) {
+  wxString helpText = 
+    _("Ropeless Plugin - Keyboard Shortcuts\n\n") +
+    _("The following keyboard shortcuts are available:\n\n") +
+    _("Ctrl+S  -  Show On Map\n") +
+    _("         Center the map on the selected transponder\n\n") +
+    _("Ctrl+R  -  Release Transponder\n") +
+    _("         Send release command to selected transponder\n\n") +
+    _("Ctrl+O  -  Recover Transponder\n") +
+    _("         Mark selected transponder as recovered\n\n") +
+    _("Ctrl+D  -  Delete Transponder\n") +
+    _("         Remove selected transponder from the list\n\n") +
+    _("Ctrl+M  -  Mute Transponder\n") +
+    _("         Mute the selected transponder\n\n") +
+    _("Ctrl+Y  -  Sync\n") +
+    _("         Synchronize with the deckbox\n\n") +
+    _("Ctrl+A  -  Manual Release\n") +
+    _("         Manually enter a transponder ID to release\n\n") +
+    _("Note: Most commands require a transponder to be selected\n") +
+    _("from the list first, except for Sync and Manual Release.");
+
+  wxMessageDialog helpDialog(this, helpText, _("Ropeless Plugin Help"), 
+                           wxOK | wxICON_INFORMATION);
+  helpDialog.ShowModal();
 }
 
 void RopelessDialog::OnOKClick(wxCommandEvent &event) {

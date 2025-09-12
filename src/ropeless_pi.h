@@ -372,6 +372,7 @@ public:
   bool RenderOverlay(wxDC &dc, PlugIn_ViewPort *vp);
   bool RenderGLOverlay(wxGLContext *pcontext, PlugIn_ViewPort *vp);
   bool MouseEventHook(wxMouseEvent &event);
+  bool KeyboardEventHook(wxKeyEvent &event);
 
   //      void OnRolloverPopupTimerEvent( wxTimerEvent& event );
   void PopupMenuHandler(wxCommandEvent &event);

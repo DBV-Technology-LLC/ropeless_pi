@@ -55,6 +55,7 @@ protected:
   wxStdDialogButtonSizer *m_sdbSizer1;
   wxButton *m_sdbSizer1OK;
   wxButton *m_sdbSizer1Cancel;
+  wxButton *m_sdbSizer1Help;
 
 public:
   wxComboBox *m_comboPort;
@@ -147,6 +148,7 @@ public:
   virtual ~RopelessDialog();
 
   void OnOKClick(wxCommandEvent &event);
+  void OnHelpClick(wxCommandEvent &event);
   void OnClose(wxCloseEvent &event);
   void OnChooseFileButton(wxCommandEvent &event);
   void OnStopSimButton(wxCommandEvent &event);
@@ -166,6 +168,14 @@ public:
   void OnRecoverButton(wxCommandEvent &event);
   void OnDeleteButton(wxCommandEvent &event);
   void OnMuteButton(wxCommandEvent &event);
+  void OnKeyDown(wxKeyEvent &event);
+  void OnShowOnMapAccelerator(wxCommandEvent &event);
+  void OnReleaseAccelerator(wxCommandEvent &event);
+  void OnDeleteAccelerator(wxCommandEvent &event);
+  void OnRecoverAccelerator(wxCommandEvent &event);
+  void OnManualReleaseAccelerator(wxCommandEvent &event);
+  void OnSyncAccelerator(wxCommandEvent &event);
+  void OnMuteAccelerator(wxCommandEvent &event);
   void UpdateTransponderInfo(transponder_state *state);
   void AddDebugMessage(const wxString &message);
   void DebugMessage(const wxString &message, bool alsoLog = true);
