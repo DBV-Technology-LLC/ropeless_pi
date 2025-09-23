@@ -29,6 +29,9 @@
 #include "manualPlacementDlg.h"
 #include <wx/choice.h>
 
+// Forward declaration
+struct transponder_state;
+
 /// Implementation of the GUI functionality for Preferences dialog.
 /// To obtain \c MainConfigFrame information use \c wxFormBuilder to open \c
 /// dashboardsk.fbp
@@ -40,17 +43,23 @@ class manualPlacementDlgImpl : public manualPlacementDlg {
         void OnPositionSourceChanged(wxCommandEvent& event);
         void AddDeviceTypeControl();
         void OnDeviceTypeChanged(wxCommandEvent& event);
+        void AddTrawlSelectionControl();
+        void OnTrawlSelectionChanged(wxCommandEvent& event);
+        void PopulateTrawlDropdown();
+        void ReorganizeLayout();
+        uint8_t GetMfgCodeFromSelection(int selection);
 
     public:
 
-        manualPlacementDlgImpl( wxWindow* parent, wxWindowID id = wxID_ANY, const wxString& title = _("Place Transponder"), const wxPoint& pos = wxDefaultPosition, 
-            const wxSize& size = wxSize( -1,-1 ), long style = wxDEFAULT_DIALOG_STYLE, const wxString& latStr = _(""), 
-            const wxString& lonStr = _(""), const wxString& utcStr = _("") );
+        manualPlacementDlgImpl( wxWindow* parent, wxWindowID id = wxID_ANY, const wxString& title = _("Place Transponder"), const wxPoint& pos = wxDefaultPosition,
+            const wxSize& size = wxSize( -1,-1 ), long style = wxDEFAULT_DIALOG_STYLE, const wxString& latStr = _(""),
+            const wxString& lonStr = _(""), const wxString& utcStr = _(""), transponder_state* existingState = nullptr );
         ~manualPlacementDlgImpl() = default;
 
         bool isOwned;
-        int xpdrId;
-        int pairId;
+        int markID;
+        int pairId;             // Keep for backward compatibility
+        int selectedTrawlId;    // Selected trawl ID from dropdown
         bool valid;
         int positionSource;
         int deviceType;
@@ -60,6 +69,9 @@ class manualPlacementDlgImpl : public manualPlacementDlg {
         
         // Device type dropdown control
         wxChoice* m_choiceDeviceType;
+        
+        // Trawl selection dropdown control
+        wxChoice* m_choiceTrawlId;
         
     protected:
 

@@ -61,8 +61,6 @@ void GML::Empty( void )
    Latitude = 0.0;
    Longitude = 0.0;
    Depth = 0;
-   MfgID = 0;
-   Mfg = 0;
    Ownership = 0;
    Source = 0;
    DateNum = 0.0;
@@ -75,30 +73,31 @@ bool GML::Parse( const SENTENCE& sentence )
    **
    **        1      2        3         4       5       6         7         8     9     10  11        12     13      14
    **        |      |        |         |       |       |         |         |     |     |   |         |      |       |
-   ** $--GML,MarkID,MarkType,PosStatus,TrawlID,TrawlNum,Latitude,Longitude,Depth,MfgID,Mfg,Ownership,Source,DateNum*hh<CR><LF>
+   ** $--GML,MarkID,MarkType,PosStatus,TrawlID,TrawlNum,Latitude,Longitude,Depth,Ownership,Source,DateNum*hh<CR><LF>
    **
    ** Field Number: 
    **  1) MarkID (0-8 enum)
    **  2) MarkType (enum)
    **  3) PosStatus (0-5 enum)
-   **  4) TrawlID (8-bit ID)
+   **  4) TrawlID (16-bit ID)
    **  5) TrawlNum (8-bit)
    **  6) Latitude (decimal degrees)
    **  7) Longitude (decimal degrees)
    **  8) Depth (16-bit)
-   **  9) MfgID (16-bit)
-   ** 10) Mfg (8-bit)
-   ** 11) Ownership (8-bit)
-   ** 12) Source (enum)
-   ** 13) DateNum (matlab utc datetime)
-   ** 14) Checksum
+   **  9) Ownership (8-bit)
+   ** 10) Source (enum)
+   ** 11) DateNum (matlab utc datetime)
+   ** 12) Checksum
+   **
+   ** Note: Manufacturer ID is derived from MarkID internally:
+   **       MarkID = [8-bit manufacturer code][24-bit serial number]
    */
 
    /*
    ** First we check the checksum...
    */
 
-   if ( sentence.IsChecksumBad( 14 ) == TRUE )
+   if ( sentence.IsChecksumBad( 12 ) == TRUE )
    {
       SetErrorMessage( _T("Invalid Checksum") );
       return( FALSE );
@@ -123,11 +122,10 @@ bool GML::Parse( const SENTENCE& sentence )
         Longitude = sentence.Double(7);
 
    Depth      = sentence.Integer( 8 );
-   MfgID      = sentence.Integer( 9 );
-   Mfg        = sentence.Integer( 10 );
-   Ownership  = sentence.Integer( 11 );
-   Source     = sentence.Integer( 12 );
-   DateNum    = sentence.Double( 13 );
+
+   Ownership  = sentence.Integer( 9 );
+   Source     = sentence.Integer( 10 );
+   DateNum    = sentence.Double( 11 );
 
    return( TRUE );
 }
@@ -148,8 +146,7 @@ bool GML::Write( SENTENCE& sentence )
    sentence += Latitude;
    sentence += Longitude;
    sentence += Depth;
-   sentence += MfgID;
-   sentence += Mfg;
+
    sentence += Ownership;
    sentence += Source;
    sentence += DateNum;
@@ -169,8 +166,6 @@ const GML& GML::operator = ( const GML& source )
    Latitude   = source.Latitude;
    Longitude  = source.Longitude;
    Depth      = source.Depth;
-   MfgID      = source.MfgID;
-   Mfg        = source.Mfg;
    Ownership  = source.Ownership;
    Source     = source.Source;
    DateNum    = source.DateNum;

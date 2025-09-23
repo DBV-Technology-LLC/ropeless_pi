@@ -56,13 +56,11 @@ class GML : public RESPONSE
       int MarkID;           // 0-8 enum
       int MarkType;         // enum
       int PosStatus;        // 0-5 enum
-      int TrawlID;          // 8-bit ID
+      uint16_t TrawlID;     // 16-bit ID (0-65535)
       int TrawlNum;         // 8-bit
       double Latitude;      // decimal degrees
       double Longitude;     // decimal degrees
       int Depth;            // 16-bit
-      int MfgID;            // 16-bit
-      int Mfg;              // 8-bit
       int Ownership;        // 8-bit
       int Source;           // enum
       double DateNum;       // matlab utc datetime

@@ -161,6 +161,30 @@ void RopelessPrefsDialog::CreateControls() {
     radiusSizer->Add(m_tcCloudRadius, 0);
     displaySizer->Add(radiusSizer, 0, wxEXPAND | wxALL, 5);
     
+    // // Visual appearance settings
+    // wxStaticText *visualLabel = new wxStaticText(this, wxID_ANY, _("Visual Appearance:"));
+    // displaySizer->Add(visualLabel, 0, wxALL | wxALIGN_LEFT, 5);
+    
+    // Circle size setting
+    wxBoxSizer *circleSizer = new wxBoxSizer(wxHORIZONTAL);
+    circleSizer->Add(new wxStaticText(this, wxID_ANY, _("Circle size:")), 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 5);
+    m_tcCircleSize = new wxTextCtrl(this, wxID_ANY, wxEmptyString, wxDefaultPosition, wxSize(80, -1));
+    if (m_parent_pi) {
+        m_tcCircleSize->SetValue(wxString::Format("%d", m_parent_pi->m_transponder_circle_size));
+    }
+    circleSizer->Add(m_tcCircleSize, 0);
+    displaySizer->Add(circleSizer, 0, wxEXPAND | wxALL, 5);
+    
+    // Text size setting  
+    wxBoxSizer *textSizer = new wxBoxSizer(wxHORIZONTAL);
+    textSizer->Add(new wxStaticText(this, wxID_ANY, _("Text size:")), 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 5);
+    m_tcTextSize = new wxTextCtrl(this, wxID_ANY, wxEmptyString, wxDefaultPosition, wxSize(80, -1));
+    if (m_parent_pi) {
+        m_tcTextSize->SetValue(wxString::Format("%d", m_parent_pi->m_transponder_text_size));
+    }
+    textSizer->Add(m_tcTextSize, 0);
+    displaySizer->Add(textSizer, 0, wxEXPAND | wxALL, 5);
+    
     mainSizer->Add(displaySizer, 0, wxEXPAND | wxALL, 10);
     
     // Default Settings button
@@ -211,6 +235,20 @@ void RopelessPrefsDialog::OnOKClick(wxCommandEvent &event) {
                 m_parent_pi->m_debug_enabled = m_cbDebugEnabled->GetValue();
             }
             
+            // Save visual settings
+            if (m_tcCircleSize) {
+                long circle_size;
+                if (m_tcCircleSize->GetValue().ToLong(&circle_size) && circle_size >= 5 && circle_size <= 30) {
+                    m_parent_pi->m_transponder_circle_size = (int)circle_size;
+                }
+            }
+            if (m_tcTextSize) {
+                long text_size;
+                if (m_tcTextSize->GetValue().ToLong(&text_size) && text_size >= 6 && text_size <= 24) {
+                    m_parent_pi->m_transponder_text_size = (int)text_size;
+                }
+            }
+            
             // Save to config file
             m_parent_pi->SaveConfig();
         } catch (...) {
@@ -255,6 +293,8 @@ void RopelessPrefsDialog::OnDefaultSettingsClick(wxCommandEvent &event) {
     if (m_cbHideRecovered) m_cbHideRecovered->SetValue(false);
     if (m_cbTimeoutCloud) m_cbTimeoutCloud->SetValue(true);
     if (m_tcCloudRadius) m_tcCloudRadius->SetValue(_("2"));
+    if (m_tcCircleSize) m_tcCircleSize->SetValue(_("10"));
+    if (m_tcTextSize) m_tcTextSize->SetValue(_("12"));
     
     // Update control states
     UpdateTCPControls();

@@ -161,16 +161,16 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
   m_pListCtrlTranponders->InsertColumn(tlICON, _("Color"), wxLIST_FORMAT_CENTER,
                                        txs.x + dx * 2);
 
-  txs = GetTextExtent("ID");
-  m_pListCtrlTranponders->InsertColumn(tlIDENT, _("ID"), wxLIST_FORMAT_CENTER,
+  txs = GetTextExtent("Serial Number");
+  m_pListCtrlTranponders->InsertColumn(tlIDENT, _("Serial Number"), wxLIST_FORMAT_CENTER,
                                        txs.x + dx * 2);
 
   txs = GetTextExtent("Release Status");
   m_pListCtrlTranponders->InsertColumn(tlRELEASE_STATUS, _("Release Status"),
                                        wxLIST_FORMAT_CENTER, txs.x + dx * 2);
 
-  txs = GetTextExtent("LastReportTime (UTC)");
-  m_pListCtrlTranponders->InsertColumn(tlTIMESTAMP, _("LastReportTime (UTC)"),
+  txs = GetTextExtent("Last Report");
+  m_pListCtrlTranponders->InsertColumn(tlTIMESTAMP, _("Last Report"),
                                        wxLIST_FORMAT_CENTER, txs.x + dx * 2);
 
   // txs = GetTextExtent("Range, M");
@@ -252,7 +252,7 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
   headerFont.SetPointSize(headerFont.GetPointSize() + 2);
   headerFont.SetWeight(wxFONTWEIGHT_BOLD);
   m_selectedTransponderLabel->SetFont(headerFont);
-  sidebarSizer->Add(m_selectedTransponderLabel, 0, wxALL | wxALIGN_CENTER_HORIZONTAL, 5);
+  sidebarSizer->Add(m_selectedTransponderLabel, 0, wxALL | wxALIGN_LEFT, 5);
   
   // Tab view for transponder info/status/position (at top of sidebar)
   m_transponderInfoNotebook = new wxNotebook(this, wxID_ANY);
@@ -271,17 +271,17 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
   infoSizer->Add(new wxStaticLine(m_infoPanel), 0, wxEXPAND | wxLEFT | wxRIGHT, 5);
   
   // Create info display controls with text wrapping support
-  m_infoIdText = new wxStaticText(m_infoPanel, wxID_ANY, _("ID: ---"), wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_MIDDLE);
-  m_infoPartnerIdText = new wxStaticText(m_infoPanel, wxID_ANY, _("Partner ID: ---"), wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_MIDDLE);
+  m_infoIdText = new wxStaticText(m_infoPanel, wxID_ANY, _("Mark ID: ---"), wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_MIDDLE);
   m_infoManufacturerText = new wxStaticText(m_infoPanel, wxID_ANY, _("Manufacturer: ---"), wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_MIDDLE);
+  m_infoSerialNumberText = new wxStaticText(m_infoPanel, wxID_ANY, _("Serial Number: ---"), wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_MIDDLE);
   m_infoOwnershipText = new wxStaticText(m_infoPanel, wxID_ANY, _("Ownership: ---"), wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_MIDDLE);
   m_infoTrawlIdText = new wxStaticText(m_infoPanel, wxID_ANY, _("Trawl ID: ---"), wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_MIDDLE);
   m_infoMarkTypeText = new wxStaticText(m_infoPanel, wxID_ANY, _("Mark Type: ---"), wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_MIDDLE);
   
   // Add controls and let them size to their content
   infoSizer->Add(m_infoIdText, 0, wxALL, 5);
-  infoSizer->Add(m_infoPartnerIdText, 0, wxALL, 5);
   infoSizer->Add(m_infoManufacturerText, 0, wxALL, 5);
+  infoSizer->Add(m_infoSerialNumberText, 0, wxALL, 5);
   infoSizer->Add(m_infoOwnershipText, 0, wxALL, 5);
   infoSizer->Add(m_infoTrawlIdText, 0, wxALL, 5);
   infoSizer->Add(m_infoMarkTypeText, 0, wxALL, 5);
@@ -412,7 +412,9 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
   // Release Status block (merged from transponderReleaseDlg functionality)
   m_releaseStatusSizer = new wxStaticBoxSizer(
       new wxStaticBox(this, wxID_ANY, _("Release Status")), wxVERTICAL);
+  m_releaseStatusIdText = new wxStaticText(this, wxID_ANY, _("ID: ---"), wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_MIDDLE);
   m_releaseStatusText = new wxStaticText(this, wxID_ANY, _("Status: Standby"), wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_MIDDLE);
+  m_releaseStatusSizer->Add(m_releaseStatusIdText, 0, wxALL | wxEXPAND, 5);
   m_releaseStatusSizer->Add(m_releaseStatusText, 0, wxALL | wxEXPAND, 5);
   
   // Release action buttons commented out per request
@@ -607,14 +609,14 @@ void RopelessDialog::OnTargetRightClick(wxListEvent &event) {
     index = m_pListCtrlTranponders->HitTest(wxPoint(mouseX, mouseY), flags);
 
     if (index >= 0) {
-      wxString sID = m_pListCtrlTranponders->GetItemText(index, 1);
-      long fid = atoi(sID.ToStdString().c_str());
+      wxString sSerialNum = m_pListCtrlTranponders->GetItemText(index, 1);
+      long serial_num = atol(sSerialNum.ToStdString().c_str());
 
-      // search the transponder list for an ident match
+      // search the transponder list for a serial number match
       long foundIndex = -1;
       for (unsigned int i = 0; i < transponderStatus.size(); i++) {
         transponder_state *state = transponderStatus[i];
-        if (state->ident == fid) {
+        if (state->serial_num == serial_num) {
           foundIndex = i;
           wxLogMessage("List found index: %d", index);
           break;
@@ -625,13 +627,13 @@ void RopelessDialog::OnTargetRightClick(wxListEvent &event) {
         g_ropelessPI->m_foundState = transponderStatus[foundIndex];
 
         wxLogMessage("Right Clicked via List on ID: %d",
-                     g_ropelessPI->m_foundState->ident);
+                     g_ropelessPI->m_foundState->markID);
 
         wxMenu *contextMenu = new wxMenu;
 
         wxMenuItem *id_item = 0;
         wxString transponderIDString;
-        transponderIDString.Printf("ID: %d", g_ropelessPI->m_foundState->ident);
+        transponderIDString.Printf("ID: %d", g_ropelessPI->m_foundState->markID);
         id_item = new wxMenuItem(contextMenu, ID_TPR_ID, _(transponderIDString));
         
         wxMenuItem *release_item = 0;
@@ -648,6 +650,9 @@ void RopelessDialog::OnTargetRightClick(wxListEvent &event) {
           recovered_item = new wxMenuItem(contextMenu, ID_TPR_RECOVER, _("Mark Deployed") );
         }
 
+        wxMenuItem *edit_item = 0;
+        edit_item = new wxMenuItem(contextMenu, ID_TPR_EDIT, _("Edit Transponder"));
+
         wxMenuItem *delete_item = 0;
         delete_item = new wxMenuItem(contextMenu, ID_TPR_DELETE, _("Delete"));
 
@@ -657,9 +662,15 @@ void RopelessDialog::OnTargetRightClick(wxListEvent &event) {
 #endif
 
         contextMenu->Append(id_item);
+        contextMenu->Append(edit_item);
         contextMenu->Append(release_item);
         contextMenu->Append(recovered_item);
         contextMenu->Append(delete_item);
+
+        GetOCPNCanvasWindow()->Connect(
+            ID_TPR_EDIT, wxEVT_COMMAND_MENU_SELECTED,
+            wxCommandEventHandler(ropeless_pi::PopupMenuHandler), NULL,
+            pParentPi);
 
         GetOCPNCanvasWindow()->Connect(
             ID_TPR_RELEASE, wxEVT_COMMAND_MENU_SELECTED,
@@ -679,6 +690,12 @@ void RopelessDialog::OnTargetRightClick(wxListEvent &event) {
         //   Invoke the drop-down menu
         GetOCPNCanvasWindow()->PopupMenu(contextMenu, wxGetMousePosition().x,
                                          wxGetMousePosition().y);
+
+        if (edit_item)
+          GetOCPNCanvasWindow()->Disconnect(
+              ID_TPR_EDIT, wxEVT_COMMAND_MENU_SELECTED,
+              wxCommandEventHandler(ropeless_pi::PopupMenuHandler), NULL,
+              pParentPi);
 
         if (release_item)
           GetOCPNCanvasWindow()->Disconnect(
@@ -718,20 +735,17 @@ wxArrayInt RopelessDialog::GetSelectedItems() {
 }
 
 transponder_state *RopelessDialog::getXpdrFromIndex(int index) {
-  long fid;
-  transponder_state *state;
+  transponder_state *state = nullptr;
 
-  // Get idents of selected items
+  // Get markID from item data
   if (index >= 0) {
-    wxString sID = m_pListCtrlTranponders->GetItemText(index, 1);
-    fid = atoi(sID.ToStdString().c_str());
+    long markID = m_pListCtrlTranponders->GetItemData(index);
 
-    // search the transponder list for an ident match
-    long foundIndex = -1;
+    // Search the transponder list for a markID match
     for (unsigned int i = 0; i < transponderStatus.size(); i++) {
-      state = transponderStatus[i];
-      if (state->ident == fid) {
-        foundIndex = i;
+      transponder_state *currentState = transponderStatus[i];
+      if (currentState->markID == markID) {
+        state = currentState;
         break;
       }
     }
@@ -747,12 +761,7 @@ void RopelessDialog::OnTargetListDeselected(wxListEvent &event) {
   if (deselectedIndex >= 0) {
     transponder_state *state = getXpdrFromIndex(deselectedIndex);
 
-    if (state->ident > 0) {
-      state->color_index = COLOR_INDEX_GREEN;
-
-    } else {
-      state->color_index = COLOR_INDEX_RED;
-    }
+    state->color_index = pParentPi->GetColorIndexForTransponder(state);
 
     // Clear selected transponder and update info panel
     m_selectedTransponder = NULL;
@@ -834,14 +843,14 @@ void RopelessDialog::RefreshTransponderList() {
     // long result = m_pListCtrlTranponders->InsertItem(item);
     long result = m_pListCtrlTranponders->InsertItem(i, " ");
 
-    m_pListCtrlTranponders->SetItemData(result, (long)i);
+    m_pListCtrlTranponders->SetItemData(result, state->markID);
 
     item.SetColumn(tlICON);
     m_pListCtrlTranponders->SetItemImage(item, state->color_index);
 
     // item.SetColumn(tlIDENT);
     wxString sid;
-    sid.Printf("%d", state->ident);
+    sid.Printf("%u", getSerialNumber(state->markID));
     // item.SetText(sid);
     // m_pListCtrlTranponders->SetItem(item);
     m_pListCtrlTranponders->SetItem(result, tlIDENT, sid);
@@ -1034,7 +1043,7 @@ void RopelessDialog::OnManualReleaseButton(wxCommandEvent &event) {
   if (result >= 0) {
     wxLogMessage("Manual Release Req for ID: %d", result);
 
-    g_ropelessPI->manualReleaseState.ident = result;
+    g_ropelessPI->manualReleaseState.markID = result;
     g_ropelessPI->SendCommandMessage(&g_ropelessPI->manualReleaseState, eCMD_RELEASE);
 
   }
@@ -1050,7 +1059,7 @@ void RopelessDialog::OnShowOnMapButton(wxCommandEvent &event)
     // check if position is valid
     if (m_selectedTransponder->predicted_lat > 90.0 || m_selectedTransponder->predicted_lon > 180.0)
     {
-      //wxLogMessage("Invalid lat/lon for transpoder state: " + state->ident);
+      //wxLogMessage("Invalid lat/lon for transpoder state: " + state->markID);
       return;
     }
 
@@ -1061,7 +1070,7 @@ void RopelessDialog::OnShowOnMapButton(wxCommandEvent &event)
     GetOCPNCanvasWindow()->Refresh(true);
 
     wxLogMessage("Show On Map: Centering on transponder %d at lat=%.6f, lon=%.6f with scale_ppm=%.6f", 
-                 m_selectedTransponder->ident,
+                 m_selectedTransponder->markID,
                  m_selectedTransponder->predicted_lat,
                  m_selectedTransponder->predicted_lon,
                  scale_ppm);
@@ -1108,9 +1117,9 @@ void RopelessDialog::UpdateTransponderInfo(transponder_state *state) {
   if (!state) {
     // Clear all displays when no transponder is selected
     m_selectedTransponderLabel->SetLabel(_("Transponder: None Selected"));
-    m_infoIdText->SetLabel(_("ID: ---"));
-    m_infoPartnerIdText->SetLabel(_("Partner ID: ---"));
+    m_infoIdText->SetLabel(_("Mark ID: ---"));
     m_infoManufacturerText->SetLabel(_("Manufacturer: ---"));
+    m_infoSerialNumberText->SetLabel(_("Serial Number: ---"));
     m_infoOwnershipText->SetLabel(_("Ownership: ---"));
     m_infoTrawlIdText->SetLabel(_("Trawl ID: ---"));
     m_infoMarkTypeText->SetLabel(_("Mark Type: ---"));
@@ -1130,12 +1139,12 @@ void RopelessDialog::UpdateTransponderInfo(transponder_state *state) {
     m_positionTempText->SetLabel(_("Temperature: ---°C"));
   } else {
     // Update header with selected transponder ID
-    m_selectedTransponderLabel->SetLabel(wxString::Format(_("Transponder: %d"), state->ident));
+    m_selectedTransponderLabel->SetLabel(wxString::Format(_("Transponder: %u"), state->markID));
     
     // Update Info tab
-    m_infoIdText->SetLabel(wxString::Format(_("ID: %d"), state->ident));
-    m_infoPartnerIdText->SetLabel(wxString::Format(_("Partner ID: %d"), state->ident_partner));
-    m_infoManufacturerText->SetLabel(wxString::Format(_("Manufacturer: %d"), state->mfg));
+    m_infoIdText->SetLabel(wxString::Format(_("Mark ID: %u"), state->markID));
+    m_infoManufacturerText->SetLabel(wxString::Format(_("Manufacturer: %s"), state->mfg_str));
+    m_infoSerialNumberText->SetLabel(wxString::Format(_("Serial Number: %u"), getSerialNumber(state->markID)));
     m_infoOwnershipText->SetLabel(wxString::Format(_("Ownership: %d"), state->ownership));
     m_infoTrawlIdText->SetLabel(wxString::Format(_("Trawl ID: %d"), state->trawl_id));
     m_infoMarkTypeText->SetLabel(wxString::Format(_("Mark Type: %d"), state->mark_type));
@@ -1248,12 +1257,7 @@ void RopelessDialog::clearHighlighted() {
   if (numItems > 0) {
     transponder_state *state = getXpdrFromIndex(selectedItems[0]);
 
-    if (state->ident > 0) {
-      state->color_index = COLOR_INDEX_GREEN;
-
-    } else {
-      state->color_index = COLOR_INDEX_RED;
-    }
+    state->color_index = pParentPi->GetColorIndexForTransponder(state);
   }
 }
 
@@ -1401,7 +1405,7 @@ int wxCALLBACK wxListCompareFunction(wxIntPtr item1, wxIntPtr item2,
     }
 
     case tlIDENT:
-      return (CompareD((double)tS2->ident, (double)tS1->ident));
+      return (CompareD((double)tS2->markID, (double)tS1->markID));
       break;
 
     // case tlRANGE:
@@ -1446,7 +1450,7 @@ void RopelessDialog::OnRecoverButton(wxCommandEvent &event) {
   
   if (pParentPi) {
     pParentPi->SendCommandMessage(m_selectedTransponder, eCMD_RECOVER);
-    //DebugMessage(wxString::Format("Sent RECOVER command for transponder %d", m_selectedTransponder->ident));
+    //DebugMessage(wxString::Format("Sent RECOVER command for transponder %d", m_selectedTransponder->markID));
   }
 }
 
@@ -1460,7 +1464,7 @@ void RopelessDialog::OnDeleteButton(wxCommandEvent &event) {
   }
   
   if (pParentPi) {
-    pParentPi->ConfirmAndDeleteTransponder(m_selectedTransponder->ident);
+    pParentPi->ConfirmAndDeleteTransponder(m_selectedTransponder->markID);
   }
 }
 
@@ -1472,7 +1476,7 @@ void RopelessDialog::OnMuteButton(wxCommandEvent &event) {
   
   if (pParentPi) {
     pParentPi->SendCommandMessage(m_selectedTransponder, eCMD_MUTE);
-    //DebugMessage(wxString::Format("Sent DELETE command for transponder %d", m_selectedTransponder->ident));
+    //DebugMessage(wxString::Format("Sent DELETE command for transponder %d", m_selectedTransponder->markID));
   }
 }
 
@@ -1491,7 +1495,7 @@ void RopelessDialog::OnMarkRecoveredButton(wxCommandEvent &event) {
     //ShowReleaseStatusButtons(false);  // Hide buttons after action
 
     //pParentPi->SendCommandMessage(m_selectedTransponder, eCMD_RECOVER);
-    //DebugMessage(wxString::Format("Sent DELETE command for transponder %d", m_selectedTransponder->ident));
+    //DebugMessage(wxString::Format("Sent DELETE command for transponder %d", m_selectedTransponder->markID));
   }
 }
 
@@ -1517,8 +1521,10 @@ void RopelessDialog::ShowReleaseStatusButtons(bool show) {
 void RopelessDialog::UpdateReleaseStatusInfo(int transponder_id, const wxString &status) {
   wxLogMessage("UpdateReleaseStatusInfo: Starting for ID %d with status '%s'", transponder_id, status);
   
-  wxString statusText = wxString::Format(_("ID: %d - %s"), transponder_id, status);
+  wxString idText = wxString::Format(_("ID: %d"), transponder_id);
+  wxString statusText = wxString::Format(_("Status: %s"), status);
   wxLogMessage("UpdateReleaseStatusInfo: About to call SetLabel");
+  m_releaseStatusIdText->SetLabel(idText);
   m_releaseStatusText->SetLabel(statusText);
   wxLogMessage("UpdateReleaseStatusInfo: SetLabel completed");
   

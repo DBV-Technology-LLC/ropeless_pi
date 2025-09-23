@@ -103,6 +103,7 @@ public:
   wxStaticText *m_acousticStatusText;
   wxStaticText *m_cloudStatusText;
   wxStaticBoxSizer *m_releaseStatusSizer;
+  wxStaticText *m_releaseStatusIdText;
   wxStaticText *m_releaseStatusText;
   
   // Release Status buttons (moved from transponderReleaseDlg)
@@ -119,6 +120,7 @@ public:
   wxStaticText *m_infoIdText;
   wxStaticText *m_infoPartnerIdText;
   wxStaticText *m_infoManufacturerText;
+  wxStaticText *m_infoSerialNumberText;
   wxStaticText *m_infoOwnershipText;
   wxStaticText *m_infoTrawlIdText;
   wxStaticText *m_infoMarkTypeText;

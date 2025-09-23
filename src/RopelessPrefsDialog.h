@@ -68,6 +68,9 @@ private:
     wxCheckBox *m_cbHideRecovered;
     wxCheckBox *m_cbTimeoutCloud;
     wxTextCtrl *m_tcCloudRadius;
+    // Visual settings
+    wxTextCtrl *m_tcCircleSize;
+    wxTextCtrl *m_tcTextSize;
     
     void CreateControls();
     void OnOKClick(wxCommandEvent &event);

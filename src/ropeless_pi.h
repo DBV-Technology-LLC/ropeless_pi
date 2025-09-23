@@ -51,6 +51,8 @@
 #include <wx/spinctrl.h>
 #include <wx/aui/aui.h>
 #include <wx/fontpicker.h>
+#include <wx/socket.h>
+
 #include "ocpn_plugin.h"
 #include "ODdc.h"
 #include "pugixml.hpp"
@@ -61,10 +63,7 @@
 #include "vector2d.h"
 #include "OCPN_DataStreamEvent.h"
 #include "NMEA_TCP_OutputConnection.h"
-#include <deque>
-#include <wx/socket.h>
 
-// #include "transponderReleaseDlgImpl.h"  // Functionality moved to RopelessDialog
 
 #define EPL_TOOL_POSITION -1  // Request default positioning of toolbar tool
 
@@ -72,7 +71,6 @@
 
 #define UDP_PORT 59647
 #define RELEASE_TIME_MS 5000
-#define SHOW_DISTANCE
 
 //    Constants
 #ifndef PI
@@ -92,6 +90,7 @@
 #define ID_TPR_MANUAL_RELEASE 8872
 #define ID_TPR_PLACE 8873
 #define ID_TPR_RECOVER 8874
+#define ID_TPR_EDIT 8875
 
 //      Message IDs
 #define SIM_TIMER 5003
@@ -102,19 +101,19 @@
 #define ID_TRANSPONDER_LIST 5060
 
 //      Options
-#define HISTORY_FADE_SECS 10
 #define COLOR_TABLE_COUNT 5
 #define COLOR_INDEX_GOLDEN 4
 #define COLOR_INDEX_GREEN 0
 #define COLOR_INDEX_RED 1
+
 #define SET_RECOVERED_OPACITY
+#define SHOW_DISTANCE
 
 enum {
   tlICON = 0,
   tlIDENT,
   tlRELEASE_STATUS,
   tlTIMESTAMP,
-  // tlRANGE,
   tlDISTANCE,
   tlRECOVERED
   // Removed columns: tlPINGS, tlDEPTH, tlTEMP, tlBATT_STAT, tlRANGE
@@ -129,7 +128,6 @@ enum {
   eRELEASE_NOT_INIT = 5,
   eRELEASE_NETWORK_ERR = 6,
   eRELEASE_CONNECTING = 7,
-
 };
 
 enum {
@@ -144,6 +142,7 @@ enum {
   ePOS_SOURCE_ACOUSTIC = 2,
   ePOS_SOURCE_GPS = 3,
 };
+
 
 enum {
   eCOMM_UDP = 0,
@@ -165,6 +164,28 @@ const wxString releaseStatusNames[] = {"TIMEOUT", "SENDING...", "Released", "NOT
 const wxString recoveredStrList[] = {"DEPLOYED","RECOVERED"};
 const wxString positionSourceNames[] = {"USER", "CLOUD", "ACOUSTIC", "GPS"};
 const wxString commModeNames[] = {"UDP Broadcast"};
+
+//----------------------------------------------------------------------------------------------------------
+//    Manufacturer ID Utility Functions
+//----------------------------------------------------------------------------------------------------------
+
+// Create 32-bit transponder ID from manufacturer code and serial number
+inline uint32_t createTransponderID(uint8_t mfg_code, uint32_t serial_number) {
+    return (static_cast<uint32_t>(mfg_code) << 24) | (serial_number & 0xFFFFFF);
+}
+
+// Extract manufacturer code from 32-bit transponder ID
+inline uint8_t getMfgCode(uint32_t transponder_id) {
+    return static_cast<uint8_t>(transponder_id >> 24);
+}
+
+// Extract serial number from 32-bit transponder ID
+inline uint32_t getSerialNumber(uint32_t transponder_id) {
+    return transponder_id & 0xFFFFFF;
+}
+
+// Get manufacturer string name from manufacturer code
+wxString getMfgString(uint8_t mfg_code);
 
 // static int wxCALLBACK wxListCompareFunction(wxIntPtr item1, wxIntPtr item2,
 //                                             wxIntPtr sortData);
@@ -190,27 +211,12 @@ WX_DECLARE_OBJARRAY(vector2D *, ArrayOf2DPoints);
 // void RenderGLText( wxString &msg, wxFont *font, int xp, int yp, double
 // angle);
 
-class transponder_state_history {
-public:
-  transponder_state_history() { position_source = ePOS_SOURCE_USER; };
-  ~transponder_state_history() {};
-
-  int ident;
-  int ident_partner;
-  int color_index;
-  double timeStamp;
-  double predicted_lat;
-  double predicted_lon;
-  double tsh_timer_age;
-  int position_source;
-};
 
 class transponder_state {
 public:
   transponder_state() {
     release_status = -2;
-    ident = 0;
-    ident_partner = 0;
+    markID = 0;
     range = 0;
     bearing = 0;
     depth = 0;
@@ -228,7 +234,9 @@ public:
     trawl_id = 0;
     trawl_num = 0;
     mfg_id = 0;
-    mfg = 0;
+    mfg_code = 0;
+    serial_num = 0;
+    mfg_str = "";
     ownership = 0;
     source = 0;
     date_num = 0.0;
@@ -240,6 +248,16 @@ public:
     seafloor_temp = 0;
     air_pressure = 0;
     gms_date_num = 0.0;
+    
+    // Initialize lifecycle timestamps
+    initial_deployment_utc = 0.0;
+    recovered_utc = 0.0;
+    released_utc = 0.0;
+    
+    // Initialize trawl relationship fields
+    assigned_trawl_id = 0;
+    is_trawl_start_end = false;
+    trawl_position = -1;
 
     predicted_lat = 999.0;
     predicted_lon = 999.0;
@@ -250,8 +268,7 @@ public:
   ~transponder_state() {};
 
   // Original fields
-  int ident;
-  int ident_partner;
+  uint32_t markID;        // Full 32-bit transponder ID (MarkID from GML)
   int color_index;
   double timeStamp;
   double predicted_lat;
@@ -272,11 +289,13 @@ public:
 
   // GML (Gear Mark Location) status parameters
   int mark_type;        // MarkType from GML
-  int pos_status;       // PosStatus from GML  
-  int trawl_id;         // TrawlID from GML
+  int pos_status;       // PosStatus from GML
+  uint16_t trawl_id;    // TrawlID from GML (16-bit: 0-65535)
   int trawl_num;        // TrawlNum from GML
-  int mfg_id;           // MfgID from GML
-  int mfg;              // Mfg from GML
+  uint32_t mfg_id;      // Full 32-bit manufacturer ID (derived from MarkID)
+  uint8_t mfg_code;     // 8-bit manufacturer code (extracted from mfg_id)
+  uint32_t serial_num;  // 24-bit serial number (extracted from mfg_id)
+  wxString mfg_str;     // Manufacturer string name (derived from mfg_code)
   int ownership;        // Ownership from GML
   int source;           // Source from GML
   double date_num;      // DateNum from GML
@@ -289,7 +308,66 @@ public:
   int air_pressure;     // AirPressure from GMS
   double gms_date_num;  // DateNum from GMS
   
-  std::deque<transponder_state_history *> historyQ;
+  // Lifecycle UTC timestamps
+  double initial_deployment_utc;  // UTC time of initial deployment
+  double recovered_utc;           // UTC time when marked as recovered
+  double released_utc;            // UTC time when released
+  
+  // Trawl relationship fields
+  uint16_t assigned_trawl_id;     // ID of trawl this transponder belongs to (0 = not in trawl, range: 0-65535)
+  bool is_trawl_start_end;        // Is this a start/end marker transponder
+  int trawl_position;             // Order position in trawl (0=start, 1=second, etc.)
+  
+};
+
+// Coordinate structure for trawl path
+struct trawl_coordinate {
+  double lat;
+  double lon;
+  
+  trawl_coordinate() : lat(0.0), lon(0.0) {}
+  trawl_coordinate(double latitude, double longitude) : lat(latitude), lon(longitude) {}
+};
+
+// Forward declaration for access to global transponder list
+extern class ropeless_pi *g_ropelessPI;
+
+// Trawl tracking class using ID-based approach
+class trawl_tracker {
+public:
+  trawl_tracker() {
+    trawl_id = 0;
+    devices_in_set = 0;
+  }
+  
+  ~trawl_tracker() {}
+  
+  // Core fields
+  uint16_t trawl_id;                                   // Unique trawl identifier (16-bit: 0-65535)
+  int devices_in_set;                                  // Number of devices in this trawl set (for reference)
+  std::vector<trawl_coordinate> trawl_path;           // Array of lat/lon coordinates defining trawl path
+  
+  // ID-based transponder tracking methods
+  std::vector<transponder_state*> getTransponders() const;
+  std::vector<uint32_t> getTransponderIds() const;
+  transponder_state* getStartEndTransponder() const;
+  std::vector<transponder_state*> getOrderedTransponders() const;
+  
+  // Transponder management
+  bool addTransponder(uint32_t transponder_id, int position = -1);
+  bool removeTransponder(uint32_t transponder_id);
+  void setStartEnd(uint32_t transponder_id);
+  void reorderTransponders();
+  
+  // Query methods
+  int traps_in_set() const;
+  bool hasTransponder(uint32_t transponder_id) const;
+  bool isStartEnd(uint32_t transponder_id) const;
+  int getTransponderPosition(uint32_t transponder_id) const;
+  
+  // Path management
+  void addPathPoint(double lat, double lon);
+  void clearPath();
 };
 
 struct deckbox_status {
@@ -405,7 +483,7 @@ public:
   void startReleaseTimer();
   void stopReleaseTimer();
   void updateReleaseTimer(transponder_state * state);
-  void toggleTransponderRecovered(int id);
+  void toggleTransponderRecovered(uint32_t markID);
   void updateReleaseDialog(bool show);
 
   void startDistanceTimer();
@@ -424,6 +502,8 @@ public:
   
   // Display settings
   bool m_colorblind_mode;
+  int m_transponder_circle_size;
+  int m_transponder_text_size;
   
   // Debug settings
   bool m_debug_enabled;
@@ -442,6 +522,7 @@ public:
   void SendSyncMessage(void);
   wxString GetConnectionStatusText();
   wxString GetColorName(int color_index);
+  int GetColorIndexForTransponder(transponder_state* state);
   
   // TCP NMEA Output Methods
   void InitializeTCPOutput();
@@ -474,27 +555,31 @@ public:
   void releaseCallbackRetry(void);
   void releaseCallbackExit(void);
   
-  bool ConfirmAndDeleteTransponder(int id);
+  bool ConfirmAndDeleteTransponder(uint32_t markID);
   bool ConfirmAndReleaseTransponder(transponder_state* state);
+  int getNextCloudId();
+  transponder_state *GetStateByMarkID(uint32_t markID);
 
 private:
   bool LoadConfig(void);
   void ApplyConfig(void);
 
-  transponder_state *GetStateByIdent(int identTarget);
-  bool DeleteTransponder(int id);
+  bool DeleteTransponder(uint32_t markID);
 
   void RenderTransponder(transponder_state *state);
-  void RenderTrawls();
+  void RenderTransponders();
+  void RenderTrawlConnectors();
+  void RenderTransponderTexts();
   void RenderTrawlConnector(transponder_state *state1,
                             transponder_state *state2);
   void RenderVesselRangeCircle();
 
   void ProcessRFACapture(void);
   void ProcessRLACapture(void);
-  transponder_state *addTransponderPos(int transponderIdent);
-  void placeTransponderManually(int xpdrId, int pairId, double lat, double lon,
-                                double utc, int pos_source = ePOS_SOURCE_USER);
+  transponder_state *addTransponderPos(uint32_t markID);
+  void placeTransponderManually(uint32_t markID, uint32_t pairId, double lat, double lon,
+                                double utc, int pos_source = ePOS_SOURCE_USER, int ownership = 1);
+  void EditTransponder(transponder_state* state);
 
   void SaveTransponderStatus();
   void populateTransponderNode(pugi::xml_node &transponderNode,
@@ -569,6 +654,9 @@ private:
   double m_ownship_lon;
   double m_hdt;
   wxDateTime mUTCDateTime;
+  
+  // Cloud ID assignment counter (starts at 32768)
+  int m_nextCloudId;
 
   //        Rollover Window support
   RolloverWin *m_pBrgRolloverWin;
@@ -606,6 +694,10 @@ private:
   DECLARE_EVENT_TABLE();
 };
 
+// Global vectors for tracking objects (declared after class definitions)
+extern std::vector<transponder_state *> transponderStatus;
+extern std::vector<trawl_tracker *> trawlList;
+
 // Global debug message function accessible from anywhere
 void GlobalRopelessDebugMessage(const wxString& message, bool alsoLog = true);
 
@@ -626,73 +718,5 @@ private:
 };
 
 typedef enum BearingTypeEnum { MAG_BRG = 0, TRUE_BRG } _BearingTypeEnum;
-
-// class RopelessDialog : public wxDialog {
-// private:
-// protected:
-//   wxStdDialogButtonSizer *m_sdbSizer1;
-//   wxButton *m_sdbSizer1OK;
-//   wxButton *m_sdbSizer1Cancel;
-
-// public:
-//   //     wxRadioBox* m_rbViewType;
-//   //     wxCheckBox* m_cbShowPlotOptions;
-//   //     wxCheckBox* m_cbShowAtCursor;
-//   //     wxCheckBox* m_cbLiveIcon;
-//   //     wxCheckBox* m_cbShowIcon;
-//   //     wxSlider* m_sOpacity;
-
-//   wxComboBox *m_comboPort;
-//   wxArrayString *m_pSerialArray;
-
-//   wxComboBox *m_wpComboPort;
-
-//   wxString m_trackedPointName;
-//   wxString m_trackedPointGUID;
-
-//   wxComboBox *m_comboIcon;
-//   wxTextCtrl *m_pTenderGPSOffsetX;
-//   wxTextCtrl *m_pTenderGPSOffsetY;
-//   wxTextCtrl *m_pTenderLength;
-//   wxTextCtrl *m_pTenderWidth;
-
-//   wxTextCtrl *m_simTextCtrl;
-//   wxButton *m_ChooseFileButton, *m_StopSimButton, *m_StartSimButton,
-//       *m_ManualReleaseButton, *m_SyncButton;
-
-//   wxStaticText *m_ConnectionStatusText;
-
-//   ropeless_pi *pParentPi;
-//   OCPNListCtrl *m_pListCtrlTranponders;
-
-//   RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
-//                  wxWindowID id = wxID_ANY,
-//                  const wxString &title = _("Ropeless"),
-//                  const wxPoint &pos = wxDefaultPosition,
-//                  const wxSize &size = wxDefaultSize,
-//                  long style = wxCAPTION | wxDEFAULT_DIALOG_STYLE);
-//   ~RopelessDialog();
-
-//   void OnOKClick(wxCommandEvent &event);
-//   void OnClose(wxCloseEvent &event);
-//   void OnChooseFileButton(wxCommandEvent &event);
-//   void OnStopSimButton(wxCommandEvent &event);
-//   void OnStartSimButton(wxCommandEvent &event);
-//   void OnManualReleaseButton(wxCommandEvent &event);
-//   void RefreshTransponderList();
-//   void OnTargetListSelected(wxListEvent &event);
-//   void OnTargetListDeselected(wxListEvent &event);
-//   void OnTargetListColumnClicked(wxListEvent &event);
-//   void OnTargetRightClick(wxListEvent &event);
-//   void OnSyncButton(wxCommandEvent &event);
-
-
-//   wxArrayInt GetSelectedItems();
-//   transponder_state *getXpdrFromIndex(int index);
-//   void clearHighlighted();
-//   long FindItemByName(wxListCtrl* listCtrl, const wxString& name);
-
-//   DECLARE_EVENT_TABLE()
-// };
 
 #endif

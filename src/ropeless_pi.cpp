@@ -121,6 +121,7 @@ ropeless_pi *g_ropelessPI;
 bool g_bRopelessTargetList_sortReverse;
 int g_RopelessTargetList_sortColumn;
 std::vector<transponder_state *> transponderStatus;
+std::vector<trawl_tracker *> trawlList;
 
 wxPopupWindow *popup;
 wxStaticText *popupText;
@@ -309,6 +310,9 @@ int ropeless_pi::Init(void) {
   m_ownship_cog = 0;
   m_nfix = 0;
   m_bshow_fix_hat = false;
+  
+  // Initialize cloud ID counter (starts at 32768 = 65535/2)
+  m_nextCloudId = 32768;
 
   m_Thread_run_flag = -1;
 
@@ -346,6 +350,8 @@ int ropeless_pi::Init(void) {
   m_tcp_host = "127.0.0.1";
   m_tcp_port = 4001;
   m_colorblind_mode = false;
+  m_transponder_circle_size = 10;
+  m_transponder_text_size = 12;
   m_debug_enabled = false;
   m_debug_show_nmea = false;
   m_debug_show_log = false;
@@ -590,7 +596,7 @@ void ropeless_pi::OnToolbarToolCallback(int id) {
   // if (!m_buseable) return;
   if (NULL == m_pRLDialog) {
     m_pRLDialog = new RopelessDialog(
-        m_parent_window, this, -1, "Ropeless Fishing v3.0.0.0", wxDefaultPosition,
+        m_parent_window, this, -1, "Ropeless Fishing v3.0.0.1", wxDefaultPosition,
         wxDefaultSize, wxCAPTION | wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER);
     wxFont *pFont = OCPNGetFont(_T("Dialog"), 0);
     m_pRLDialog->SetFont(*pFont);
@@ -680,11 +686,20 @@ void ropeless_pi::OnContextMenuItemCallback(int id) {
 
     if (res == wxID_OK) {
       // wxLogMessage("Manual Placement res OK!");
-      // wxLogMessage("Id: %d, Pair: %d, Owned: %d", mPl.xpdrId, mPl.pairId,
+      // wxLogMessage("Id: %d, Pair: %d, Owned: %d", mPl.markID, mPl.pairId,
       //              mPl.isOwned);
 
       if (mPl.valid) {
-        placeTransponderManually(mPl.xpdrId, mPl.pairId, mp_lat, mp_lon, utc_d, mPl.positionSource);
+        placeTransponderManually(mPl.markID, mPl.pairId, mp_lat, mp_lon, utc_d, mPl.positionSource, mPl.isOwned ? 1 : 0);
+        
+        // Handle trawl assignment if a trawl was selected
+        if (mPl.selectedTrawlId > 0) {
+          transponder_state* newTransponder = GetStateByMarkID(mPl.markID);
+          if (newTransponder) {
+            newTransponder->assigned_trawl_id = mPl.selectedTrawlId;
+            wxLogMessage("Assigned transponder %d to trawl %d", mPl.markID, mPl.selectedTrawlId);
+          }
+        }
       }
     }
   } else if (id == m_place_trap_now) {
@@ -710,11 +725,20 @@ void ropeless_pi::OnContextMenuItemCallback(int id) {
 
     if (res == wxID_OK) {
       // wxLogMessage("Manual Placement res OK!");
-      // wxLogMessage("Id: %d, Pair: %d, Owned: %d", mPl.xpdrId, mPl.pairId,
+      // wxLogMessage("Id: %d, Pair: %d, Owned: %d", mPl.markID, mPl.pairId,
       //              mPl.isOwned);
 
       if (mPl.valid) {
-        placeTransponderManually(mPl.xpdrId, mPl.pairId, m_ownship_lat, m_ownship_lon, utc_d, mPl.positionSource);
+        placeTransponderManually(mPl.markID, mPl.pairId, m_ownship_lat, m_ownship_lon, utc_d, mPl.positionSource, mPl.isOwned ? 1 : 0);
+        
+        // Handle trawl assignment if a trawl was selected
+        if (mPl.selectedTrawlId > 0) {
+          transponder_state* newTransponder = GetStateByMarkID(mPl.markID);
+          if (newTransponder) {
+            newTransponder->assigned_trawl_id = mPl.selectedTrawlId;
+            wxLogMessage("Assigned transponder %d to trawl %d", mPl.markID, mPl.selectedTrawlId);
+          }
+        }
       }
     }
   }
@@ -781,7 +805,12 @@ void ropeless_pi::PopupMenuHandler(wxCommandEvent &event) {
     }
 
     case ID_TPR_DELETE: {
-      ConfirmAndDeleteTransponder(g_ropelessPI->m_foundState->ident);
+      ConfirmAndDeleteTransponder(g_ropelessPI->m_foundState->markID);
+      handled = true;
+      break;
+    }
+    case ID_TPR_EDIT: {
+      EditTransponder(g_ropelessPI->m_foundState);
       handled = true;
       break;
     }
@@ -791,7 +820,7 @@ void ropeless_pi::PopupMenuHandler(wxCommandEvent &event) {
     }
     case ID_TPR_RECOVER: {
 
-      toggleTransponderRecovered(m_foundState->ident);
+      toggleTransponderRecovered(m_foundState->markID);
 
       handled = true;
       break;
@@ -900,7 +929,7 @@ bool ropeless_pi::SendCommandMessage(transponder_state *state, long code) {
   gmr_msg.CmdUID = 1;           // Command UID (can be incremented for tracking)
   gmr_msg.SourceID = 0;         // Source ID (0 = this system)
   gmr_msg.TargetID = 0;         // Target ID (0 = broadcast)
-  gmr_msg.MarkID = state->ident;// Mark ID (transponder identifier)
+  gmr_msg.MarkID = state->markID;// Mark ID (transponder identifier)
   gmr_msg.CmdType = code;       // Command type from enum
   gmr_msg.ResCode = 0;          // Response code (0 for requests)
   gmr_msg.Param1 = 0;           // Additional parameter 1
@@ -917,7 +946,7 @@ bool ropeless_pi::SendCommandMessage(transponder_state *state, long code) {
   // TODO: Track status of release requestsNo 
   // if (code == eCMD_RELEASE)
   // {
-  //   wxLogMessage("SendCommandMessage: Processing RELEASE command for ID %d, ret=%s", state->ident, ret ? "true" : "false");
+  //   wxLogMessage("SendCommandMessage: Processing RELEASE command for ID %d, ret=%s", state->markID, ret ? "true" : "false");
   //   if (ret != false) {
   //     state->release_status = -5;
   //     m_release_tim_state.ptstate = state;
@@ -1004,8 +1033,8 @@ void ropeless_pi::updateReleaseDialog(bool show)
   rid.Printf("%s%s", releaseStatusNames[rlsNum],appendStr);
   
   // Update the Release Status section in the main dialog instead of separate dialog
-  wxLogMessage("updateReleaseDialog: About to call UpdateReleaseStatusInfo for ID %d with status '%s'", state->ident, rid);
-  m_pRLDialog->UpdateReleaseStatusInfo(state->ident, rid);
+  wxLogMessage("updateReleaseDialog: About to call UpdateReleaseStatusInfo for ID %d with status '%s'", state->markID, rid);
+  m_pRLDialog->UpdateReleaseStatusInfo(state->markID, rid);
   wxLogMessage("updateReleaseDialog: UpdateReleaseStatusInfo completed");
 
   if (state->release_status != -5 && state->release_status <= 0)
@@ -1043,7 +1072,7 @@ void ropeless_pi::updateReleaseTimer(transponder_state * state)
 
   transponder_state* timer_state = m_release_tim_state.ptstate;
 
-  if (state->ident != timer_state->ident) return;
+  if (state->markID != timer_state->markID) return;
 
   updateReleaseDialog(true);
 }
@@ -1074,8 +1103,8 @@ void ropeless_pi::ProcessDistanceTimerEvent(wxTimerEvent &event) {
     {
       if (distnmi > 2.0)
       {
-        wxLogMessage("Deleting Cloud transponder outside 2nmi! Ident: " + t->ident);
-        DeleteTransponder(t->ident);
+        wxLogMessage("Deleting Cloud transponder outside 2nmi! Ident: " + t->markID);
+        DeleteTransponder(t->markID);
       }
       else if (distnmi > 1.0 && t->hide_pos == false)
       {
@@ -1104,7 +1133,7 @@ void ropeless_pi::ProcessReleaseTimerEvent(wxTimerEvent &event) {
   if (this_transponder_state != NULL)
   {
     m_release_tim_state.ptstate->release_status = -3;
-    wxLogMessage("Release Timer Expired for ID: %d",m_release_tim_state.ptstate->ident);
+    wxLogMessage("Release Timer Expired for ID: %d",m_release_tim_state.ptstate->markID);
     updateReleaseDialog(true);
   }
 
@@ -1177,18 +1206,6 @@ void ropeless_pi::ProcessSimTimerEvent(wxTimerEvent &event) {
 }
 
 void ropeless_pi::ProcessTimerEvent(wxTimerEvent &event) {
-  // Age the transponder history records
-  for (unsigned int i = 0; i < transponderStatus.size(); i++) {
-    transponder_state *state = transponderStatus[i];
-
-    std::deque<transponder_state_history *>::iterator it =
-        state->historyQ.begin();
-    while (it != state->historyQ.end()) {
-      transponder_state_history *tsh = *it++;
-      if (tsh->tsh_timer_age > 0) tsh->tsh_timer_age--;
-    }
-  }
-
   RequestRefresh(GetOCPNCanvasWindow());
 }
 
@@ -1198,12 +1215,9 @@ void ropeless_pi::populateTransponderNode(pugi::xml_node &transponderNode,
 
   child = transponderNode.append_child("ID");
   wxString ss;
-  ss.Printf("%d", state->ident);
+  ss.Printf("%d", state->markID);
   child.append_child(pugi::node_pcdata).set_value(ss.c_str());
 
-  child = transponderNode.append_child("identPartner");
-  ss.Printf("%d", state->ident_partner);
-  child.append_child(pugi::node_pcdata).set_value(ss.c_str());
 
   child = transponderNode.append_child("timeStamp");
   ss.Printf("%f", state->timeStamp);
@@ -1259,12 +1273,19 @@ void ropeless_pi::populateTransponderNode(pugi::xml_node &transponderNode,
   child.append_child(pugi::node_pcdata).set_value(ss.c_str());
   
   child = transponderNode.append_child("MfgID");
-  ss.Printf("%d", state->mfg_id);
+  ss.Printf("%u", state->mfg_id);
   child.append_child(pugi::node_pcdata).set_value(ss.c_str());
-  
-  child = transponderNode.append_child("Mfg");
-  ss.Printf("%d", state->mfg);
+
+  child = transponderNode.append_child("MfgCode");
+  ss.Printf("%u", (unsigned int)state->mfg_code);
   child.append_child(pugi::node_pcdata).set_value(ss.c_str());
+
+  child = transponderNode.append_child("SerialNum");
+  ss.Printf("%u", state->serial_num);
+  child.append_child(pugi::node_pcdata).set_value(ss.c_str());
+
+  child = transponderNode.append_child("MfgStr");
+  child.append_child(pugi::node_pcdata).set_value(state->mfg_str.c_str());
   
   child = transponderNode.append_child("Ownership");
   ss.Printf("%d", state->ownership);
@@ -1302,6 +1323,24 @@ void ropeless_pi::populateTransponderNode(pugi::xml_node &transponderNode,
   child = transponderNode.append_child("GMSDateNum");
   ss.Printf("%f", state->gms_date_num);
   child.append_child(pugi::node_pcdata).set_value(ss.c_str());
+
+  // Position source
+  child = transponderNode.append_child("PositionSource");
+  ss.Printf("%d", state->position_source);
+  child.append_child(pugi::node_pcdata).set_value(ss.c_str());
+
+  // Lifecycle timestamps
+  child = transponderNode.append_child("InitialDeploymentUTC");
+  ss.Printf("%f", state->initial_deployment_utc);
+  child.append_child(pugi::node_pcdata).set_value(ss.c_str());
+
+  child = transponderNode.append_child("RecoveredUTC");
+  ss.Printf("%f", state->recovered_utc);
+  child.append_child(pugi::node_pcdata).set_value(ss.c_str());
+
+  child = transponderNode.append_child("ReleasedUTC");
+  ss.Printf("%f", state->released_utc);
+  child.append_child(pugi::node_pcdata).set_value(ss.c_str());
 }
 
 void ropeless_pi::SaveTransponderStatus() {
@@ -1310,7 +1349,7 @@ void ropeless_pi::SaveTransponderStatus() {
       transponderStatusDoc.append_child("transponders");
 
   pugi::xml_node childT = transpondersNode.append_child("version");
-  childT.append_child(pugi::node_pcdata).set_value("3.0.0");
+  childT.append_child(pugi::node_pcdata).set_value("3.0.0.1");
   childT = transpondersNode.append_child("date");
   wxDateTime now = wxDateTime::GetTimeNow();
   wxString timeFormat = now.FormatISOCombined(' ');
@@ -1346,10 +1385,7 @@ bool ropeless_pi::parseTransponderNode(pugi::xml_node &transponderNode,
     for (pugi::xml_node child = transponderNode.first_child(); child;
          child = child.next_sibling()) {
       if (!strcmp(child.name(), "ID")) {
-        state->ident = atoi(child.first_child().value());
-      }
-      if (!strcmp(child.name(), "identPartner")) {
-        state->ident_partner = atoi(child.first_child().value());
+        state->markID = atoi(child.first_child().value());
       }
       if (!strcmp(child.name(), "timeStamp")) {
         wxString val(child.first_child().value());
@@ -1416,8 +1452,14 @@ bool ropeless_pi::parseTransponderNode(pugi::xml_node &transponderNode,
         if (!strcmp(child.name(), "MfgID")) {
           state->mfg_id = atoi(child.first_child().value());
         }
-        if (!strcmp(child.name(), "Mfg")) {
-          state->mfg = atoi(child.first_child().value());
+        if (!strcmp(child.name(), "MfgCode")) {
+          state->mfg_code = atoi(child.first_child().value());
+        }
+        if (!strcmp(child.name(), "SerialNum")) {
+          state->serial_num = strtoul(child.first_child().value(), NULL, 10);
+        }
+        if (!strcmp(child.name(), "MfgStr")) {
+          state->mfg_str = wxString(child.first_child().value());
         }
         if (!strcmp(child.name(), "Ownership")) {
           state->ownership = atoi(child.first_child().value());
@@ -1453,6 +1495,26 @@ bool ropeless_pi::parseTransponderNode(pugi::xml_node &transponderNode,
           double dval;
           val.ToDouble(&dval);
           state->gms_date_num = dval;
+        }
+
+        // Lifecycle timestamps
+        if (!strcmp(child.name(), "InitialDeploymentUTC")) {
+          wxString val(child.first_child().value());
+          double dval;
+          val.ToDouble(&dval);
+          state->initial_deployment_utc = dval;
+        }
+        if (!strcmp(child.name(), "RecoveredUTC")) {
+          wxString val(child.first_child().value());
+          double dval;
+          val.ToDouble(&dval);
+          state->recovered_utc = dval;
+        }
+        if (!strcmp(child.name(), "ReleasedUTC")) {
+          wxString val(child.first_child().value());
+          double dval;
+          val.ToDouble(&dval);
+          state->released_utc = dval;
         }
       }
     }
@@ -1494,6 +1556,9 @@ void ropeless_pi::LoadTransponderStatus() {
           _("OpenCPN Ropeless Plugin Error"));
       return;
     }
+
+    // TODO: Re-generate the trawl list here from the transponder info
+
   }
 
   pugi::xml_node statusRoot = transponderStatusXML.first_child();
@@ -1502,18 +1567,29 @@ void ropeless_pi::LoadTransponderStatus() {
        element = element.next_sibling()) {
     if (!strcmp(element.name(), "transponder")) {
       transponder_state *this_state = new transponder_state;
-      ;
+
       if (parseTransponderNode(element, this_state)) {
-        if (this_state->ident > 0) {
-          this_state->color_index = COLOR_INDEX_GREEN;
-        } else {
-          this_state->color_index = COLOR_INDEX_RED;
-        }
+        // Set color based on ownership
+        this_state->color_index = GetColorIndexForTransponder(this_state);
 
         transponderStatus.push_back(this_state);
       } else {
         delete this_state;
       }
+    }
+  }
+
+  // Validate and fix manufacturer fields for existing transponders
+  for (unsigned int i = 0; i < transponderStatus.size(); i++) {
+    transponder_state *state = transponderStatus[i];
+    if (state->serial_num == 0 && state->markID != 0) {
+      // Extract manufacturer information from transponder ID if missing
+      state->mfg_id = state->markID;
+      state->mfg_code = getMfgCode(state->markID);
+      state->serial_num = getSerialNumber(state->markID);
+      state->mfg_str = getMfgString(state->mfg_code);
+      wxLogMessage("Fixed manufacturer fields for transponder %u: mfg_code=%u, serial_num=%u",
+                   state->markID, state->mfg_code, state->serial_num);
     }
   }
 }
@@ -1523,13 +1599,13 @@ void ropeless_pi::RenderTransponder(transponder_state *state) {
   // don't render if the lat lon are invalid pos 999.00000
   if (state->predicted_lat > 90.0 || state->predicted_lon > 180.0)
   {
-    //wxLogMessage("Invalid lat/lon for transpoder state: " + state->ident);
+    //wxLogMessage("Invalid lat/lon for transpoder state: " + state->markID);
     return;
   }
 
   if (state->hide_pos == true) return;
 
-  int circle_size = 10;
+  int circle_size = m_transponder_circle_size;
 
   wxPoint ab;
   wxString colorName = GetColorName(state->color_index);
@@ -1595,7 +1671,7 @@ void ropeless_pi::RenderTransponder(transponder_state *state) {
   // Check position source and draw appropriate shape
   if (state->position_source == ePOS_SOURCE_CLOUD) {
     // Debug logging
-    // wxLogMessage("Rendering cloud position grey dot for transponder ID: %d", state->ident);
+    // wxLogMessage("Rendering cloud position grey dot for transponder ID: %d", state->markID);
     
     // Draw grey circle for cloud positions
     wxColour greyColour(128, 128, 128, opacity); // Grey color
@@ -1607,7 +1683,7 @@ void ropeless_pi::RenderTransponder(transponder_state *state) {
   } else {
     // Debug logging for other position sources
     // wxLogMessage("Rendering circle for transponder ID: %d, position_source: %d (%s)", 
-    //             state->ident, state->position_source, 
+    //             state->markID, state->position_source, 
     //             (state->position_source < 4) ? positionSourceNames[state->position_source] : "UNKNOWN");
     
     // Draw regular circle for other position sources
@@ -1643,89 +1719,9 @@ void ropeless_pi::RenderTransponder(transponder_state *state) {
   //   m_oDC->DrawLine(x1, y1, x2, y2, true);
   // }
 
-#if 0
-    // Render the history buffer, if present
-    std::deque<transponder_state_history *>::iterator it = state->historyQ.begin();
-    while (it != state->historyQ.end()){
-        transponder_state_history *tsh = *it++;
 
-        wxPoint abh;
-        GetCanvasPixLL(g_vp, &abh, tsh->predicted_lat, tsh->predicted_lon);
 
-        wxColour hcolour(rcolour.Red(), rcolour.Green(), rcolour.Blue(),
-                         (tsh->tsh_timer_age / HISTORY_FADE_SECS) * 254);
-        wxPen dpen( hcolour );
-        wxBrush dbrush( hcolour );
-        m_oDC->SetPen( dpen );
-        m_oDC->SetBrush( dbrush );
-        m_oDC->DrawCircle( abh.x, abh.y, circle_size/2);
-    }
-#endif
-
-  // Draw an "X" over the primary target
-  if (state->ident != state->ident_partner) {
-    // Use appropriate size for the "X" based on shape
-    int x_size = (state->position_source == ePOS_SOURCE_CLOUD) ? (circle_size + 2) : circle_size;
-    
-    wxPoint x1(ab.x - x_size * .707, ab.y - x_size * .707);
-    wxPoint x2(ab.x + x_size * .707, ab.y + x_size * .707);
-    wxPoint x3(ab.x - x_size * .707, ab.y + x_size * .707);
-    wxPoint x4(ab.x + x_size * .707, ab.y - x_size * .707);
-
-    wxColour pColour = wxColour(0, 0, 0, opacity);
-    wxPen xpen(pColour, 3);
-    m_oDC->SetPen(xpen);
-    m_oDC->DrawLine(x1.x, x1.y, x2.x, x2.y, true);
-    m_oDC->DrawLine(x3.x, x3.y, x4.x, x4.y, true);
-  }
-
-  // Display transponder number above the shape (skip for cloud positions and non-owned transponders)
-  if (state->position_source != ePOS_SOURCE_CLOUD && state->ident > 0) {
-    wxString transponderText = wxString::Format(wxT("%d"), state->ident);
-  
-  // Create a memory bitmap to render text
-  wxFont textFont(16, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD);
-  
-  // Create a memory DC to measure text size
-  wxMemoryDC memDC;
-  wxBitmap tempBmp(100, 50); // Temporary bitmap for measurement
-  memDC.SelectObject(tempBmp);
-  memDC.SetFont(textFont);
-  
-  // Measure the text
-  wxCoord textW, textH;
-  memDC.GetTextExtent(transponderText, &textW, &textH);
-  
-  // Create the actual bitmap with proper size and padding
-  int bmpW = textW + 8; // Add padding
-  int bmpH = textH + 8;
-  wxBitmap textBmp(bmpW, bmpH);
-  
-  // Render text to the bitmap
-  memDC.SelectObject(textBmp);
-  memDC.SetBackground(wxBrush(wxColour(255, 255, 255))); // White background
-  memDC.Clear();
-  memDC.SetFont(textFont);
-  memDC.SetTextForeground(wxColour(0, 0, 0)); // Black text
-  
-  // Draw text centered in the bitmap
-  memDC.DrawText(transponderText, 4, 4); // 4px padding
-  
-  // Draw black border around the bitmap
-  wxPen borderPen(wxColour(0, 0, 0), 2);
-  memDC.SetPen(borderPen);
-  memDC.SetBrush(*wxTRANSPARENT_BRUSH);
-  memDC.DrawRectangle(0, 0, bmpW, bmpH);
-  
-  memDC.SelectObject(wxNullBitmap); // Deselect bitmap
-  
-  // Position the bitmap above the circle
-  int bmp_x = ab.x - bmpW/2;
-  int bmp_y = ab.y - circle_size - bmpH - 8;
-  
-  // Draw the bitmap using ODDC's DrawBitmap function
-  m_oDC->DrawBitmap(textBmp, bmp_x, bmp_y, false);
-  } // End of non-cloud position ID display
+  // Text rendering moved to RenderTransponderTexts() to ensure it draws on top of trawl lines
 }
 
 void ropeless_pi::RenderTrawlConnector(transponder_state *state1,
@@ -1744,6 +1740,72 @@ void ropeless_pi::RenderTrawlConnector(transponder_state *state1,
   wxBrush dbrush(rcolour);
 
   m_oDC->DrawLine(P1.x, P1.y, P2.x, P2.y, true);
+}
+
+void ropeless_pi::RenderTransponderTexts() {
+  int circle_size = m_transponder_circle_size; // Same as in RenderTransponder
+  
+  for (unsigned int i = 0; i < transponderStatus.size(); i++) {
+    transponder_state *state = transponderStatus[i];
+    
+    // Skip rendering text for hidden, cloud positions, or invalid transponders
+    if (state->hide_pos == true || state->position_source == ePOS_SOURCE_CLOUD || state->markID <= 0) {
+      continue;
+    }
+    
+    // Skip if coordinates are invalid
+    if (state->predicted_lat > 90.0 || state->predicted_lon > 180.0) {
+      continue;
+    }
+    
+    wxPoint ab;
+    GetCanvasPixLL(g_vp, &ab, state->predicted_lat, state->predicted_lon);
+    
+    wxString transponderText = wxString::Format(wxT("%d"), state->markID);
+    
+    // Create a memory bitmap to render text
+    wxFont textFont(m_transponder_text_size, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD);
+    
+    // Create a memory DC to measure text size
+    wxMemoryDC memDC;
+    wxBitmap tempBmp(100, 50); // Temporary bitmap for measurement
+    memDC.SelectObject(tempBmp);
+    memDC.SetFont(textFont);
+    
+    // Measure the text
+    wxCoord textW, textH;
+    memDC.GetTextExtent(transponderText, &textW, &textH);
+    
+    // Create the actual bitmap with proper size and padding
+    int bmpW = textW + 8; // Add padding
+    int bmpH = textH + 8;
+    wxBitmap textBmp(bmpW, bmpH);
+    
+    // Render text to the bitmap
+    memDC.SelectObject(textBmp);
+    memDC.SetBackground(wxBrush(wxColour(255, 255, 255))); // White background
+    memDC.Clear();
+    memDC.SetFont(textFont);
+    memDC.SetTextForeground(wxColour(0, 0, 0)); // Black text
+    
+    // Draw text centered in the bitmap
+    memDC.DrawText(transponderText, 4, 4); // 4px padding
+    
+    // Draw black border around the bitmap
+    wxPen borderPen(wxColour(0, 0, 0), 2);
+    memDC.SetPen(borderPen);
+    memDC.SetBrush(*wxTRANSPARENT_BRUSH);
+    memDC.DrawRectangle(0, 0, bmpW, bmpH);
+    
+    memDC.SelectObject(wxNullBitmap); // Deselect bitmap
+    
+    // Position the bitmap above the circle
+    int bmp_x = ab.x - bmpW/2;
+    int bmp_y = ab.y - circle_size - bmpH - 8;
+    
+    // Draw the bitmap using ODDC's DrawBitmap function
+    m_oDC->DrawBitmap(textBmp, bmp_x, bmp_y, false);
+  }
 }
 
 void ropeless_pi::RenderVesselRangeCircle() {
@@ -1804,26 +1866,26 @@ void ropeless_pi::RenderVesselRangeCircle() {
   m_oDC->DrawText(rangeText, text_x, text_y);
 }
 
-transponder_state *ropeless_pi::GetStateByIdent(int identTarget) {
+transponder_state *ropeless_pi::GetStateByMarkID(uint32_t markID) {
   transponder_state *rv = NULL;
 
   for (unsigned int i = 0; i < transponderStatus.size(); i++) {
     transponder_state *state = transponderStatus[i];
 
-    if (state->ident == identTarget) return state;
+    if (state->markID == markID) return state;
   }
 
   return rv;
 }
 
-bool ropeless_pi::DeleteTransponder(int id)
+bool ropeless_pi::DeleteTransponder(uint32_t markID)
 {
   // Check if status for this transponder is in the status vector
   transponder_state *this_transponder_state = NULL;
   for (unsigned int i = 0; i < transponderStatus.size(); i++) {
-    if (transponderStatus[i]->ident == id) {
+    if (transponderStatus[i]->markID == markID) {
 
-      SendCommandMessage(GetStateByIdent(id),eCMD_DELETE);
+      SendCommandMessage(GetStateByMarkID(markID),eCMD_DELETE);
 
       transponderStatus.erase(transponderStatus.begin() + i);
 
@@ -1834,11 +1896,11 @@ bool ropeless_pi::DeleteTransponder(int id)
   return false;
 }
 
-bool ropeless_pi::ConfirmAndDeleteTransponder(int id)
+bool ropeless_pi::ConfirmAndDeleteTransponder(uint32_t markID)
 {
   wxString msg("Delete Transponder: ");
   wxString msg1;
-  msg1.Printf("%d\n", id);
+  msg1.Printf("%d\n", markID);
   msg += msg1;
 
   myOkDialog dialog2;
@@ -1854,8 +1916,8 @@ bool ropeless_pi::ConfirmAndDeleteTransponder(int id)
   wxLogMessage("Deleting Transponder!");
 
   if (dialog2.ShowModal() == wxID_OK) {
-    if (DeleteTransponder(id)) {
-      SendCommandMessage(GetStateByIdent(id), eCMD_RELEASE);
+    if (DeleteTransponder(markID)) {
+      SendCommandMessage(GetStateByMarkID(markID), eCMD_RELEASE);
       return true;
     }
   }
@@ -1869,14 +1931,14 @@ bool ropeless_pi::ConfirmAndReleaseTransponder(transponder_state* state)
   
   wxString msg("Send Release to Transponder: ");
   wxString msg1;
-  msg1.Printf("%d\n", state->ident);
+  msg1.Printf("%d\n", state->markID);
   msg += msg1;
 
   long result = -1;
   myNumberEntryDialog dialog;
   myOkDialog okDialog;
 
-  if (state->ident > 0) {
+  if (state->markID > 0) {
 
 #ifdef __ANDROID__
     wxFont *pFont = OCPNGetFont(_T("Dialog"), 0);
@@ -1926,32 +1988,50 @@ wxString ropeless_pi::GetColorName(int color_index) {
   return "MAGENTA";  // fallback color
 }
 
-void ropeless_pi::RenderTrawls() {
-  //  Walk the vector of transponder status  
-  static int render_log_count = 0;
-  render_log_count++;
-  
+int ropeless_pi::GetColorIndexForTransponder(transponder_state* state) {
+  if (!state) return COLOR_INDEX_RED;
+
+  // Color based on ownership: owned = green, non-owned = orange
+  if (state->ownership == 1) {
+    return COLOR_INDEX_GREEN;  // Owned transponders are green
+  } else {
+    return COLOR_INDEX_RED;    // Non-owned transponders are orange/red
+  }
+}
+
+wxString getMfgString(uint8_t mfg_code) {
+  // Manufacturer code to string mapping
+  switch (mfg_code) {
+    case 0x00: return "Ropeless Systems Inc.";
+    case 0x01: return "Desert Star Systems";
+    case 0x02: return "EdgeTech";
+    case 0x03: return "Benthos";
+    case 0x04: return "SubSea Sonics";
+    case 0x05: return "Teledyne Marine";
+    case 0x10: return "Ashored Innovations";
+    case 0xFF: return "Ephemeral";
+    default:
+      return wxString::Format("Unknown Mfg 0x%02X", mfg_code);
+  }
+}
+
+void ropeless_pi::RenderTransponders() {
   for (unsigned int i = 0; i < transponderStatus.size(); i++) {
     transponder_state *state = transponderStatus[i];
-    
-    // Always log cloud positions for debugging
-    // if (state->position_source == ePOS_SOURCE_CLOUD || render_log_count % 100 == 0) {
-    //   wxLogMessage("Rendering transponder %d: ID=%d, PosSource=%d, Lat=%.6f, Lon=%.6f", 
-    //                i, state->ident, state->position_source, 
-    //                state->predicted_lat, state->predicted_lon);
-    // }
-
-    // Decide if we have to render this transponder here since we don't want to draw the trawl connector
-    //if (state->hide_pos == true) return;
-
-    // Show transponder on screen
     RenderTransponder(state);
+  }
+}
 
-    // Draw line to transponder partner if necessary
-    if (state->ident_partner != state->ident) {
-      transponder_state *statePartner = GetStateByIdent(state->ident_partner);
-      if (statePartner) {
-        RenderTrawlConnector(state, statePartner);
+void ropeless_pi::RenderTrawlConnectors() {
+  for (auto* trawl : trawlList) {
+    if (trawl && trawl->traps_in_set() > 1) {  // Only render if multiple transponders
+      auto transponders = trawl->getOrderedTransponders();
+
+      // Draw connections between consecutive transponders in trawl
+      for (size_t i = 0; i < transponders.size() - 1; i++) {
+        if (transponders[i] && transponders[i+1]) {
+          RenderTrawlConnector(transponders[i], transponders[i+1]);
+        }
       }
     }
   }
@@ -2012,9 +2092,15 @@ bool ropeless_pi::RenderGLOverlay(wxGLContext *pcontext, PlugIn_ViewPort *vp) {
 
   // Render vessel range circle first (behind transponders)
   RenderVesselRangeCircle();
-  
-  // Render transponders
-  RenderTrawls();
+
+  // Render trawl connectors (behind transponders)
+  RenderTrawlConnectors();
+
+  // Render individual transponders (on top of connectors)
+  RenderTransponders();
+
+  // Render transponder texts on top of everything else
+  RenderTransponderTexts();
 
   return true;
 }
@@ -2024,12 +2110,12 @@ void ropeless_pi::ProcessRFACapture(void) {
     return;
   }
 
-  int transponderIdent = m_NMEA0183.Rfa.TransponderCode;
+  int markID = m_NMEA0183.Rfa.TransponderCode;
 
   // Check if status for this transponder is in the status vector
   transponder_state *this_transponder_state = NULL;
   for (unsigned int i = 0; i < transponderStatus.size(); i++) {
-    if (transponderStatus[i]->ident == transponderIdent) {
+    if (transponderStatus[i]->markID == markID) {
       this_transponder_state = transponderStatus[i];
       break;
     }
@@ -2039,45 +2125,25 @@ void ropeless_pi::ProcessRFACapture(void) {
   if (this_transponder_state == NULL) {
     this_transponder_state = new transponder_state;
 
-    if (transponderIdent > 0) {
-      this_transponder_state->color_index = COLOR_INDEX_GREEN;
-    } else {
-      this_transponder_state->color_index = COLOR_INDEX_RED;
-    }
+    // Extract manufacturer information from transponder ID
+    this_transponder_state->mfg_id = markID;
+    this_transponder_state->mfg_code = getMfgCode(markID);
+    this_transponder_state->serial_num = getSerialNumber(markID);
+    this_transponder_state->mfg_str = getMfgString(this_transponder_state->mfg_code);
+
+    // Set initial ownership to owned (1) for new transponders
+    this_transponder_state->ownership = 1;
+    this_transponder_state->color_index = GetColorIndexForTransponder(this_transponder_state);
 
     transponderStatus.push_back(this_transponder_state);
   } else {
 
     this_transponder_state->pings++;
 
-    // Maintain history buffer
-    transponder_state_history *this_transponder_state_history =
-        new transponder_state_history;
-    this_transponder_state_history->ident = this_transponder_state->ident;
-    this_transponder_state_history->ident_partner =
-        this_transponder_state->ident_partner;
-    this_transponder_state_history->timeStamp =
-        this_transponder_state->timeStamp;
-    this_transponder_state_history->predicted_lat =
-        this_transponder_state->predicted_lat;
-    this_transponder_state_history->predicted_lon =
-        this_transponder_state->predicted_lon;
-    this_transponder_state_history->position_source =
-        this_transponder_state->position_source;
-    this_transponder_state_history->color_index =
-        this_transponder_state->color_index;
-    this_transponder_state_history->tsh_timer_age = HISTORY_FADE_SECS;
-
-    if (this_transponder_state->historyQ.size() > 10) {
-      this_transponder_state->historyQ.pop_back();
-    }
-
-    this_transponder_state->historyQ.push_front(this_transponder_state_history);
   }
 
   //  Update the instant record
-  this_transponder_state->ident = transponderIdent;
-  this_transponder_state->ident_partner = m_NMEA0183.Rfa.TransponderPartner;
+  this_transponder_state->markID = markID;
 
   this_transponder_state->timeStamp = m_NMEA0183.Rfa.TimeStamp;
 
@@ -2132,31 +2198,31 @@ void ropeless_pi::ProcessRFACapture(void) {
   }
 }
 
-void ropeless_pi::placeTransponderManually(int xpdrId, int pairId, double lat,
-                                           double lon, double utc, int pos_source) {
+void ropeless_pi::placeTransponderManually(uint32_t markID, uint32_t pairId, double lat,
+                                           double lon, double utc, int pos_source, int ownership) {
   
   wxLogMessage("Placing Transponder Manually - ID: %d, Position Source: %s (%d)", 
-               xpdrId, positionSourceNames[pos_source], pos_source);
+               markID, positionSourceNames[pos_source], pos_source);
 
   transponder_state *this_transponder_state;
-  this_transponder_state = addTransponderPos(xpdrId);
+  this_transponder_state = addTransponderPos(markID);
 
   if (!this_transponder_state) {
-    wxLogMessage("ERROR: Failed to create transponder state for ID: %d", xpdrId);
+    wxLogMessage("ERROR: Failed to create transponder state for ID: %d", markID);
     return;
   }
 
-  this_transponder_state->ident = xpdrId;
-  this_transponder_state->ident_partner = pairId;
+  this_transponder_state->markID = markID;
 
   this_transponder_state->timeStamp = utc;
 
   this_transponder_state->predicted_lat = lat;
   this_transponder_state->predicted_lon = lon;
   this_transponder_state->position_source = pos_source;
+  this_transponder_state->ownership = ownership;
   
   wxLogMessage("Transponder created: ID=%d, Lat=%.6f, Lon=%.6f, PosSource=%d (%s)", 
-               this_transponder_state->ident, 
+               this_transponder_state->markID, 
                this_transponder_state->predicted_lat, 
                this_transponder_state->predicted_lon,
                this_transponder_state->position_source,
@@ -2174,15 +2240,81 @@ void ropeless_pi::placeTransponderManually(int xpdrId, int pairId, double lat,
 
 }
 
+void ropeless_pi::EditTransponder(transponder_state* state) {
+  if (!state) {
+    wxLogMessage("ERROR: EditTransponder called with null state");
+    return;
+  }
+
+  // Get current position for dialog
+  wxString latStr = wxString::Format("%.6f", state->predicted_lat);
+  wxString lonStr = wxString::Format("%.6f", state->predicted_lon);
+
+  // Format timestamp for display
+  wxDateTime timestamp = wxDateTime((time_t)state->timeStamp);
+  timestamp.MakeFromUTC();
+  wxString utcStr = timestamp.FormatISOTime();
+
+  wxLogMessage("Opening edit dialog for transponder ID: %u", state->markID);
+
+  // Create edit dialog with existing transponder data
+  manualPlacementDlgImpl editDlg(GetOCPNCanvasWindow(), wxID_ANY,
+                                _("Edit Transponder"), wxDefaultPosition,
+                                wxSize(-1, -1), wxDEFAULT_DIALOG_STYLE,
+                                latStr, lonStr, utcStr, state);
+
+  int res = editDlg.ShowModal();
+
+  if (res == wxID_OK && editDlg.valid) {
+    // Update the existing transponder with new values
+    uint32_t newMarkID = editDlg.markID;
+
+    wxLogMessage("Updating transponder: old ID=%u, new ID=%u", state->markID, newMarkID);
+
+    // Update the transponder fields
+    state->markID = newMarkID;
+
+    // Extract manufacturer and serial number for logging
+    uint8_t mfg_code = getMfgCode(newMarkID);
+    uint32_t serial_num = getSerialNumber(newMarkID);
+    state->mfg_code = mfg_code;
+    state->serial_num = serial_num;
+    state->mfg_str = getMfgString(mfg_code);
+
+    // Update position source
+    state->position_source = editDlg.positionSource;
+
+    // Update ownership
+    state->ownership = editDlg.isOwned ? 1 : 0;
+
+    // Update trawl assignment
+    state->assigned_trawl_id = editDlg.selectedTrawlId;
+
+    wxLogMessage("Transponder updated: ID=%u (mfg=0x%02X, serial=%u), source=%s, trawl=%d",
+                 newMarkID, mfg_code, serial_num,
+                 positionSourceNames[state->position_source], state->assigned_trawl_id);
+
+    // Save changes and refresh UI
+    SaveTransponderStatus();
+    if (m_pRLDialog) {
+      m_pRLDialog->RefreshTransponderList();
+    }
+  }
+}
+
+int ropeless_pi::getNextCloudId() {
+  return m_nextCloudId++;
+}
+
 // Check for transponder state in list. if does not exist add new one
-transponder_state *ropeless_pi::addTransponderPos(int transponderIdent) {
-  
-  wxLogMessage("Creating new transponder id: " + transponderIdent);
+transponder_state *ropeless_pi::addTransponderPos(uint32_t markID) {
+
+  wxLogMessage("Creating new transponder id: " + markID);
 
   transponder_state *this_transponder_state = NULL;
 
   for (unsigned int i = 0; i < transponderStatus.size(); i++) {
-    if (transponderStatus[i]->ident == transponderIdent) {
+    if (transponderStatus[i]->markID == markID) {
       this_transponder_state = transponderStatus[i];
 
       wxLogMessage("Already exists!");
@@ -2194,14 +2326,17 @@ transponder_state *ropeless_pi::addTransponderPos(int transponderIdent) {
   if (this_transponder_state == NULL) {
     this_transponder_state = new transponder_state;
 
-    this_transponder_state->ident = transponderIdent;
+    this_transponder_state->markID = markID;
 
-    if (transponderIdent > 0) {
-      this_transponder_state->color_index = 0;
-    } 
-    else {
-      this_transponder_state->color_index = 1;
-    }
+    // Extract manufacturer information from transponder ID
+    this_transponder_state->mfg_id = markID;
+    this_transponder_state->mfg_code = getMfgCode(markID);
+    this_transponder_state->serial_num = getSerialNumber(markID);
+    this_transponder_state->mfg_str = getMfgString(this_transponder_state->mfg_code);
+
+    // Set initial ownership to owned (1) for new transponders
+    this_transponder_state->ownership = 1;
+    this_transponder_state->color_index = GetColorIndexForTransponder(this_transponder_state);
 
     // Select a new color for this new transponder
     // this_transponder_state->color_index = m_colorIndexNext;
@@ -2216,32 +2351,6 @@ transponder_state *ropeless_pi::addTransponderPos(int transponderIdent) {
 
   } 
 
-  // TODO: Decide if we want to keep history of transponders
-  // else {
-  //   // Maintain history buffer
-  //   transponder_state_history *this_transponder_state_history =
-  //       new transponder_state_history;
-  //   this_transponder_state_history->ident = this_transponder_state->ident;
-  //   this_transponder_state_history->ident_partner =
-  //       this_transponder_state->ident_partner;
-  //   this_transponder_state_history->timeStamp =
-  //       this_transponder_state->timeStamp;
-  //   this_transponder_state_history->predicted_lat =
-  //       this_transponder_state->predicted_lat;
-  //   this_transponder_state_history->predicted_lon =
-  //       this_transponder_state->predicted_lon;
-  //   this_transponder_state_history->position_source =
-  //       this_transponder_state->position_source;
-  //   this_transponder_state_history->color_index =
-  //       this_transponder_state->color_index;
-  //   this_transponder_state_history->tsh_timer_age = HISTORY_FADE_SECS;
-
-  //   if (this_transponder_state->historyQ.size() > 10) {
-  //     this_transponder_state->historyQ.pop_back();
-  //   }
-
-  //   this_transponder_state->historyQ.push_front(this_transponder_state_history);
-  // }
 
   return this_transponder_state;
 }
@@ -2251,19 +2360,19 @@ void ropeless_pi::ProcessRLACapture(void) {
     return;
   }
 
-  int transponderIdent = m_NMEA0183.Rla.TransponderCode;
+  int markID = m_NMEA0183.Rla.TransponderCode;
 
   // Check if status for this transponder is in the status vector
   transponder_state *this_transponder_state = NULL;
   for (unsigned int i = 0; i < transponderStatus.size(); i++) {
-    if (transponderStatus[i]->ident == transponderIdent) {
+    if (transponderStatus[i]->markID == markID) {
       this_transponder_state = transponderStatus[i];
       break;
     }
   }
 
   // Check if ident matches released transponder
-  if (manualReleaseState.ident == transponderIdent)
+  if (manualReleaseState.markID == markID)
   {
     this_transponder_state = &manualReleaseState;
   }
@@ -2356,14 +2465,14 @@ void ropeless_pi::SetNMEASentence(wxString &sentence) {
                      m_NMEA0183.Gml.Latitude,
                      m_NMEA0183.Gml.Longitude,
                      m_NMEA0183.Gml.Depth,
-                     m_NMEA0183.Gml.MfgID,
-                     m_NMEA0183.Gml.Mfg,
+                     m_NMEA0183.Gml.MarkID,
+                     0,
                      m_NMEA0183.Gml.Ownership,
                      m_NMEA0183.Gml.Source,
                      m_NMEA0183.Gml.DateNum);
         
         // Update transponder state with GML data
-        transponder_state *tstate = GetStateByIdent(m_NMEA0183.Gml.MarkID);
+        transponder_state *tstate = GetStateByMarkID(m_NMEA0183.Gml.MarkID);
         if (!tstate) {
             wxLogMessage("Couldn't find Transponder Ident. Creating new...");
             tstate = addTransponderPos(m_NMEA0183.Gml.MarkID);
@@ -2375,8 +2484,13 @@ void ropeless_pi::SetNMEASentence(wxString &sentence) {
             tstate->pos_status = m_NMEA0183.Gml.PosStatus;
             tstate->trawl_id = m_NMEA0183.Gml.TrawlID;
             tstate->trawl_num = m_NMEA0183.Gml.TrawlNum;
-            tstate->mfg_id = m_NMEA0183.Gml.MfgID;
-            tstate->mfg = m_NMEA0183.Gml.Mfg;
+
+            // Split MarkID into manufacturer components
+            tstate->mfg_id = static_cast<uint32_t>(m_NMEA0183.Gml.MarkID);  // Use MarkID directly
+            tstate->mfg_code = getMfgCode(tstate->mfg_id);
+            tstate->serial_num = getSerialNumber(tstate->mfg_id);
+            tstate->mfg_str = getMfgString(tstate->mfg_code);
+
             tstate->ownership = m_NMEA0183.Gml.Ownership;
             tstate->source = m_NMEA0183.Gml.Source;
             tstate->date_num = m_NMEA0183.Gml.DateNum;
@@ -2417,7 +2531,7 @@ void ropeless_pi::SetNMEASentence(wxString &sentence) {
                      m_NMEA0183.Gms.DateNum);
         
         // Update transponder state with GMS data  
-        transponder_state *tstate = GetStateByIdent(m_NMEA0183.Gms.MarkID);
+        transponder_state *tstate = GetStateByMarkID(m_NMEA0183.Gms.MarkID);
         if (!tstate) {
             wxLogMessage("Couldn't find Transponder Ident. Creating new...");
             tstate = addTransponderPos(m_NMEA0183.Gms.MarkID);
@@ -2520,6 +2634,8 @@ bool ropeless_pi::LoadConfig(void) {
     
     // Display Configuration
     pConf->Read(_T( "Colorblind_Mode" ), &m_colorblind_mode, false);
+    pConf->Read(_T( "Transponder_Circle_Size" ), &m_transponder_circle_size, 10);
+    pConf->Read(_T( "Transponder_Text_Size" ), &m_transponder_text_size, 12);
     
     // Debug Configuration
     pConf->Read(_T( "Debug_Enabled" ), &m_debug_enabled, false);
@@ -2571,6 +2687,8 @@ bool ropeless_pi::SaveConfig(void) {
     
     // Display Configuration
     pConf->Write(_T( "Colorblind_Mode" ), m_colorblind_mode);
+    pConf->Write(_T( "Transponder_Circle_Size" ), m_transponder_circle_size);
+    pConf->Write(_T( "Transponder_Text_Size" ), m_transponder_text_size);
     
     // Debug Configuration
     pConf->Write(_T( "Debug_Enabled" ), m_debug_enabled);
@@ -2627,8 +2745,8 @@ bool ropeless_pi::MouseEventHook(wxMouseEvent &event) {
 
     if ((a < m_selectRadius) && (b < m_selectRadius)) {
       m_foundState = state;
-      transponderFoundID = transponderStatus[i]->ident;
-      //wxLogMessage("Found Transponder! %d", m_foundState->ident);
+      transponderFoundID = transponderStatus[i]->markID;
+      //wxLogMessage("Found Transponder! %d", m_foundState->markID);
       break;
     }
   }
@@ -2648,8 +2766,8 @@ bool ropeless_pi::MouseEventHook(wxMouseEvent &event) {
 
   //     if( ( a < m_selectRadius ) && ( b < m_selectRadius ) ){
   //       m_foundState = state;
-  //       transponderFoundID = transponderStatus[i]->ident;
-  //       //wxLogMessage("Found Transponder! %d",m_foundState->ident);
+  //       transponderFoundID = transponderStatus[i]->markID;
+  //       //wxLogMessage("Found Transponder! %d",m_foundState->markID);
   //       break;
   //     }
   //   }
@@ -2726,7 +2844,7 @@ bool ropeless_pi::MouseEventHook(wxMouseEvent &event) {
       contextMenu->Append(id_item);
       contextMenu->Append(release_item);
 
-      if (m_foundState->ident > 0)
+      if (m_foundState->markID > 0)
       {
         contextMenu->Append(recovered_item);
       }
@@ -2814,10 +2932,10 @@ void ropeless_pi::ShowPreferencesDialog(wxWindow *parent) {
     }
 }
 
-void ropeless_pi::toggleTransponderRecovered(int id)
+void ropeless_pi::toggleTransponderRecovered(uint32_t markID)
 {
 
-  transponder_state* tstate = GetStateByIdent(id);
+  transponder_state* tstate = GetStateByMarkID(markID);
 
   if (tstate != NULL) 
   {     
@@ -2839,7 +2957,7 @@ void ropeless_pi::toggleTransponderRecovered(int id)
 
 void ropeless_pi::releaseCallbackRecovered(void)
 {
-  transponder_state* tstate = GetStateByIdent(m_release_tim_state.ptstate->ident);
+  transponder_state* tstate = GetStateByMarkID(m_release_tim_state.ptstate->markID);
 
   if (tstate != NULL) 
   {   
@@ -3000,16 +3118,14 @@ void ropeless_pi::SendGMLMessageForManualPlacement(transponder_state* state, dou
   GML gml_msg;
 
   // Fill in the RSGML fields based on manual placement
-  gml_msg.MarkID = state->ident;              // Use transponder ID as MarkID
+  gml_msg.MarkID = state->markID;              // Use transponder ID as MarkID
   gml_msg.MarkType = 1;                       // 1 = Manual placement mark type
   gml_msg.PosStatus = 1;                      // 1 = Valid/confirmed position
-  gml_msg.TrawlID = state->ident_partner;     // Use partner ID as TrawlID
+  gml_msg.TrawlID = state->assigned_trawl_id; // Use assigned trawl ID
   gml_msg.TrawlNum = 1;                       // Default trawl number
   gml_msg.Latitude = lat;                     // Placement latitude
   gml_msg.Longitude = lon;                    // Placement longitude
   gml_msg.Depth = (int)state->depth;          // Depth from state (may be 0 for manual)
-  gml_msg.MfgID = 1001;                       // Default manufacturer ID
-  gml_msg.Mfg = 10;                          // Default manufacturer code
   gml_msg.Ownership = 1;                      // 1 = Own vessel's equipment
   gml_msg.Source = 2;                         // 2 = Manual entry source
   gml_msg.DateNum = utc;                      // UTC timestamp as matlab datenum
@@ -3149,4 +3265,167 @@ void PI_EventHandler::OnEvtOCPN_NMEA(PI_OCPN_DataStreamEvent &event) {
 
     }
 #endif
+}
+
+//=============================================================================
+// Trawl Tracker Method Implementations
+//=============================================================================
+
+std::vector<transponder_state*> trawl_tracker::getTransponders() const {
+  std::vector<transponder_state*> result;
+  
+  for (auto* t : transponderStatus) {
+    if (t && t->assigned_trawl_id == trawl_id) {
+      result.push_back(t);
+    }
+  }
+  return result;
+}
+
+std::vector<uint32_t> trawl_tracker::getTransponderIds() const {
+  std::vector<uint32_t> result;
+  
+  for (auto* t : transponderStatus) {
+    if (t && t->assigned_trawl_id == trawl_id) {
+      result.push_back(t->markID);
+    }
+  }
+  return result;
+}
+
+transponder_state* trawl_tracker::getStartEndTransponder() const {
+  for (auto* t : transponderStatus) {
+    if (t && t->assigned_trawl_id == trawl_id && t->is_trawl_start_end) {
+      return t;
+    }
+  }
+  return nullptr;
+}
+
+std::vector<transponder_state*> trawl_tracker::getOrderedTransponders() const {
+  auto transponders = getTransponders();
+  
+  // Sort by trawl_position
+  std::sort(transponders.begin(), transponders.end(), 
+           [](const transponder_state* a, const transponder_state* b) {
+             return a->trawl_position < b->trawl_position;
+           });
+  
+  return transponders;
+}
+
+bool trawl_tracker::addTransponder(uint32_t transponder_id, int position) {
+  transponder_state* t = nullptr;
+  for (auto* state : transponderStatus) {
+    if (state && state->markID == transponder_id) {
+      t = state;
+      break;
+    }
+  }
+  if (!t) return false;
+  
+  // Remove from any existing trawl first
+  if (t->assigned_trawl_id != 0) {
+    // Could notify old trawl here if needed
+  }
+  
+  // Assign to this trawl
+  t->assigned_trawl_id = trawl_id;
+  t->trawl_position = (position >= 0) ? position : traps_in_set();
+  
+  return true;
+}
+
+bool trawl_tracker::removeTransponder(uint32_t transponder_id) {
+  transponder_state* t = nullptr;
+  for (auto* state : transponderStatus) {
+    if (state && state->markID == transponder_id) {
+      t = state;
+      break;
+    }
+  }
+  if (!t || t->assigned_trawl_id != trawl_id) return false;
+  
+  // Remove from trawl
+  t->assigned_trawl_id = 0;
+  t->is_trawl_start_end = false;
+  t->trawl_position = -1;
+  
+  // Reorder remaining transponders
+  reorderTransponders();
+  
+  return true;
+}
+
+void trawl_tracker::setStartEnd(uint32_t transponder_id) {
+  // Clear any existing start/end markers in this trawl
+  for (auto* t : getTransponders()) {
+    if (t) t->is_trawl_start_end = false;
+  }
+  
+  // Set new start/end
+  transponder_state* t = nullptr;
+  for (auto* state : transponderStatus) {
+    if (state && state->markID == transponder_id) {
+      t = state;
+      break;
+    }
+  }
+  if (t && t->assigned_trawl_id == trawl_id) {
+    t->is_trawl_start_end = true;
+  }
+}
+
+void trawl_tracker::reorderTransponders() {
+  auto transponders = getTransponders();
+  
+  // Sort by current position, then reassign consecutive positions
+  std::sort(transponders.begin(), transponders.end(), 
+           [](const transponder_state* a, const transponder_state* b) {
+             return a->trawl_position < b->trawl_position;
+           });
+  
+  for (size_t i = 0; i < transponders.size(); ++i) {
+    transponders[i]->trawl_position = static_cast<int>(i);
+  }
+}
+
+int trawl_tracker::traps_in_set() const {
+  return static_cast<int>(getTransponders().size());
+}
+
+bool trawl_tracker::hasTransponder(uint32_t transponder_id) const {
+  for (auto* state : transponderStatus) {
+    if (state && state->markID == transponder_id) {
+      return state->assigned_trawl_id == trawl_id;
+    }
+  }
+  return false;
+}
+
+bool trawl_tracker::isStartEnd(uint32_t transponder_id) const {
+  for (auto* state : transponderStatus) {
+    if (state && state->markID == transponder_id) {
+      return state->assigned_trawl_id == trawl_id && state->is_trawl_start_end;
+    }
+  }
+  return false;
+}
+
+int trawl_tracker::getTransponderPosition(uint32_t transponder_id) const {
+  for (auto* state : transponderStatus) {
+    if (state && state->markID == transponder_id) {
+      return (state->assigned_trawl_id == trawl_id) ? state->trawl_position : -1;
+    }
+  }
+  return -1;
+}
+
+
+void trawl_tracker::addPathPoint(double lat, double lon) {
+  trawl_path.push_back(trawl_coordinate(lat, lon));
+}
+
+void trawl_tracker::clearPath() {
+  trawl_path.clear();
 }
