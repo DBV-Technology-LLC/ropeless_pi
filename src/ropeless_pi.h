@@ -261,7 +261,7 @@ public:
     mark_type = 0;
     pos_status = 0;
     trawl_id = 0;
-    trawl_num = 0;
+    trawl_num = -1;
     mfg_id = 0;
     mfg_code = 0;
     serial_num = 0;
@@ -282,9 +282,7 @@ public:
     released_utc = 0.0;
     
     // Initialize trawl relationship fields
-    assigned_trawl_id = 0;
     is_trawl_start_end = false;
-    trawl_position = -1;
 
     predicted_lat = 999.0;
     predicted_lon = 999.0;
@@ -319,8 +317,8 @@ public:
   // GML (Gear Mark Location) status parameters
   int mark_type;        // MarkType from GML
   int pos_status;       // PosStatus from GML
-  uint16_t trawl_id;    // TrawlID from GML (16-bit: 0-65535)
-  int trawl_num;        // TrawlNum from GML
+  uint16_t trawl_id;    // TrawlID from GML / ID of trawl this transponder belongs to (16-bit: 0-65535, 0 = not in trawl)
+  int trawl_num;        // TrawlNum from GML / Order position in trawl (0=start, 1=second, etc., -1 = not positioned)
   double predicted_lat; // current pos lat
   double predicted_lon; // current pos lon
   double depth;         // Depth m GML
@@ -345,9 +343,7 @@ public:
   double released_utc;            // UTC time when released
   
   // Trawl relationship fields
-  uint16_t assigned_trawl_id;     // ID of trawl this transponder belongs to (0 = not in trawl, range: 0-65535)
   bool is_trawl_start_end;        // Is this a start/end marker transponder
-  int trawl_position;             // Order position in trawl (0=start, 1=second, etc.)
   
 };
 
@@ -533,6 +529,7 @@ public:
   
   // Display settings
   bool m_colorblind_mode;
+  bool m_hide_transponder_text;
   int m_transponder_circle_size;
   int m_transponder_text_size;
   

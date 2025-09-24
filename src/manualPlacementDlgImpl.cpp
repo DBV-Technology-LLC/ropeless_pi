@@ -98,11 +98,11 @@ manualPlacementDlgImpl::manualPlacementDlgImpl(wxWindow* parent, int id, const w
 		}
 
 		// Set trawl selection
-		if (existingState->assigned_trawl_id > 0) {
+		if (existingState->trawl_id > 0) {
 			for (int i = 0; i < m_choiceTrawlId->GetCount(); i++) {
 				void* clientData = m_choiceTrawlId->GetClientData(i);
 				int trawlId = reinterpret_cast<intptr_t>(clientData);
-				if (trawlId == existingState->assigned_trawl_id) {
+				if (trawlId == existingState->trawl_id) {
 					m_choiceTrawlId->SetSelection(i);
 					selectedTrawlId = trawlId;
 					break;
@@ -118,8 +118,8 @@ manualPlacementDlgImpl::manualPlacementDlgImpl(wxWindow* parent, int id, const w
 		markID = existingState->markID;
 
 		// Set trawl position if available
-		if (existingState->trawl_position > 0) {
-			trawlPosition = existingState->trawl_position;
+		if (existingState->trawl_num > 0) {
+			trawlPosition = existingState->trawl_num;
 			if (m_spinCtrlTrawlPos) {
 				m_spinCtrlTrawlPos->SetValue(trawlPosition);
 			}
@@ -543,7 +543,7 @@ void manualPlacementDlgImpl::UpdateTrawlPosControl() {
                 // Count transponders in this trawl
                 extern std::vector<transponder_state *> transponderStatus;
                 for (auto* state : transponderStatus) {
-                    if (state && state->assigned_trawl_id == selectedTrawlId) {
+                    if (state && state->trawl_id == selectedTrawlId) {
                         trawlLength++;
                     }
                 }

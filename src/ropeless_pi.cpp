@@ -365,6 +365,7 @@ int ropeless_pi::Init(void) {
   m_tcp_host = "127.0.0.1";
   m_tcp_port = 4001;
   m_colorblind_mode = false;
+  m_hide_transponder_text = false;
   m_transponder_circle_size = 10;
   m_transponder_text_size = 12;
   m_debug_enabled = false;
@@ -485,6 +486,8 @@ bool ropeless_pi::DeInit(void) {
       canvas->Disconnect(ID_TPR_RECOVER, wxEVT_COMMAND_MENU_SELECTED,
                         wxCommandEventHandler(ropeless_pi::PopupMenuHandler), NULL, this);
       canvas->Disconnect(ID_TPR_DELETE, wxEVT_COMMAND_MENU_SELECTED,
+                        wxCommandEventHandler(ropeless_pi::PopupMenuHandler), NULL, this);
+      canvas->Disconnect(ID_TPR_EDIT, wxEVT_COMMAND_MENU_SELECTED,
                         wxCommandEventHandler(ropeless_pi::PopupMenuHandler), NULL, this);
     }
   } catch (...) {
@@ -711,7 +714,13 @@ void ropeless_pi::OnContextMenuItemCallback(int id) {
         if (mPl.selectedTrawlId > 0) {
           transponder_state* newTransponder = GetStateByMarkID(mPl.markID);
           if (newTransponder) {
-            newTransponder->assigned_trawl_id = mPl.selectedTrawlId;
+            newTransponder->trawl_id = mPl.selectedTrawlId;
+            if (mPl.selectedTrawlId == 0) {
+              newTransponder->is_trawl_start_end = false;  // Clear start/end flag when removing from trawl
+              newTransponder->trawl_num = -1;  // Reset position when removing from trawl
+            } else {
+              newTransponder->is_trawl_start_end = false;  // Reset start/end flag when assigning to trawl
+            }
             wxLogMessage("Assigned transponder %d to trawl %d", mPl.markID, mPl.selectedTrawlId);
           }
         }
@@ -750,7 +759,13 @@ void ropeless_pi::OnContextMenuItemCallback(int id) {
         if (mPl.selectedTrawlId > 0) {
           transponder_state* newTransponder = GetStateByMarkID(mPl.markID);
           if (newTransponder) {
-            newTransponder->assigned_trawl_id = mPl.selectedTrawlId;
+            newTransponder->trawl_id = mPl.selectedTrawlId;
+            if (mPl.selectedTrawlId == 0) {
+              newTransponder->is_trawl_start_end = false;  // Clear start/end flag when removing from trawl
+              newTransponder->trawl_num = -1;  // Reset position when removing from trawl
+            } else {
+              newTransponder->is_trawl_start_end = false;  // Reset start/end flag when assigning to trawl
+            }
             wxLogMessage("Assigned transponder %d to trawl %d", mPl.markID, mPl.selectedTrawlId);
           }
         }
@@ -1580,10 +1595,10 @@ void ropeless_pi::RegenerateTrawlListFromTransponders() {
   // Create a map to collect unique trawl IDs from transponders
   std::map<uint16_t, std::vector<transponder_state*>> trawlMap;
 
-  // Group transponders by their assigned_trawl_id
+  // Group transponders by their trawl_id
   for (auto* transponder : transponderStatus) {
-    if (transponder && transponder->assigned_trawl_id > 0) {
-      trawlMap[transponder->assigned_trawl_id].push_back(transponder);
+    if (transponder && transponder->trawl_id > 0) {
+      trawlMap[transponder->trawl_id].push_back(transponder);
     }
   }
 
@@ -1598,7 +1613,7 @@ void ropeless_pi::RegenerateTrawlListFromTransponders() {
 
     // Add transponders to the trawl
     for (auto* transponder : transponders) {
-      newTrawl->addTransponder(transponder->markID, transponder->trawl_position);
+      newTrawl->addTransponder(transponder->markID, transponder->trawl_num);
 
       // Set start/end marker if flagged
       if (transponder->is_trawl_start_end) {
@@ -1745,6 +1760,38 @@ void ropeless_pi::RenderTransponder(transponder_state *state) {
     m_oDC->DrawCircle(ab.x, ab.y, circle_size);
   }
 
+  // Draw marking for Trawl End / Midpoint
+  if (state->trawl_id > 0)
+  {
+    // Are we an endpoint?
+    if (state->is_trawl_start_end)
+    {
+      // Draw X marker for start/end transponders
+      wxPoint x1(ab.x - circle_size * .707, ab.y - circle_size * .707);
+      wxPoint x2(ab.x + circle_size * .707, ab.y + circle_size * .707);
+      wxPoint x3(ab.x - circle_size * .707, ab.y + circle_size * .707);
+      wxPoint x4(ab.x + circle_size * .707, ab.y - circle_size * .707);
+
+      wxColour pColour = wxColour(0, 0, 0, opacity);
+      wxPen xpen(pColour, 3);
+      m_oDC->SetPen(xpen);
+      m_oDC->DrawLine(x1.x, x1.y, x2.x, x2.y, true);
+      m_oDC->DrawLine(x3.x, x3.y, x4.x, x4.y, true);
+    }
+    else
+    {
+      // Draw a small black dot in the center to mark it's part of trawl but not the end
+      int dot_size = circle_size / 3;  // Small dot, 1/3 the size of the main circle
+      wxColour dotColour = wxColour(0, 0, 0, opacity);
+      wxPen dotPen(dotColour);
+      wxBrush dotBrush(dotColour);
+      m_oDC->SetPen(dotPen);
+      m_oDC->SetBrush(dotBrush);
+      m_oDC->DrawCircle(ab.x, ab.y, dot_size);
+    }
+  }
+
+
   // TODO: Remove me? 
   // // Draw 6 evenly spaced segments around the circle
   // wxPen solidBlackPen(wxColour(0, 0, 0), 3);
@@ -1799,7 +1846,7 @@ void ropeless_pi::RenderTransponderTexts() {
     transponder_state *state = transponderStatus[i];
     
     // Skip rendering text for hidden, cloud positions, or invalid transponders
-    if (state->hide_pos == true || state->position_source == ePOS_SOURCE_CLOUD || state->markID <= 0) {
+    if (state->hide_pos == true || state->position_source == ePOS_SOURCE_CLOUD || state->markID <= 0 || m_hide_transponder_text) {
       continue;
     }
     
@@ -2303,11 +2350,17 @@ void ropeless_pi::EditTransponder(transponder_state* state) {
     state->ownership = editDlg.isOwned ? 1 : 0;
 
     // Update trawl assignment
-    state->assigned_trawl_id = editDlg.selectedTrawlId;
+    state->trawl_id = editDlg.selectedTrawlId;
+    if (editDlg.selectedTrawlId == 0) {
+      state->is_trawl_start_end = false;  // Clear start/end flag when removing from trawl
+      state->trawl_num = -1;  // Reset position when removing from trawl
+    } else {
+      state->is_trawl_start_end = false;  // Reset start/end flag when assigning to new trawl
+    }
 
     wxLogMessage("Transponder updated: ID=%u (mfg=0x%02X, serial=%u), source=%s, trawl=%d",
                  newMarkID, mfg_code, serial_num,
-                 positionSourceNames[state->position_source], state->assigned_trawl_id);
+                 positionSourceNames[state->position_source], state->trawl_id);
 
     // Save changes and refresh UI
     SaveTransponderStatus();
@@ -2644,6 +2697,7 @@ bool ropeless_pi::LoadConfig(void) {
     
     // Display Configuration
     pConf->Read(_T( "Colorblind_Mode" ), &m_colorblind_mode, false);
+    pConf->Read(_T( "Hide_Transponder_Text" ), &m_hide_transponder_text, false);
     pConf->Read(_T( "Transponder_Circle_Size" ), &m_transponder_circle_size, 10);
     pConf->Read(_T( "Transponder_Text_Size" ), &m_transponder_text_size, 12);
     
@@ -2697,6 +2751,7 @@ bool ropeless_pi::SaveConfig(void) {
     
     // Display Configuration
     pConf->Write(_T( "Colorblind_Mode" ), m_colorblind_mode);
+    pConf->Write(_T( "Hide_Transponder_Text" ), m_hide_transponder_text);
     pConf->Write(_T( "Transponder_Circle_Size" ), m_transponder_circle_size);
     pConf->Write(_T( "Transponder_Text_Size" ), m_transponder_text_size);
     
@@ -2842,6 +2897,9 @@ bool ropeless_pi::MouseEventHook(wxMouseEvent &event) {
       wxMenuItem *delete_item = 0;
       delete_item = new wxMenuItem(contextMenu, ID_TPR_DELETE, _("Delete Transponder") );
 
+      wxMenuItem *edit_item = 0;
+      edit_item = new wxMenuItem(contextMenu, ID_TPR_EDIT, _("Edit Transponder") );
+
       // wxMenuItem *release_item = 0;
       // release_item = new wxMenuItem(contextMenu, ID_TPR_RELEASE, _("Info") );
 
@@ -2849,6 +2907,7 @@ bool ropeless_pi::MouseEventHook(wxMouseEvent &event) {
       wxFont *pFont = OCPNGetFont(_T("Dialog"), 0);
       release_item->SetFont(*pFont);
       id_item->SetFont(*pFont);
+      edit_item->SetFont(*pFont);
 #endif
 
       contextMenu->Append(id_item);
@@ -2860,6 +2919,7 @@ bool ropeless_pi::MouseEventHook(wxMouseEvent &event) {
       }
 
       contextMenu->Append(delete_item);
+      contextMenu->Append(edit_item);
 
       GetOCPNCanvasWindow()->Connect(
           ID_TPR_RELEASE, wxEVT_COMMAND_MENU_SELECTED,
@@ -2871,6 +2931,10 @@ bool ropeless_pi::MouseEventHook(wxMouseEvent &event) {
 
       GetOCPNCanvasWindow()->Connect(
           ID_TPR_DELETE, wxEVT_COMMAND_MENU_SELECTED,
+          wxCommandEventHandler(ropeless_pi::PopupMenuHandler), NULL, this);
+
+      GetOCPNCanvasWindow()->Connect(
+          ID_TPR_EDIT, wxEVT_COMMAND_MENU_SELECTED,
           wxCommandEventHandler(ropeless_pi::PopupMenuHandler), NULL, this);
 
       wxLogMessage("Creating popup!");
@@ -3131,8 +3195,8 @@ void ropeless_pi::SendGMLMessageForManualPlacement(transponder_state* state, dou
   gml_msg.MarkID = state->markID;              // Use transponder ID as MarkID
   gml_msg.MarkType = 1;                       // 1 = Manual placement mark type
   gml_msg.PosStatus = 1;                      // 1 = Valid/confirmed position
-  gml_msg.TrawlID = state->assigned_trawl_id; // Use assigned trawl ID
-  gml_msg.TrawlNum = state->trawl_position;    // Default trawl number
+  gml_msg.TrawlID = state->trawl_id; // Use assigned trawl ID
+  gml_msg.TrawlNum = state->trawl_num;    // Default trawl number
   gml_msg.Latitude = lat;                     // Placement latitude
   gml_msg.Longitude = lon;                    // Placement longitude
   gml_msg.Depth = (int)state->depth;          // Depth from state (may be 0 for manual)
@@ -3285,7 +3349,7 @@ std::vector<transponder_state*> trawl_tracker::getTransponders() const {
   std::vector<transponder_state*> result;
   
   for (auto* t : transponderStatus) {
-    if (t && t->assigned_trawl_id == trawl_id) {
+    if (t && t->trawl_id == trawl_id) {
       result.push_back(t);
     }
   }
@@ -3296,7 +3360,7 @@ std::vector<uint32_t> trawl_tracker::getTransponderIds() const {
   std::vector<uint32_t> result;
   
   for (auto* t : transponderStatus) {
-    if (t && t->assigned_trawl_id == trawl_id) {
+    if (t && t->trawl_id == trawl_id) {
       result.push_back(t->markID);
     }
   }
@@ -3305,7 +3369,7 @@ std::vector<uint32_t> trawl_tracker::getTransponderIds() const {
 
 transponder_state* trawl_tracker::getStartEndTransponder() const {
   for (auto* t : transponderStatus) {
-    if (t && t->assigned_trawl_id == trawl_id && t->is_trawl_start_end) {
+    if (t && t->trawl_id == trawl_id && t->is_trawl_start_end) {
       return t;
     }
   }
@@ -3315,10 +3379,10 @@ transponder_state* trawl_tracker::getStartEndTransponder() const {
 std::vector<transponder_state*> trawl_tracker::getOrderedTransponders() const {
   auto transponders = getTransponders();
   
-  // Sort by trawl_position
+  // Sort by trawl_num
   std::sort(transponders.begin(), transponders.end(), 
            [](const transponder_state* a, const transponder_state* b) {
-             return a->trawl_position < b->trawl_position;
+             return a->trawl_num < b->trawl_num;
            });
   
   return transponders;
@@ -3335,13 +3399,14 @@ bool trawl_tracker::addTransponder(uint32_t transponder_id, int position) {
   if (!t) return false;
   
   // Remove from any existing trawl first
-  if (t->assigned_trawl_id != 0) {
+  if (t->trawl_id != 0) {
     // Could notify old trawl here if needed
   }
   
   // Assign to this trawl
-  t->assigned_trawl_id = trawl_id;
-  t->trawl_position = (position >= 0) ? position : traps_in_set();
+  t->trawl_id = trawl_id;
+  t->trawl_num = (position >= 0) ? position : traps_in_set();
+  t->is_trawl_start_end = false;  // Reset start/end flag when adding to trawl
   
   return true;
 }
@@ -3354,12 +3419,12 @@ bool trawl_tracker::removeTransponder(uint32_t transponder_id) {
       break;
     }
   }
-  if (!t || t->assigned_trawl_id != trawl_id) return false;
+  if (!t || t->trawl_id != trawl_id) return false;
   
   // Remove from trawl
-  t->assigned_trawl_id = 0;
+  t->trawl_id = 0;
   t->is_trawl_start_end = false;
-  t->trawl_position = -1;
+  t->trawl_num = -1;
   
   // Reorder remaining transponders
   reorderTransponders();
@@ -3381,7 +3446,7 @@ void trawl_tracker::setStartEnd(uint32_t transponder_id) {
       break;
     }
   }
-  if (t && t->assigned_trawl_id == trawl_id) {
+  if (t && t->trawl_id == trawl_id) {
     t->is_trawl_start_end = true;
   }
 }
@@ -3392,11 +3457,11 @@ void trawl_tracker::reorderTransponders() {
   // Sort by current position, then reassign consecutive positions
   std::sort(transponders.begin(), transponders.end(), 
            [](const transponder_state* a, const transponder_state* b) {
-             return a->trawl_position < b->trawl_position;
+             return a->trawl_num < b->trawl_num;
            });
   
   for (size_t i = 0; i < transponders.size(); ++i) {
-    transponders[i]->trawl_position = static_cast<int>(i);
+    transponders[i]->trawl_num = static_cast<int>(i);
   }
 }
 
@@ -3407,7 +3472,7 @@ int trawl_tracker::traps_in_set() const {
 bool trawl_tracker::hasTransponder(uint32_t transponder_id) const {
   for (auto* state : transponderStatus) {
     if (state && state->markID == transponder_id) {
-      return state->assigned_trawl_id == trawl_id;
+      return state->trawl_id == trawl_id;
     }
   }
   return false;
@@ -3416,7 +3481,7 @@ bool trawl_tracker::hasTransponder(uint32_t transponder_id) const {
 bool trawl_tracker::isStartEnd(uint32_t transponder_id) const {
   for (auto* state : transponderStatus) {
     if (state && state->markID == transponder_id) {
-      return state->assigned_trawl_id == trawl_id && state->is_trawl_start_end;
+      return state->trawl_id == trawl_id && state->is_trawl_start_end;
     }
   }
   return false;
@@ -3425,7 +3490,7 @@ bool trawl_tracker::isStartEnd(uint32_t transponder_id) const {
 int trawl_tracker::getTransponderPosition(uint32_t transponder_id) const {
   for (auto* state : transponderStatus) {
     if (state && state->markID == transponder_id) {
-      return (state->assigned_trawl_id == trawl_id) ? state->trawl_position : -1;
+      return (state->trawl_id == trawl_id) ? state->trawl_num : -1;
     }
   }
   return -1;

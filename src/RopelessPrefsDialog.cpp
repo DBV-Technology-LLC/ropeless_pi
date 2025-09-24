@@ -153,7 +153,13 @@ void RopelessPrefsDialog::CreateControls() {
     
     m_cbTimeoutCloud = new wxCheckBox(this, wxID_ANY, _("Timeout cloud positions"));
     displaySizer->Add(m_cbTimeoutCloud, 0, wxALL, 5);
-    
+
+    m_cbHideTransponderText = new wxCheckBox(this, wxID_ANY, _("Hide transponder IDs"));
+    if (m_parent_pi) {
+        m_cbHideTransponderText->SetValue(m_parent_pi->m_hide_transponder_text);
+    }
+    displaySizer->Add(m_cbHideTransponderText, 0, wxALL, 5);
+
     // Cloud radius text input
     wxBoxSizer *radiusSizer = new wxBoxSizer(wxHORIZONTAL);
     radiusSizer->Add(new wxStaticText(this, wxID_ANY, _("Cloud radius (nmi):")), 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 5);
@@ -216,7 +222,12 @@ void RopelessPrefsDialog::OnOKClick(wxCommandEvent &event) {
             if (m_cbColorblind) {
                 m_parent_pi->m_colorblind_mode = m_cbColorblind->GetValue();
             }
-            
+
+            // Save hide transponder text setting
+            if (m_cbHideTransponderText) {
+                m_parent_pi->m_hide_transponder_text = m_cbHideTransponderText->GetValue();
+            }
+
             // Save TCP settings
             if (m_cbTCPEnabled && m_tcTCPHost && m_tcTCPPort && m_cbTCPAutoReconnect) {
                 bool tcp_enabled = m_cbTCPEnabled->GetValue();
@@ -292,6 +303,7 @@ void RopelessPrefsDialog::OnDefaultSettingsClick(wxCommandEvent &event) {
     if (m_cbShowCloud) m_cbShowCloud->SetValue(true);
     if (m_cbHideRecovered) m_cbHideRecovered->SetValue(false);
     if (m_cbTimeoutCloud) m_cbTimeoutCloud->SetValue(true);
+    if (m_cbHideTransponderText) m_cbHideTransponderText->SetValue(false);
     if (m_tcCloudRadius) m_tcCloudRadius->SetValue(_("2"));
     if (m_tcCircleSize) m_tcCircleSize->SetValue(_("10"));
     if (m_tcTextSize) m_tcTextSize->SetValue(_("12"));

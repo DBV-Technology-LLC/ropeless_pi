@@ -67,6 +67,7 @@ private:
     wxCheckBox *m_cbShowCloud;
     wxCheckBox *m_cbHideRecovered;
     wxCheckBox *m_cbTimeoutCloud;
+    wxCheckBox *m_cbHideTransponderText;
     wxTextCtrl *m_tcCloudRadius;
     // Visual settings
     wxTextCtrl *m_tcCircleSize;

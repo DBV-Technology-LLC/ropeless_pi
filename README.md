@@ -10,10 +10,14 @@ This is a plugin for OpenCPN to support the integration of Ropeless Fishing equi
 9/24/2025
 [x] - Saving position of Plugin on close
 [x] - Merged old / new transponder fields (range,id etc..)
+[x] - Updating Transponder color scheme to be handled by render -- not saved with Transponder info
+[x] - Adding hide transponder text to preferences
+[x] - Adding edit transponder to right click on transponder
+[x] - Updating Table Color marking and Transponder color change on select / deselect faster
 
-[] - Updating Transponder color scheme to be handled by render -- not saved with Transponder info
 
--1: Option to hide transponder text
+-1. Fix text cutoff in "Transponder Status" Tab?
+
 0. Right click on transponder show manuf/sn/trawl_id
 
 1. Make sure trawl_id saved with transponder obj
@@ -22,7 +26,6 @@ This is a plugin for OpenCPN to support the integration of Ropeless Fishing equi
 4. Keep track of ends of trawls
 5. Draw black X on ends of trawls
 6. Update table / gui more frequently / on select / actions
-7. Add edit option to manual transponder marking
 8. User trawls assigned trawl_ids descending from 65k
 9. Verify Cloud pos
 10. Cloud trawl_id 
