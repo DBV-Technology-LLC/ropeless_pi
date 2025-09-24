@@ -6,8 +6,16 @@ This is a plugin for OpenCPN to support the integration of Ropeless Fishing equi
 ** TRAWL ID NOT SAVED WITH TRANSPONDER IN XML **
 
 ## TODO:
+
+9/24/2025
+[x] - Saving position of Plugin on close
+[x] - Merged old / new transponder fields (range,id etc..)
+
+[] - Updating Transponder color scheme to be handled by render -- not saved with Transponder info
+
 -1: Option to hide transponder text
 0. Right click on transponder show manuf/sn/trawl_id
+
 1. Make sure trawl_id saved with transponder obj
 2. Change trawl line back to black dotted line
 3. Draw black dot in center of transponders in trawls
@@ -24,7 +32,6 @@ This is a plugin for OpenCPN to support the integration of Ropeless Fishing equi
 14. Mark Type enum strings
 15. Show trawl pos field in manual placement
 16. Show trawl pos in status
-17. Remember position when closed via ESC / OK / X
 18. Move manual release to bottom near OK. Remove mute?
 19. Set TCP connection default / enable
 20. Fix trawl rendering order by enforcing trawl positions 

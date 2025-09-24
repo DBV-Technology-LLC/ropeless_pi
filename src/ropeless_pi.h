@@ -103,11 +103,20 @@
 //      Options
 #define COLOR_TABLE_COUNT 5
 #define COLOR_INDEX_GOLDEN 4
-#define COLOR_INDEX_GREEN 0
-#define COLOR_INDEX_RED 1
+#define COLOR_INDEX_GREEN 1
+#define COLOR_INDEX_RED 0
 
 #define SET_RECOVERED_OPACITY
 #define SHOW_DISTANCE
+
+enum {
+  eMARK_TYPE_ACOUSTIC = 0,
+  eMARK_TYPE_TIMER,
+  eMARK_TYPE_GALVANIC,
+  eMARK_TYPE_OTHER,
+  eMARK_TYPE_SURFACE_FIXED,
+  eMARK_TYPE_SURFACE_DRIFT
+};
 
 enum {
   tlICON = 0,
@@ -143,7 +152,6 @@ enum {
   ePOS_SOURCE_GPS = 3,
 };
 
-
 enum {
   eCOMM_UDP = 0,
 };
@@ -160,10 +168,31 @@ enum {
   eCMD_RELEASE = 8
 };
 
-const wxString releaseStatusNames[] = {"TIMEOUT", "SENDING...", "Released", "NOT VERIFIED", "FAILED", "---", "NETWORK ERROR", "CONNECTING..."};
+const wxString releaseStatusNames[] = {"TIMEOUT", "SENDING...", "RELEASED", "NOT VERIFIED", "FAILED", "---", "NETWORK ERROR", "CONNECTING..."};
 const wxString recoveredStrList[] = {"DEPLOYED","RECOVERED"};
 const wxString positionSourceNames[] = {"USER", "CLOUD", "ACOUSTIC", "GPS"};
-const wxString commModeNames[] = {"UDP Broadcast"};
+const wxString markTypeNames[] = {"Acoustic", "Timer", "Galvanic", "Other", "Surface Fixed", "Surface Drift"};
+
+// Manufacturer lookup table structure
+struct ManufacturerInfo {
+    uint8_t code;
+    const char* name;
+    const char* displayName;  // For dropdowns with hex code
+};
+
+// Centralized manufacturer lookup table
+const ManufacturerInfo manufacturerTable[] = {
+    {0x00, "Ropeless Systems Inc.", "0x00 - Ropeless Systems Inc."},
+    {0x01, "Desert Star Systems", "0x01 - Desert Star Systems"},
+    {0x02, "EdgeTech", "0x02 - EdgeTech"},
+    {0x03, "Benthos", "0x03 - Benthos"},
+    {0x04, "SubSea Sonics", "0x04 - SubSea Sonics"},
+    {0x05, "Teledyne Marine", "0x05 - Teledyne Marine"},
+    {0x10, "Ashored Innovations", "0x10 - Ashored Innovations"},
+    {0xFF, "Ephemeral", "0xFF - Ephemeral"}
+};
+
+const int manufacturerTableSize = sizeof(manufacturerTable) / sizeof(ManufacturerInfo);
 
 //----------------------------------------------------------------------------------------------------------
 //    Manufacturer ID Utility Functions
@@ -215,12 +244,12 @@ WX_DECLARE_OBJARRAY(vector2D *, ArrayOf2DPoints);
 class transponder_state {
 public:
   transponder_state() {
-    release_status = -2;
     markID = 0;
-    range = 0;
+    timeStamp = 0;
+    
+    release_status = -2;
     bearing = 0;
     depth = 0;
-    temp = 0;
     timeStamp = 0;
     batt_stat = 0;
     recovered_state = eREC_DEPLOYED;
@@ -238,8 +267,6 @@ public:
     serial_num = 0;
     mfg_str = "";
     ownership = 0;
-    source = 0;
-    date_num = 0.0;
     
     // Initialize GMS parameters  
     surface_range = 0;
@@ -262,47 +289,51 @@ public:
     predicted_lat = 999.0;
     predicted_lon = 999.0;
     hide_pos = false;
-    
+    selected = false;
+
   }
 
   ~transponder_state() {};
-
-  // Original fields
-  uint32_t markID;        // Full 32-bit transponder ID (MarkID from GML)
-  int color_index;
-  double timeStamp;
-  double predicted_lat;
-  double predicted_lon;
-  int release_status;
-  double range;
-  double bearing;
-  double depth;
-  double temp;
-  int batt_stat;
-  int pings;
-  int opacity;
-  int recovered_state;
-  double distance;
-  int position_source;
   
+  // Unique Identifier
+  uint32_t markID;      // Full 32-bit transponder ID (MarkID from GML)
+
+  double timeStamp;
+
+  // Parsed
+  uint32_t mfg_id;      // Full 32-bit manufacturer ID (derived from MarkID)
+  uint8_t mfg_code;     // 8-bit manufacturer code (extracted from mfg_id)
+  uint32_t serial_num;  // 24-bit serial number (extracted from mfg_id)
+  wxString mfg_str;     // Manufacturer string name (derived from mfg_code)
+
+  // Calculated
+  double distance;      // UI distance vessel to Transponder lat/lon
+  int pings;            // Number of GML messages received from transponder
+
+  // Plugin Status
   bool hide_pos;
+  int recovered_state;
+  int opacity;
+  bool selected;
 
   // GML (Gear Mark Location) status parameters
   int mark_type;        // MarkType from GML
   int pos_status;       // PosStatus from GML
   uint16_t trawl_id;    // TrawlID from GML (16-bit: 0-65535)
   int trawl_num;        // TrawlNum from GML
-  uint32_t mfg_id;      // Full 32-bit manufacturer ID (derived from MarkID)
-  uint8_t mfg_code;     // 8-bit manufacturer code (extracted from mfg_id)
-  uint32_t serial_num;  // 24-bit serial number (extracted from mfg_id)
-  wxString mfg_str;     // Manufacturer string name (derived from mfg_code)
+  double predicted_lat; // current pos lat
+  double predicted_lon; // current pos lon
+  double depth;         // Depth m GML
   int ownership;        // Ownership from GML
-  int source;           // Source from GML
-  double date_num;      // DateNum from GML
+  int position_source;  // Source from GML
+  double gml_timestamp; // timeStamp from GML
   
   // GMS (Gear Mark Status) parameters
+  int release_status;   // Release status from GMS
+  int batt_stat;        // Battery from GMS
   int surface_range;    // SurfaceRange from GMS
   int slant_range;      // SlantRange from GMS  
+  double bearing;       // Bearing from GMS
   int tilt;             // Tilt from GMS
   int seafloor_temp;    // SeafloorTemp from GMS
   int air_pressure;     // AirPressure from GMS
@@ -522,7 +553,6 @@ public:
   void SendSyncMessage(void);
   wxString GetConnectionStatusText();
   wxString GetColorName(int color_index);
-  int GetColorIndexForTransponder(transponder_state* state);
   
   // TCP NMEA Output Methods
   void InitializeTCPOutput();
@@ -544,8 +574,6 @@ public:
 
   wxTimer m_releaseTimer;
   wxTimer m_distanceTimer;
-
-  // transponderReleaseDlgImpl *m_releaseDlg = NULL;  // Functionality moved to RopelessDialog
 
   release_timer_state m_release_tim_state;
 
@@ -585,16 +613,11 @@ private:
   void populateTransponderNode(pugi::xml_node &transponderNode,
                                transponder_state *state);
   void LoadTransponderStatus();
+  void RegenerateTrawlListFromTransponders();
   bool parseTransponderNode(pugi::xml_node &transponderNode,
                             transponder_state *state);
 
   unsigned char ComputeChecksum(wxString msg);
-
-  //      int CalculateFix( void );
-  //      void setTrackedWPSelect(wxString GUID);
-
-  //      void startSerial(const wxString &port);
-  //      void stopSerial( void );
 
   wxBitmap *m_pplugin_icon;
   wxFileConfig *m_pconfig;
@@ -605,7 +628,6 @@ private:
 
   NMEA0183 m_NMEA0183;     // Used to parse incoming NMEA Sentences
   NMEA0183 m_NMEA0183_tx;  // outgoing NMEA sentences
-
 
   // FFU
   int m_config_version;

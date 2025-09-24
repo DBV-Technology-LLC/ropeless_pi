@@ -194,6 +194,7 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
     wxBitmap tbm(imageRefSize, imageRefSize, -1);
     wxMemoryDC mdc(tbm);
     mdc.Clear();
+    
     wxString colorName;
     if (g_ropelessPI) {
         colorName = g_ropelessPI->GetColorName(i);
@@ -212,6 +213,7 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
 
     int xd = 0;
     int yd = 0;
+
     //    mdc.DrawRoundedRectangle(xd, yd, w+(label_offset * 2), h+2, -.25);
     mdc.DrawRectangle(xd, yd, imageRefSize, imageRefSize);
     mdc.SelectObject(wxNullBitmap);
@@ -518,8 +520,32 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
   
   // Final layout to ensure everything is positioned correctly
   this->Layout();
-  
+
+  // Restore saved position and size, or center if no saved values
+#ifndef __ANDROID__
+  if (pParentPi->m_dialogPosX != -1 && pParentPi->m_dialogPosY != -1) {
+    // Restore saved position
+    wxPoint savedPos(pParentPi->m_dialogPosX, pParentPi->m_dialogPosY);
+    this->SetPosition(savedPos);
+
+    // Restore saved size if available
+    if (pParentPi->m_dialogSizeWidth != -1 && pParentPi->m_dialogSizeHeight != -1) {
+      wxSize savedSize(pParentPi->m_dialogSizeWidth, pParentPi->m_dialogSizeHeight);
+      this->SetSize(savedSize);
+    }
+
+    wxLogMessage("RopelessDialog: Restored position/size - pos(%d,%d) size(%d,%d)",
+                 pParentPi->m_dialogPosX, pParentPi->m_dialogPosY,
+                 pParentPi->m_dialogSizeWidth, pParentPi->m_dialogSizeHeight);
+  } else {
+    // No saved position, center the dialog
+    this->Centre(wxBOTH);
+    wxLogMessage("RopelessDialog: No saved position, centering dialog");
+  }
+#else
+  // On Android, always center
   this->Centre(wxBOTH);
+#endif
   
   // Enable key events for the dialog
   this->SetCanFocus(true);
@@ -790,11 +816,23 @@ void RopelessDialog::OnTargetListDeselected(wxListEvent &event) {
   if (deselectedIndex >= 0) {
     transponder_state *state = getXpdrFromIndex(deselectedIndex);
 
-    state->color_index = pParentPi->GetColorIndexForTransponder(state);
+    state->selected = false;
 
     // Clear selected transponder and update info panel
     m_selectedTransponder = NULL;
     UpdateTransponderInfo(NULL);
+
+    // Change color of item in list immediately back to unselected
+    wxListItem listItem;
+    listItem.SetId(deselectedIndex);
+    listItem.SetColumn(tlICON);
+    int display_color = (state->ownership == 1 ? COLOR_INDEX_GREEN : COLOR_INDEX_RED);  // Unselected color
+    m_pListCtrlTranponders->SetItemImage(listItem, display_color);
+
+    // Force table refresh to update colors immediately
+    // m_pListCtrlTranponders->Refresh();
+    // m_pListCtrlTranponders->Update();
+    // RefreshTransponderList();
 
     RequestRefresh(GetOCPNCanvasWindow());
   }
@@ -814,11 +852,18 @@ void RopelessDialog::OnTargetListSelected(wxListEvent &event) {
 
     transponder_state *state = getXpdrFromIndex(selectedItems[0]);
 
-    state->color_index = COLOR_INDEX_GOLDEN;
-    
+    state->selected = true;
+
     // Update selected transponder and refresh info panel
     m_selectedTransponder = state;
     UpdateTransponderInfo(state);
+
+    // Change color of item in list immediately
+    wxListItem listItem;
+    listItem.SetId(selectedItems[0]);
+    listItem.SetColumn(tlICON);
+    int display_color = COLOR_INDEX_GOLDEN;  // Selected color
+    m_pListCtrlTranponders->SetItemImage(listItem, display_color);
 
     RequestRefresh(GetOCPNCanvasWindow());
   }
@@ -875,7 +920,8 @@ void RopelessDialog::RefreshTransponderList() {
     m_pListCtrlTranponders->SetItemData(result, state->markID);
 
     item.SetColumn(tlICON);
-    m_pListCtrlTranponders->SetItemImage(item, state->color_index);
+    int display_color = state->selected ? COLOR_INDEX_GOLDEN : (state->ownership == 1 ? COLOR_INDEX_GREEN : COLOR_INDEX_RED);
+    m_pListCtrlTranponders->SetItemImage(item, display_color);
 
     // item.SetColumn(tlIDENT);
     wxString sid;
@@ -1135,7 +1181,7 @@ void RopelessDialog::UpdateTransponderInfo(transponder_state *state) {
     m_infoSerialNumberText->SetLabel(wxString::Format(_("Serial Number: %u"), getSerialNumber(state->markID)));
     m_infoOwnershipText->SetLabel(wxString::Format(_("Ownership: %d"), state->ownership));
     m_infoTrawlIdText->SetLabel(wxString::Format(_("Trawl ID: %d"), state->trawl_id));
-    m_infoMarkTypeText->SetLabel(wxString::Format(_("Mark Type: %d"), state->mark_type));
+    m_infoMarkTypeText->SetLabel(wxString::Format(_("Mark Type: %s"), markTypeNames[state->mark_type]));
     
     // Update Status tab
     wxString releaseStatus = "";
@@ -1167,10 +1213,10 @@ void RopelessDialog::UpdateTransponderInfo(transponder_state *state) {
     // Update Position tab
     m_positionLatText->SetLabel(wxString::Format(_("Latitude: %.6f"), state->predicted_lat));
     m_positionLonText->SetLabel(wxString::Format(_("Longitude: %.6f"), state->predicted_lon));
-    m_positionRangeText->SetLabel(wxString::Format(_("Range: %.1f m"), state->range));
+    m_positionRangeText->SetLabel(wxString::Format(_("Range: %.1f m"), state->slant_range));
     m_positionBearingText->SetLabel(wxString::Format(_("Bearing: %.1f°"), state->bearing));
     m_positionDepthText->SetLabel(wxString::Format(_("Depth: %.1f m"), state->depth));
-    m_positionTempText->SetLabel(wxString::Format(_("Temperature: %.1f°C"), state->temp));
+    m_positionTempText->SetLabel(wxString::Format(_("Temperature: %.1f°C"), state->seafloor_temp));
   }
   
   // Refresh the panels to show updated text
@@ -1245,7 +1291,18 @@ void RopelessDialog::clearHighlighted() {
   if (numItems > 0) {
     transponder_state *state = getXpdrFromIndex(selectedItems[0]);
 
-    state->color_index = pParentPi->GetColorIndexForTransponder(state);
+    state->selected = false;
+
+    // Change color of item in list immediately back to unselected
+    wxListItem listItem;
+    listItem.SetId(selectedItems[0]);
+    listItem.SetColumn(tlICON);
+    int display_color = (state->ownership == 1 ? COLOR_INDEX_GREEN : COLOR_INDEX_RED);  // Unselected color
+    m_pListCtrlTranponders->SetItemImage(listItem, display_color);
+
+    // Force table refresh to update colors immediately
+    // m_pListCtrlTranponders->Refresh();
+    // m_pListCtrlTranponders->Update();
   }
 }
 
@@ -1265,15 +1322,14 @@ void RopelessDialog::OnClose(wxCloseEvent &event) {
   clearHighlighted();
 
 #ifndef __ANDROID__
-  // TODO: Fix this later
-  // Comment out size/position saving to let dialog always size to fit content
-  // wxPoint p = GetPosition();
-  // pParentPi->m_dialogPosX = p.x;
-  // pParentPi->m_dialogPosY = p.y;
-  // wxSize s = GetSize();
-  // pParentPi->m_dialogSizeWidth = s.x;
-  // pParentPi->m_dialogSizeHeight = s.y;
-  // wxLogMessage("RopelessDialog: Position/size saved");
+  // Save position and size for next dialog opening
+  wxPoint p = GetPosition();
+  pParentPi->m_dialogPosX = p.x;
+  pParentPi->m_dialogPosY = p.y;
+  wxSize s = GetSize();
+  pParentPi->m_dialogSizeWidth = s.x;
+  pParentPi->m_dialogSizeHeight = s.y;
+  wxLogMessage("RopelessDialog: Position/size saved - pos(%d,%d) size(%d,%d)", p.x, p.y, s.x, s.y);
 #endif
   
   Destroy();

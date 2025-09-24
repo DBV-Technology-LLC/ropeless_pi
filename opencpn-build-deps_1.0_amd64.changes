@@ -1,5 +1,5 @@
 Format: 1.8
-Date: Fri, 12 Sep 2025 10:09:54 -0400
+Date: Wed, 24 Sep 2025 15:36:43 -0400
 Source: opencpn-build-deps
 Binary: opencpn-build-deps
 Built-For-Profiles: noudeb
@@ -16,11 +16,11 @@ Changes:
  .
    * First version
 Checksums-Sha1:
- c61adafeffc8c6457800918dcc7895a5bd94d6ef 2296 opencpn-build-deps_1.0_all.deb
- e35104141092a049b4371590262d5976c19b1e60 5796 opencpn-build-deps_1.0_amd64.buildinfo
+ 0f506f9097c3b313d13e4bf2bb46ff4ea1c955a3 2302 opencpn-build-deps_1.0_all.deb
+ 06111d7f0e217009e4023d578eead710ed97b746 5796 opencpn-build-deps_1.0_amd64.buildinfo
 Checksums-Sha256:
- 3170fa8e585914358123ee935f92137a1375aea5a6d913c1a7e0d5a1adb614d0 2296 opencpn-build-deps_1.0_all.deb
- e269a8b41bdcf387678461ee5cfaa56d2093090a7b9bdf9fd05a16c259331849 5796 opencpn-build-deps_1.0_amd64.buildinfo
+ 2bc4ecbb5abac1c5e6fd48d9852e968908cadfbda4a34daa3982d9d5110605a3 2302 opencpn-build-deps_1.0_all.deb
+ d80a967cc03d9e1269c3dceae0370e4fc06284f1a37e165236d4797bba00ac59 5796 opencpn-build-deps_1.0_amd64.buildinfo
 Files:
- 5391c32578ff607e4e4997f31ffdb1ce 2296 devel optional opencpn-build-deps_1.0_all.deb
- 41104eba3fc337ab9221afa5d8a34410 5796 devel optional opencpn-build-deps_1.0_amd64.buildinfo
+ 73d2b33a4f291496f0779d6ed04de201 2302 devel optional opencpn-build-deps_1.0_all.deb
+ 895bbff382f09075598e7177034853e1 5796 devel optional opencpn-build-deps_1.0_amd64.buildinfo

@@ -348,16 +348,11 @@ void manualPlacementDlgImpl::AddDeviceTypeControl() {
                                                     wxDefaultPosition, wxSize(100, -1), 0);
     deviceTypeSizer->Add(deviceTypeLabel, 0, wxALL | wxALIGN_CENTER_VERTICAL, 5);
     
-    // Create the dropdown with manufacturer options
+    // Create the dropdown with manufacturer options using centralized table
     wxArrayString choices;
-    choices.Add(_("0x00 - Ropeless Systems Inc."));
-    choices.Add(_("0x01 - Desert Star Systems"));
-    choices.Add(_("0x02 - EdgeTech"));
-    choices.Add(_("0x03 - Benthos"));
-    choices.Add(_("0x04 - SubSea Sonics"));
-    choices.Add(_("0x05 - Teledyne Marine"));
-    choices.Add(_("0x10 - Ashored Innovations"));
-    choices.Add(_("0xFF - Ephemeral"));
+    for (int i = 0; i < manufacturerTableSize; i++) {
+        choices.Add(_(manufacturerTable[i].displayName));
+    }
 
     m_choiceDeviceType = new wxChoice(this, wxID_ANY, wxDefaultPosition,
                                      wxSize(200, -1), choices);
@@ -517,17 +512,11 @@ void manualPlacementDlgImpl::OnTrawlSelectionChanged(wxCommandEvent& event) {
 }
 
 uint8_t manualPlacementDlgImpl::GetMfgCodeFromSelection(int selection) {
-	switch (selection) {
-		case 0: return 0x00; // Ropeless Systems Inc.
-		case 1: return 0x01; // Desert Star Systems
-		case 2: return 0x02; // EdgeTech
-		case 3: return 0x03; // Benthos
-		case 4: return 0x04; // SubSea Sonics
-		case 5: return 0x05; // Teledyne Marine
-		case 6: return 0x10; // Ashored Innovations
-		case 7: return 0xFF; // Ephemeral
-		default: return 0x01; // Default to Desert Star Systems
+	// Use centralized manufacturer lookup table
+	if (selection >= 0 && selection < manufacturerTableSize) {
+		return manufacturerTable[selection].code;
 	}
+	return 0x01; // Default to Desert Star Systems
 }
 
 void manualPlacementDlgImpl::UpdateTrawlPosControl() {
