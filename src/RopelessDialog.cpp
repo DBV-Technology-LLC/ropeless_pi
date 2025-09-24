@@ -110,16 +110,15 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
   wxBoxSizer *bSizer2 = new wxBoxSizer(wxHORIZONTAL);
 
   // Create main content sizer (left side)
-  wxBoxSizer *mainContentSizer = new wxBoxSizer(wxVERTICAL);
+  wxStaticBoxSizer *mainContentSizer = new wxStaticBoxSizer(
+      new wxStaticBox(this, wxID_ANY, _("Transponder List")), wxVERTICAL);
   
   long flags = wxLC_REPORT | wxLC_SINGLE_SEL | wxLC_HRULES | wxLC_VRULES |
                wxBORDER_SUNKEN;
-
-  // long flags = wxLC_REPORT | wxLC_HRULES | wxLC_VRULES | wxBORDER_SUNKEN;
-
+  
   m_pListCtrlTranponders = new OCPNListCtrl(
       this, ID_TRANSPONDER_LIST, wxDefaultPosition, wxDefaultSize, flags);
-  mainContentSizer->Add(m_pListCtrlTranponders, 1, wxEXPAND | wxALL, 0);
+  mainContentSizer->Add(m_pListCtrlTranponders, 1, wxEXPAND | wxALL, 5);
 
 #ifdef __ANDROID__
   wxFont *pFont = OCPNGetFont(_T("Dialog"), 0);
@@ -158,8 +157,11 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
   int dx = GetCharWidth();
 
   wxSize txs = GetTextExtent("Color");
+  // Use image size + padding for column width to better center the color squares
+  int imageRefSize = dx * 2;
+  int colorColumnWidth = wxMax(imageRefSize + dx, txs.x + dx);
   m_pListCtrlTranponders->InsertColumn(tlICON, _("Color"), wxLIST_FORMAT_CENTER,
-                                       txs.x + dx * 2);
+                                       colorColumnWidth);
 
   txs = GetTextExtent("Serial Number");
   m_pListCtrlTranponders->InsertColumn(tlIDENT, _("Serial Number"), wxLIST_FORMAT_CENTER,
@@ -173,38 +175,17 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
   m_pListCtrlTranponders->InsertColumn(tlTIMESTAMP, _("Last Report"),
                                        wxLIST_FORMAT_CENTER, txs.x + dx * 2);
 
-  // txs = GetTextExtent("Range, M");
-  // m_pListCtrlTranponders->InsertColumn(tlRANGE, _("Range, M"),
-  //                                     wxLIST_FORMAT_CENTER, txs.x + dx * 2);
-
 #ifdef SHOW_DISTANCE
   txs = GetTextExtent("Distance, M");
   m_pListCtrlTranponders->InsertColumn(tlDISTANCE, _("Distance, M"),
                                        wxLIST_FORMAT_CENTER, txs.x + dx * 2);
 #endif
 
-  // txs = GetTextExtent("Pings");
-  // m_pListCtrlTranponders->InsertColumn(tlPINGS, _("Pings"),
-  //                                      wxLIST_FORMAT_CENTER, txs.x + dx * 2);
-
-  // txs = GetTextExtent("Depth, M");
-  // m_pListCtrlTranponders->InsertColumn(tlDEPTH, _("Depth, M"),
-  //                                      wxLIST_FORMAT_CENTER, txs.x + dx * 2);
-
-  // txs = GetTextExtent("Temperature, C");
-  // m_pListCtrlTranponders->InsertColumn(tlTEMP, _("Temperature, C"),
-  //                                      wxLIST_FORMAT_CENTER, txs.x + dx * 2);
-
-  // txs = GetTextExtent("Battery %");
-  // m_pListCtrlTranponders->InsertColumn(tlBATT_STAT, _("Battery %"),
-  //                                      wxLIST_FORMAT_CENTER, txs.x + dx * 2);
-
   txs = GetTextExtent("Recovered Status");
   m_pListCtrlTranponders->InsertColumn(tlRECOVERED, _("Recovered Status"),
                                        wxLIST_FORMAT_CENTER, txs.x + dx * 2);
 
   // Build the color indicator bitmaps, adding to an image lst
-  int imageRefSize = dx * 2;
   wxImageList *imglist = new wxImageList(imageRefSize, imageRefSize, true, 1);
 
   for (int i = 0; i < COLOR_TABLE_COUNT; i++) {
@@ -240,8 +221,58 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
 
   m_pListCtrlTranponders->AssignImageList(imglist, wxIMAGE_LIST_SMALL);
 
-  // Add main content to horizontal sizer - let sidebar drive the height
-  bSizer2->Add(mainContentSizer, 1, wxEXPAND | wxALL, 0);
+  // Create Trawl List box below the Transponder List
+  wxStaticBoxSizer *trawlListSizer = new wxStaticBoxSizer(
+      new wxStaticBox(this, wxID_ANY, _("Trawl List")), wxVERTICAL);
+
+  // Create horizontal sizer for trawl content
+  wxBoxSizer *trawlContentSizer = new wxBoxSizer(wxHORIZONTAL);
+
+  // Left side: Trawl selection and info
+  wxBoxSizer *trawlLeftSizer = new wxBoxSizer(wxVERTICAL);
+
+  // Trawl dropdown
+  wxStaticText *trawlSelectLabel = new wxStaticText(this, wxID_ANY, _("Select Trawl:"));
+  trawlLeftSizer->Add(trawlSelectLabel, 0, wxALL, 2);
+
+  m_trawlChoice = new wxChoice(this, wxID_ANY);
+  m_trawlChoice->Append(_("None Selected"));
+  m_trawlChoice->SetSelection(0);
+  trawlLeftSizer->Add(m_trawlChoice, 0, wxEXPAND | wxALL, 2);
+
+  // Trawl info display
+  m_trawlInfoText = new wxStaticText(this, wxID_ANY, _("Trawl Info: ---"));
+  trawlLeftSizer->Add(m_trawlInfoText, 0, wxALL, 2);
+
+  // Delete Trawl button
+  m_deleteTrawlButton = new wxButton(this, wxID_ANY, _("Delete Trawl"), wxDefaultPosition, wxDefaultSize, 0);
+  trawlLeftSizer->Add(m_deleteTrawlButton, 0, wxEXPAND | wxALL, 2);
+
+  trawlContentSizer->Add(trawlLeftSizer, 0, wxEXPAND | wxALL, 5);
+
+  // Right side: Transponders in trawl table
+  m_trawlTranspondersListCtrl = new OCPNListCtrl(
+      this, wxID_ANY, wxDefaultPosition, wxDefaultSize,
+      wxLC_REPORT | wxLC_SINGLE_SEL | wxLC_HRULES | wxLC_VRULES | wxBORDER_SUNKEN);
+
+  // Add columns for trawl transponders
+  wxSize trawlTxs = GetTextExtent("Serial Number");
+  m_trawlTranspondersListCtrl->InsertColumn(0, _("Serial Number"), wxLIST_FORMAT_CENTER, trawlTxs.x + dx * 2);
+
+  trawlTxs = GetTextExtent("Status");
+  m_trawlTranspondersListCtrl->InsertColumn(1, _("Status"), wxLIST_FORMAT_CENTER, trawlTxs.x + dx * 2);
+
+  trawlContentSizer->Add(m_trawlTranspondersListCtrl, 1, wxEXPAND | wxALL, 5);
+
+  trawlListSizer->Add(trawlContentSizer, 1, wxEXPAND, 0);
+
+  // Create a vertical sizer to hold both transponder and trawl lists
+  wxBoxSizer *leftColumnSizer = new wxBoxSizer(wxVERTICAL);
+  leftColumnSizer->Add(mainContentSizer, 1, wxEXPAND | wxALL, 0);
+  leftColumnSizer->Add(trawlListSizer, 0, wxEXPAND | wxALL, 5);
+
+  // Add left column to horizontal sizer - let sidebar drive the height
+  bSizer2->Add(leftColumnSizer, 1, wxEXPAND | wxALL, 5);
   
   // Create sidebar (right side)
   wxBoxSizer *sidebarSizer = new wxBoxSizer(wxVERTICAL);
@@ -438,8 +469,6 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
   
   sidebarSizer->Add(m_releaseStatusSizer, 0, wxEXPAND | wxALL, 5);
   
-  // Add sidebar to main horizontal sizer with proper scaling
-  // Add sidebar without any size constraints
   bSizer2->Add(sidebarSizer, 0, wxEXPAND | wxALL, 5);
   
   // Add table/sidebar combo to main dialog - let it expand as needed
@@ -914,30 +943,6 @@ void RopelessDialog::RefreshTransponderList() {
     m_pListCtrlTranponders->SetColumnWidth(tlTIMESTAMP,
                                            wxLIST_AUTOSIZE_USEHEADER);
 
-    // item.SetColumn(tlDEPTH);
-    // wxString sdp;
-    // sdp.Printf("%g", state->depth);
-    // item.SetText(sdp);
-    // m_pListCtrlTranponders->SetItem(item);
-    // m_pListCtrlTranponders->SetItem(result, tlDEPTH, sdp);
-    // m_pListCtrlTranponders->SetColumnWidth(tlDEPTH, wxLIST_AUTOSIZE_USEHEADER);
-
-    // item.SetColumn(tlTEMP);
-    // wxString stemp;
-    // stemp.Printf("%g", state->temp);
-    // item.SetText(stemp);
-    // m_pListCtrlTranponders->SetItem(item);
-    // m_pListCtrlTranponders->SetItem(result, tlTEMP, stemp);
-    // m_pListCtrlTranponders->SetColumnWidth(tlTEMP, wxLIST_AUTOSIZE_USEHEADER);
-
-    // item.SetColumn(tlPINGS);
-    // wxString sping;
-    // sping.Printf("%d", state->pings);
-    // item.SetText(sping);
-    // m_pListCtrlTranponders->SetItem(item);
-    // m_pListCtrlTranponders->SetItem(result, tlPINGS, sping);
-    // m_pListCtrlTranponders->SetColumnWidth(tlPINGS, wxLIST_AUTOSIZE_USEHEADER);
-
 #ifdef SHOW_DISTANCE
     // item.SetColumn(tlDISTANCE);
     wxString sdist;
@@ -965,23 +970,6 @@ void RopelessDialog::RefreshTransponderList() {
     m_pListCtrlTranponders->SetColumnWidth(tlRECOVERED,
                                            wxLIST_AUTOSIZE_USEHEADER);
 
-    // item.SetColumn(tlRANGE);
-    // wxString srng;
-    // srng.Printf("%g", state->range);
-    // item.SetText(sdist);
-    // m_pListCtrlTranponders->SetItem(item);
-    // m_pListCtrlTranponders->SetItem(result, tlRANGE, srng);
-    // m_pListCtrlTranponders->SetColumnWidth(tlRANGE,
-    //                                        wxLIST_AUTOSIZE_USEHEADER);
-
-    // item.SetColumn(tlBATT_STAT);
-    // wxString sbatt;
-    // sbatt.Printf("%d", state->batt_stat);
-    // item.SetText(sdist);
-    // m_pListCtrlTranponders->SetItem(item);
-    // m_pListCtrlTranponders->SetItem(result, tlBATT_STAT, sbatt);
-    // m_pListCtrlTranponders->SetColumnWidth(tlBATT_STAT,
-    //                                        wxLIST_AUTOSIZE_USEHEADER);
   }
 
   if (g_RopelessTargetList_sortColumn > 0)

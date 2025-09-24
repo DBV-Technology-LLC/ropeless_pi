@@ -42,6 +42,7 @@ manualPlacementDlgImpl::manualPlacementDlgImpl(wxWindow* parent, int id, const w
 	positionSource = ePOS_SOURCE_USER; // Default to user
 	deviceType = 0; // Default to Ropeless Systems Inc. (0x00)
 	selectedTrawlId = 0; // Default to "None"
+	trawlPosition = 0; // Default to 0
 
 	wxLogMessage("Creating Manual Placement Dialog! @ %s",utcStr);
 
@@ -116,9 +117,20 @@ manualPlacementDlgImpl::manualPlacementDlgImpl(wxWindow* parent, int id, const w
 		// Store the original markID for updating
 		markID = existingState->markID;
 
+		// Set trawl position if available
+		if (existingState->trawl_position > 0) {
+			trawlPosition = existingState->trawl_position;
+			if (m_spinCtrlTrawlPos) {
+				m_spinCtrlTrawlPos->SetValue(trawlPosition);
+			}
+		}
+
 		wxLogMessage("Editing transponder: ID=%u, serial=%u, mfg=0x%02X, owned=%s",
 		             existingState->markID, serial_num, mfg_code, isOwned ? "true" : "false");
 	}
+
+	// Initialize the trawl position control based on current selection
+	UpdateTrawlPosControl();
 
 }
 
@@ -216,6 +228,15 @@ void manualPlacementDlgImpl::okPlaceTransponder(wxCommandEvent& event)
 		             deviceType, deviceTypeName, selected_mfg_code);
 	} else {
 		wxLogMessage("Manual placement dialog: WARNING - m_choiceDeviceType is NULL");
+	}
+
+	// Get trawl position value
+	if (m_spinCtrlTrawlPos) {
+		trawlPosition = m_spinCtrlTrawlPos->GetValue();
+		wxLogMessage("Manual placement dialog: Trawl position = %d", trawlPosition);
+	} else {
+		wxLogMessage("Manual placement dialog: WARNING - m_spinCtrlTrawlPos is NULL");
+		trawlPosition = 0;
 	}
 
     EndModal(wxID_OK);
@@ -412,10 +433,38 @@ void manualPlacementDlgImpl::AddTrawlSelectionControl() {
     }
     
     // Connect the event handler
-    m_choiceTrawlId->Connect(wxEVT_COMMAND_CHOICE_SELECTED, 
-                            wxCommandEventHandler(manualPlacementDlgImpl::OnTrawlSelectionChanged), 
+    m_choiceTrawlId->Connect(wxEVT_COMMAND_CHOICE_SELECTED,
+                            wxCommandEventHandler(manualPlacementDlgImpl::OnTrawlSelectionChanged),
                             NULL, this);
-    
+
+    // Add Trawl Pos field below Trawl ID
+    wxBoxSizer* trawlPosSizer = new wxBoxSizer(wxHORIZONTAL);
+
+    // Add label
+    wxStaticText* trawlPosLabel = new wxStaticText(this, wxID_ANY, _("Trawl Pos:"),
+                                                  wxDefaultPosition, wxSize(100, -1), 0);
+    trawlPosSizer->Add(trawlPosLabel, 0, wxALL | wxALIGN_CENTER_VERTICAL, 5);
+
+    // Create spin control for trawl position (min 1, max 999, initial 0 - will be set later)
+    m_spinCtrlTrawlPos = new wxSpinCtrl(this, wxID_ANY, wxEmptyString,
+                                       wxDefaultPosition, wxSize(120, -1),
+                                       wxSP_ARROW_KEYS, 1, 999, 0);
+    m_spinCtrlTrawlPos->Enable(false); // Initially disabled since "None" is selected by default
+    trawlPosSizer->Add(m_spinCtrlTrawlPos, 0, wxALL, 5);
+
+    // Add spacer to right-align
+    trawlPosSizer->AddStretchSpacer(1);
+
+    // Insert the trawl pos sizer right after the trawl sizer
+    size_t currentSizerCount = mainSizer->GetItemCount();
+    if (currentSizerCount > 0) {
+        // Insert before the last item (which should be the buttons)
+        mainSizer->Insert(currentSizerCount - 1, trawlPosSizer, 0, wxEXPAND | wxALL, 5);
+    } else {
+        // Fallback: just add it
+        mainSizer->Add(trawlPosSizer, 0, wxEXPAND | wxALL, 5);
+    }
+
     // Refresh the layout
     this->Layout();
     this->Fit();
@@ -448,10 +497,10 @@ void manualPlacementDlgImpl::PopulateTrawlDropdown() {
 void manualPlacementDlgImpl::OnTrawlSelectionChanged(wxCommandEvent& event) {
     int selection = m_choiceTrawlId->GetSelection();
     if (selection == wxNOT_FOUND) return;
-    
+
     void* clientData = m_choiceTrawlId->GetClientData(selection);
     selectedTrawlId = reinterpret_cast<intptr_t>(clientData);
-    
+
     wxString selectionText;
     if (selectedTrawlId == 0) {
         selectionText = "None";
@@ -460,8 +509,11 @@ void manualPlacementDlgImpl::OnTrawlSelectionChanged(wxCommandEvent& event) {
     } else {
         selectionText = wxString::Format("Trawl %d", selectedTrawlId);
     }
-    
+
     wxLogMessage("Trawl selection changed to: %s (ID: %d)", selectionText, selectedTrawlId);
+
+    // Update the trawl position control based on selection
+    UpdateTrawlPosControl();
 }
 
 uint8_t manualPlacementDlgImpl::GetMfgCodeFromSelection(int selection) {
@@ -476,6 +528,46 @@ uint8_t manualPlacementDlgImpl::GetMfgCodeFromSelection(int selection) {
 		case 7: return 0xFF; // Ephemeral
 		default: return 0x01; // Default to Desert Star Systems
 	}
+}
+
+void manualPlacementDlgImpl::UpdateTrawlPosControl() {
+    if (!m_spinCtrlTrawlPos) return;
+
+    if (selectedTrawlId == 0) {
+        // "None" selected - grey out the control
+        m_spinCtrlTrawlPos->Enable(false);
+        m_spinCtrlTrawlPos->SetValue(0);
+    } else if (selectedTrawlId == -1) {
+        // "New" selected - enable and set to 1
+        m_spinCtrlTrawlPos->Enable(true);
+        m_spinCtrlTrawlPos->SetValue(1);
+    } else {
+        // Existing trawl selected - enable and set to length + 1
+        m_spinCtrlTrawlPos->Enable(true);
+
+        // Find the trawl and get its current length (count of transponders)
+        extern std::vector<trawl_tracker *> trawlList;
+        int trawlLength = 0;
+
+        for (auto* trawl : trawlList) {
+            if (trawl && trawl->trawl_id == selectedTrawlId) {
+                // Count transponders in this trawl
+                extern std::vector<transponder_state *> transponderStatus;
+                for (auto* state : transponderStatus) {
+                    if (state && state->assigned_trawl_id == selectedTrawlId) {
+                        trawlLength++;
+                    }
+                }
+                break;
+            }
+        }
+
+        // Set value to length + 1 (next position in trawl)
+        m_spinCtrlTrawlPos->SetValue(trawlLength + 1);
+
+        wxLogMessage("Updated trawl pos control: Trawl %d has %d transponders, setting pos to %d",
+                     selectedTrawlId, trawlLength, trawlLength + 1);
+    }
 }
 
 void manualPlacementDlgImpl::ReorganizeLayout() {

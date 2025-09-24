@@ -28,6 +28,8 @@
 
 #include "manualPlacementDlg.h"
 #include <wx/choice.h>
+#include <wx/textctrl.h>
+#include <wx/spinctrl.h>
 
 // Forward declaration
 struct transponder_state;
@@ -45,6 +47,7 @@ class manualPlacementDlgImpl : public manualPlacementDlg {
         void OnDeviceTypeChanged(wxCommandEvent& event);
         void AddTrawlSelectionControl();
         void OnTrawlSelectionChanged(wxCommandEvent& event);
+        void UpdateTrawlPosControl();
         void PopulateTrawlDropdown();
         void ReorganizeLayout();
         uint8_t GetMfgCodeFromSelection(int selection);
@@ -60,6 +63,7 @@ class manualPlacementDlgImpl : public manualPlacementDlg {
         int markID;
         int pairId;             // Keep for backward compatibility
         int selectedTrawlId;    // Selected trawl ID from dropdown
+        int trawlPosition;      // Trawl position value
         bool valid;
         int positionSource;
         int deviceType;
@@ -72,6 +76,9 @@ class manualPlacementDlgImpl : public manualPlacementDlg {
         
         // Trawl selection dropdown control
         wxChoice* m_choiceTrawlId;
+
+        // Trawl position spin control
+        wxSpinCtrl* m_spinCtrlTrawlPos;
         
     protected:
 

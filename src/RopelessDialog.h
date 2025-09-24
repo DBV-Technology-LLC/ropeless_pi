@@ -37,6 +37,7 @@
 #include <wx/dialog.h>
 #include <wx/listctrl.h>
 #include <wx/combobox.h>
+#include <wx/choice.h>
 #include <wx/textctrl.h>
 #include <wx/button.h>
 #include <wx/stattext.h>
@@ -112,7 +113,13 @@ public:
 
   ropeless_pi *pParentPi;
   OCPNListCtrl *m_pListCtrlTranponders;
-  
+
+  // Trawl list controls
+  wxChoice *m_trawlChoice;
+  wxStaticText *m_trawlInfoText;
+  wxButton *m_deleteTrawlButton;
+  OCPNListCtrl *m_trawlTranspondersListCtrl;
+
   // Selected transponder tracking
   transponder_state *m_selectedTransponder;
   

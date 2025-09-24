@@ -377,7 +377,7 @@ int ropeless_pi::Init(void) {
   //     m_pTrackRolloverWin->IsActive( true );
 
   SetOwner(this, TIMER_THIS_PI);
-  Start(1000, wxTIMER_CONTINUOUS);
+  Start(100, wxTIMER_CONTINUOUS);
 
 #ifdef SHOW_DISTANCE
   startDistanceTimer();
