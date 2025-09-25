@@ -1550,9 +1550,6 @@ void ropeless_pi::LoadTransponderStatus() {
       return;
     }
 
-    // Re-generate the trawl list from the transponder info
-    RegenerateTrawlListFromTransponders();
-
   }
 
   pugi::xml_node statusRoot = transponderStatusXML.first_child();
@@ -1583,6 +1580,9 @@ void ropeless_pi::LoadTransponderStatus() {
                    state->markID, state->mfg_code, state->serial_num);
     }
   }
+
+  // Re-generate the trawl list from the loaded transponder info
+  RegenerateTrawlListFromTransponders();
 }
 
 void ropeless_pi::RegenerateTrawlListFromTransponders() {
@@ -1832,9 +1832,9 @@ void ropeless_pi::RenderTrawlConnector(transponder_state *state1,
 
   // TODO: Check if both transponders are recovered. Set trawl connector opacity too
 
-  wxColour rcolour = wxTheColourDatabase->Find(wxString("BLACK"));
-  wxPen dpen(rcolour, 3);
-  wxBrush dbrush(rcolour);
+  // Set black pen for trawl connectors
+  wxPen blackPen(wxColour(0, 0, 0), 2);  // Black pen with 2 pixel width
+  m_oDC->SetPen(blackPen);
 
   m_oDC->DrawLine(P1.x, P1.y, P2.x, P2.y, true);
 }
@@ -2870,6 +2870,42 @@ bool ropeless_pi::MouseEventHook(wxMouseEvent &event) {
       transponderIDString.Printf("ID: %d", transponderFoundID);
       id_item = new wxMenuItem(contextMenu, ID_TPR_ID, _(transponderIDString));
 
+      // Add Manufacturer field
+      wxMenuItem *manuf_item = 0;
+      wxString manufString;
+      manufString.Printf("Manuf: %s", m_foundState->mfg_str);
+      manuf_item = new wxMenuItem(contextMenu, wxID_ANY, _(manufString));
+      manuf_item->Enable(false); // Make it non-clickable
+
+      // Add Serial Number field
+      wxMenuItem *sn_item = 0;
+      wxString snString;
+      snString.Printf("SN: %d", m_foundState->serial_num);
+      sn_item = new wxMenuItem(contextMenu, wxID_ANY, _(snString));
+      sn_item->Enable(false); // Make it non-clickable
+
+      // Add Trawl ID field
+      wxMenuItem *trawl_id_item = 0;
+      wxString trawlIdString;
+      if (m_foundState->trawl_id > 0) {
+        trawlIdString.Printf("Trawl ID: %d", m_foundState->trawl_id);
+      } else {
+        trawlIdString = "Trawl ID: None";
+      }
+      trawl_id_item = new wxMenuItem(contextMenu, wxID_ANY, _(trawlIdString));
+      trawl_id_item->Enable(false); // Make it non-clickable
+
+      // Add Trawl Position field
+      wxMenuItem *trawl_pos_item = 0;
+      wxString trawlPosString;
+      if (m_foundState->trawl_num >= 0) {
+        trawlPosString.Printf("Trawl Pos: %d", m_foundState->trawl_num);
+      } else {
+        trawlPosString = "Trawl Pos: None";
+      }
+      trawl_pos_item = new wxMenuItem(contextMenu, wxID_ANY, _(trawlPosString));
+      trawl_pos_item->Enable(false); // Make it non-clickable
+
       wxMenuItem *release_item = 0;
       release_item = new wxMenuItem(contextMenu, ID_TPR_RELEASE, _("Release Transponder"));
 
@@ -2897,8 +2933,11 @@ bool ropeless_pi::MouseEventHook(wxMouseEvent &event) {
       wxMenuItem *delete_item = 0;
       delete_item = new wxMenuItem(contextMenu, ID_TPR_DELETE, _("Delete Transponder") );
 
+      // Only create edit item for USER transponders (position_source == ePOS_SOURCE_USER)
       wxMenuItem *edit_item = 0;
-      edit_item = new wxMenuItem(contextMenu, ID_TPR_EDIT, _("Edit Transponder") );
+      if (m_foundState->position_source == ePOS_SOURCE_USER) {
+        edit_item = new wxMenuItem(contextMenu, ID_TPR_EDIT, _("Edit Transponder"));
+      }
 
       // wxMenuItem *release_item = 0;
       // release_item = new wxMenuItem(contextMenu, ID_TPR_RELEASE, _("Info") );
@@ -2907,10 +2946,19 @@ bool ropeless_pi::MouseEventHook(wxMouseEvent &event) {
       wxFont *pFont = OCPNGetFont(_T("Dialog"), 0);
       release_item->SetFont(*pFont);
       id_item->SetFont(*pFont);
-      edit_item->SetFont(*pFont);
+      manuf_item->SetFont(*pFont);
+      sn_item->SetFont(*pFont);
+      trawl_id_item->SetFont(*pFont);
+      trawl_pos_item->SetFont(*pFont);
+      if (edit_item) edit_item->SetFont(*pFont);
 #endif
 
       contextMenu->Append(id_item);
+      contextMenu->Append(manuf_item);
+      contextMenu->Append(sn_item);
+      contextMenu->Append(trawl_id_item);
+      contextMenu->Append(trawl_pos_item);
+      contextMenu->AppendSeparator();
       contextMenu->Append(release_item);
 
       if (m_foundState->markID > 0)
@@ -2919,7 +2967,11 @@ bool ropeless_pi::MouseEventHook(wxMouseEvent &event) {
       }
 
       contextMenu->Append(delete_item);
-      contextMenu->Append(edit_item);
+
+      // Only append edit item for USER transponders
+      if (edit_item) {
+        contextMenu->Append(edit_item);
+      }
 
       GetOCPNCanvasWindow()->Connect(
           ID_TPR_RELEASE, wxEVT_COMMAND_MENU_SELECTED,
@@ -2933,9 +2985,12 @@ bool ropeless_pi::MouseEventHook(wxMouseEvent &event) {
           ID_TPR_DELETE, wxEVT_COMMAND_MENU_SELECTED,
           wxCommandEventHandler(ropeless_pi::PopupMenuHandler), NULL, this);
 
-      GetOCPNCanvasWindow()->Connect(
-          ID_TPR_EDIT, wxEVT_COMMAND_MENU_SELECTED,
-          wxCommandEventHandler(ropeless_pi::PopupMenuHandler), NULL, this);
+      // Only connect edit event handler if edit item exists
+      if (edit_item) {
+        GetOCPNCanvasWindow()->Connect(
+            ID_TPR_EDIT, wxEVT_COMMAND_MENU_SELECTED,
+            wxCommandEventHandler(ropeless_pi::PopupMenuHandler), NULL, this);
+      }
 
       wxLogMessage("Creating popup!");
 
@@ -2959,6 +3014,13 @@ bool ropeless_pi::MouseEventHook(wxMouseEvent &event) {
       {
         GetOCPNCanvasWindow()->Disconnect(
             ID_TPR_DELETE, wxEVT_COMMAND_MENU_SELECTED,
+            wxCommandEventHandler(ropeless_pi::PopupMenuHandler), NULL, this);
+      }
+
+      // Disconnect edit event handler if it was connected
+      if (edit_item) {
+        GetOCPNCanvasWindow()->Disconnect(
+            ID_TPR_EDIT, wxEVT_COMMAND_MENU_SELECTED,
             wxCommandEventHandler(ropeless_pi::PopupMenuHandler), NULL, this);
       }
 

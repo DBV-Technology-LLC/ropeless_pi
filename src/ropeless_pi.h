@@ -172,6 +172,7 @@ const wxString releaseStatusNames[] = {"TIMEOUT", "SENDING...", "RELEASED", "NOT
 const wxString recoveredStrList[] = {"DEPLOYED","RECOVERED"};
 const wxString positionSourceNames[] = {"USER", "CLOUD", "ACOUSTIC", "GPS"};
 const wxString markTypeNames[] = {"Acoustic", "Timer", "Galvanic", "Other", "Surface Fixed", "Surface Drift"};
+const wxString ownershipStrList[] = {"Non-Owned","Owned"};
 
 // Manufacturer lookup table structure
 struct ManufacturerInfo {

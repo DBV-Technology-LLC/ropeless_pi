@@ -3,10 +3,6 @@ This is a plugin for OpenCPN to support the integration of Ropeless Fishing equi
 
 ## v3.x Features
 
-** TRAWL ID NOT SAVED WITH TRANSPONDER IN XML **
-
-## TODO:
-
 9/24/2025
 [x] - Saving position of Plugin on close
 [x] - Merged old / new transponder fields (range,id etc..)
@@ -14,36 +10,42 @@ This is a plugin for OpenCPN to support the integration of Ropeless Fishing equi
 [x] - Adding hide transponder text to preferences
 [x] - Adding edit transponder to right click on transponder
 [x] - Updating Table Color marking and Transponder color change on select / deselect faster
+[x] - Trawl line back to Black line
+[x] - Draw black dot in center of transponders in trawls. Back x on end of trawls
+[x] - Mark Type enum strings
+[x] - Added trawl pos field to manual placement
 
+9/25/2025
+[x] - Right click to edit transponder on map. ONLY if USER marking
+[x] - Right click on transponder show manuf/sn/trawl_id
+[x] - Ownership: "Owned" / "Non-Owned" in info tab
+[x] - Fixed trawl loading after startup from xml transponders
 
--1. Fix text cutoff in "Transponder Status" Tab?
+## TODO:
 
-0. Right click on transponder show manuf/sn/trawl_id
-
-1. Make sure trawl_id saved with transponder obj
-2. Change trawl line back to black dotted line
-3. Draw black dot in center of transponders in trawls
 4. Keep track of ends of trawls
-5. Draw black X on ends of trawls
-6. Update table / gui more frequently / on select / actions
 8. User trawls assigned trawl_ids descending from 65k
 9. Verify Cloud pos
 10. Cloud trawl_id 
-11. Support trawl_path lat/lon list
-12. add update flag to transponder obj to make rendering faster for non changing transponders ?
-13. Ownership "Owned" / "Non-owned" (red/green)
-14. Mark Type enum strings
-15. Show trawl pos field in manual placement
 16. Show trawl pos in status
 18. Move manual release to bottom near OK. Remove mute?
 19. Set TCP connection default / enable
 20. Fix trawl rendering order by enforcing trawl positions 
 21. Trawl view? Show all trawls as sub table?
-22. Right click to edit transponder on map
 23. Limit trawl length to 32?
-24. Trawl creation time?
 25. Delete trawl by id?
-26. Fix sorting in list
+
+Bugs:
+[] - Fix sorting in LIst
+[] - List scrolls back up every refresh
+
+Maybe Later:
+[] - Support trawl_path lat/lon list
+[] - Add update flag to transponder obj to make rendering faster for non changing transponders ?
+
+Maybe Never:
+[] - Fix text cutoff in "Transponder Status" Tab? -- commented out for now
+[] - Trawl creation time tag -- Can just use creation of earliest transponder. plus would have to save to xml?
 
 Preferences / Defaults
 - Accessibility

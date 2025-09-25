@@ -295,11 +295,11 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
   wxBoxSizer *infoSizer = new wxBoxSizer(wxVERTICAL);
   
   // Info tab content
-  wxStaticText *infoLabel = new wxStaticText(m_infoPanel, wxID_ANY, _("Transponder Information"));
-  wxFont boldFont = infoLabel->GetFont();
-  boldFont.SetWeight(wxFONTWEIGHT_BOLD);
-  infoLabel->SetFont(boldFont);
-  infoSizer->Add(infoLabel, 0, wxALL, 5);
+  // wxStaticText *infoLabel = new wxStaticText(m_infoPanel, wxID_ANY, _("Transponder Information"));
+  // wxFont boldFont = infoLabel->GetFont();
+  // boldFont.SetWeight(wxFONTWEIGHT_BOLD);
+  // infoLabel->SetFont(boldFont);
+  // infoSizer->Add(infoLabel, 0, wxALL, 5);
   
   infoSizer->Add(new wxStaticLine(m_infoPanel), 0, wxEXPAND | wxLEFT | wxRIGHT, 5);
   
@@ -327,27 +327,27 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
   wxBoxSizer *statusSizer = new wxBoxSizer(wxVERTICAL);
   
   // Status tab content
-  wxStaticText *statusLabel = new wxStaticText(m_statusPanel, wxID_ANY, _("Transponder Status"));
-  statusLabel->SetFont(boldFont);
-  statusSizer->Add(statusLabel, 0, wxALL, 5);
+  // wxStaticText *statusLabel = new wxStaticText(m_statusPanel, wxID_ANY, _("Transponder Status"));
+  // statusLabel->SetFont(boldFont);
+  // statusSizer->Add(statusLabel, 0, wxALL, 5);
   
   statusSizer->Add(new wxStaticLine(m_statusPanel), 0, wxEXPAND | wxLEFT | wxRIGHT, 5);
   
-  // Create status display controls with text wrapping support
-  m_statusReleaseText = new wxStaticText(m_statusPanel, wxID_ANY, _("Release Status: ---"), wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_MIDDLE);
-  m_statusRecoveryText = new wxStaticText(m_statusPanel, wxID_ANY, _("Recovery Status: ---"), wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_MIDDLE);
-  m_statusBatteryText = new wxStaticText(m_statusPanel, wxID_ANY, _("Battery: ---%"), wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_MIDDLE);
-  m_statusPingsText = new wxStaticText(m_statusPanel, wxID_ANY, _("Pings: ---"), wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_MIDDLE);
-  m_statusLastReportText = new wxStaticText(m_statusPanel, wxID_ANY, _("Last Report: ---"), wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_MIDDLE);
-  m_statusPositionSourceText = new wxStaticText(m_statusPanel, wxID_ANY, _("Position Source: ---"), wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_MIDDLE);
-  
-  // Add controls and let them size to their content
-  statusSizer->Add(m_statusReleaseText, 0, wxALL, 5);
-  statusSizer->Add(m_statusRecoveryText, 0, wxALL, 5);
-  statusSizer->Add(m_statusBatteryText, 0, wxALL, 5);
-  statusSizer->Add(m_statusPingsText, 0, wxALL, 5);
-  statusSizer->Add(m_statusLastReportText, 0, wxALL, 5);
-  statusSizer->Add(m_statusPositionSourceText, 0, wxALL, 5);
+  // Create status display controls without ellipsize to prevent text cutoff
+  m_statusReleaseText = new wxStaticText(m_statusPanel, wxID_ANY, _("Release Status: ---"));
+  m_statusRecoveryText = new wxStaticText(m_statusPanel, wxID_ANY, _("Recovery Status: ---"));
+  m_statusBatteryText = new wxStaticText(m_statusPanel, wxID_ANY, _("Battery: ---%"));
+  m_statusPingsText = new wxStaticText(m_statusPanel, wxID_ANY, _("Pings: ---"));
+  m_statusLastReportText = new wxStaticText(m_statusPanel, wxID_ANY, _("Last Report: ---"));
+  m_statusPositionSourceText = new wxStaticText(m_statusPanel, wxID_ANY, _("Position Source: ---"));
+
+  // Add controls with EXPAND flag to use full width and prevent cutoff
+  statusSizer->Add(m_statusReleaseText, 0, wxEXPAND | wxALL, 5);
+  statusSizer->Add(m_statusRecoveryText, 0, wxEXPAND | wxALL, 5);
+  statusSizer->Add(m_statusBatteryText, 0, wxEXPAND | wxALL, 5);
+  statusSizer->Add(m_statusPingsText, 0, wxEXPAND | wxALL, 5);
+  statusSizer->Add(m_statusLastReportText, 0, wxEXPAND | wxALL, 5);
+  statusSizer->Add(m_statusPositionSourceText, 0, wxEXPAND | wxALL, 5);
   
   m_statusPanel->SetSizer(statusSizer);
   m_transponderInfoNotebook->AddPage(m_statusPanel, _("Status"), false);
@@ -357,9 +357,9 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
   wxBoxSizer *positionSizer = new wxBoxSizer(wxVERTICAL);
   
   // Position tab content
-  wxStaticText *positionLabel = new wxStaticText(m_positionPanel, wxID_ANY, _("Transponder Position"));
-  positionLabel->SetFont(boldFont);
-  positionSizer->Add(positionLabel, 0, wxALL, 5);
+  // wxStaticText *positionLabel = new wxStaticText(m_positionPanel, wxID_ANY, _("Transponder Position"));
+  // positionLabel->SetFont(boldFont);
+  // positionSizer->Add(positionLabel, 0, wxALL, 5);
   
   positionSizer->Add(new wxStaticLine(m_positionPanel), 0, wxEXPAND | wxLEFT | wxRIGHT, 5);
   
@@ -1179,7 +1179,7 @@ void RopelessDialog::UpdateTransponderInfo(transponder_state *state) {
     m_infoIdText->SetLabel(wxString::Format(_("Mark ID: %u"), state->markID));
     m_infoManufacturerText->SetLabel(wxString::Format(_("Manufacturer: %s"), state->mfg_str));
     m_infoSerialNumberText->SetLabel(wxString::Format(_("Serial Number: %u"), getSerialNumber(state->markID)));
-    m_infoOwnershipText->SetLabel(wxString::Format(_("Ownership: %d"), state->ownership));
+    m_infoOwnershipText->SetLabel(wxString::Format(_("Ownership: %s"), ownershipStrList[state->ownership]));
     m_infoTrawlIdText->SetLabel(wxString::Format(_("Trawl ID: %d"), state->trawl_id));
     m_infoMarkTypeText->SetLabel(wxString::Format(_("Mark Type: %s"), markTypeNames[state->mark_type]));
     
@@ -1219,9 +1219,12 @@ void RopelessDialog::UpdateTransponderInfo(transponder_state *state) {
     m_positionTempText->SetLabel(wxString::Format(_("Temperature: %.1f°C"), state->seafloor_temp));
   }
   
-  // Refresh the panels to show updated text
+  // Refresh the panels to show updated text and recalculate layout
+  m_infoPanel->Layout();
   m_infoPanel->Refresh();
+  m_statusPanel->Layout();
   m_statusPanel->Refresh();
+  m_positionPanel->Layout();
   m_positionPanel->Refresh();
 }
 
