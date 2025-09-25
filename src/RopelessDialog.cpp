@@ -36,6 +36,7 @@
 #include <wx/msgdlg.h>
 #include <wx/notebook.h>
 #include <sstream>
+#include <cmath>
 
 #include "mynumdlg.h"
 #include "myokdlg.h"
@@ -91,6 +92,7 @@ EVT_BUTTON(wxID_OK, RopelessDialog::OnOKClick)
 EVT_BUTTON(wxID_HELP, RopelessDialog::OnHelpClick)
 EVT_CLOSE(RopelessDialog::OnClose)
 EVT_KEY_DOWN(RopelessDialog::OnKeyDown)
+EVT_CHOICE(wxID_ANY, RopelessDialog::OnTrawlChoice)
 END_EVENT_TABLE()
 
 RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
@@ -574,6 +576,9 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
   // Update initial TCP connection status
   UpdateTCPConnectionStatus();
 
+  // Initialize trawl dropdown
+  RefreshTrawlChoice();
+
   m_selectedTransponder = NULL;
 
 }
@@ -874,6 +879,8 @@ void RopelessDialog::OnTargetListColumnClicked(wxListEvent &event) {
   wxListItem item;
   // item.SetMask(wxLIST_MASK_IMAGE);
 
+  wxLogMessage("Column clicked: %d (current sort column: %d)", key, g_RopelessTargetList_sortColumn);
+
   if (key == g_RopelessTargetList_sortColumn)
     g_bRopelessTargetList_sortReverse = !g_bRopelessTargetList_sortReverse;
   else {
@@ -882,6 +889,9 @@ void RopelessDialog::OnTargetListColumnClicked(wxListEvent &event) {
     g_bRopelessTargetList_sortReverse = false;
     g_RopelessTargetList_sortColumn = key;
   }
+
+  wxLogMessage("Sort column now: %d, reverse: %s", g_RopelessTargetList_sortColumn,
+               g_bRopelessTargetList_sortReverse ? "true" : "false");
   // item.SetImage(g_bAisTargetList_sortReverse ? 1 : 0);
 
   // if (!g_bAisTargetList_autosort) g_bsort_once = true;
@@ -889,6 +899,7 @@ void RopelessDialog::OnTargetListColumnClicked(wxListEvent &event) {
   //  if (g_RopelessTargetList_sortColumn >= 0) {
   // m_pListCtrlAISTargets->SetColumn(g_AisTargetList_sortColumn, item);
   RefreshTransponderList();
+  RefreshTrawlChoice();
   //  }
 }
 
@@ -913,9 +924,8 @@ void RopelessDialog::RefreshTransponderList() {
     }
 
     wxListItem item;
-    item.SetId(i);
-    // long result = m_pListCtrlTranponders->InsertItem(item);
-    long result = m_pListCtrlTranponders->InsertItem(i, " ");
+    item.SetId(m_pListCtrlTranponders->GetItemCount()); // Use next available index
+    long result = m_pListCtrlTranponders->InsertItem(item);
 
     m_pListCtrlTranponders->SetItemData(result, state->markID);
 
@@ -1018,9 +1028,14 @@ void RopelessDialog::RefreshTransponderList() {
 
   }
 
-  if (g_RopelessTargetList_sortColumn > 0)
-    m_pListCtrlTranponders->SortItems(
-        wxListCompareFunction, reinterpret_cast<wxIntPtr>(&transponderStatus));
+  if (g_RopelessTargetList_sortColumn >= 0) {
+    wxLogMessage("Sorting list with column %d, item count: %ld",
+                 g_RopelessTargetList_sortColumn, m_pListCtrlTranponders->GetItemCount());
+    m_pListCtrlTranponders->SortItems(wxListCompareFunction, 0);
+    wxLogMessage("Sort completed");
+  } else {
+    wxLogMessage("Not sorting - sort column is %d", g_RopelessTargetList_sortColumn);
+  }
 
   for (auto index : selectedIndices) {
       if (index < m_pListCtrlTranponders->GetItemCount()) {
@@ -1432,11 +1447,30 @@ void RopelessDialog::OnOKClick(wxCommandEvent &event) {
 
 int wxCALLBACK wxListCompareFunction(wxIntPtr item1, wxIntPtr item2,
                                      wxIntPtr sortData) {
-  std::vector<transponder_state *> *v = &transponderStatus;  // reinterpret_cast<std::vector<transponder_state
-                                                             // *>*>(sortData);
+  // item1 and item2 are actually the markID values (from SetItemData), not list indices!
+  uint32_t markID1 = static_cast<uint32_t>(item1);
+  uint32_t markID2 = static_cast<uint32_t>(item2);
 
-  auto tS1 = (*v)[static_cast<size_t>(item1)];
-  auto tS2 = (*v)[static_cast<size_t>(item2)];
+  // Find the corresponding transponder states by markID
+  transponder_state* tS1 = nullptr;
+  transponder_state* tS2 = nullptr;
+
+  for (auto* state : transponderStatus) {
+    if (state && state->markID == markID1) {
+      tS1 = state;
+    }
+    if (state && state->markID == markID2) {
+      tS2 = state;
+    }
+    if (tS1 && tS2) break; // Found both, no need to continue
+  }
+
+  // If either transponder not found, return 0
+  if (!tS1 || !tS2) {
+    wxLogMessage("Compare function: transponder not found - tS1=%p, tS2=%p (markID1=%u, markID2=%u)",
+                 tS1, tS2, markID1, markID2);
+    return 0;
+  }
 
   switch (g_RopelessTargetList_sortColumn) {
 
@@ -1451,9 +1485,13 @@ int wxCALLBACK wxListCompareFunction(wxIntPtr item1, wxIntPtr item2,
       break;
     }
 
-    case tlIDENT:
-      return (CompareD((double)tS2->markID, (double)tS1->markID));
+    case tlIDENT: {
+      int result = CompareD((double)tS2->serial_num, (double)tS1->serial_num);
+      wxLogMessage("Compare tlIDENT: serial1=%u, serial2=%u, result=%d",
+                   tS1->serial_num, tS2->serial_num, result);
+      return result;
       break;
+    }
 
     // case tlRANGE:
     //   return (CompareD(tS2->range, tS1->range));
@@ -1567,17 +1605,126 @@ void RopelessDialog::ShowReleaseStatusButtons(bool show) {
 
 void RopelessDialog::UpdateReleaseStatusInfo(int transponder_id, const wxString &status) {
   wxLogMessage("UpdateReleaseStatusInfo: Starting for ID %d with status '%s'", transponder_id, status);
-  
+
   wxString idText = wxString::Format(_("ID: %d"), transponder_id);
   wxString statusText = wxString::Format(_("Status: %s"), status);
   wxLogMessage("UpdateReleaseStatusInfo: About to call SetLabel");
   m_releaseStatusIdText->SetLabel(idText);
   m_releaseStatusText->SetLabel(statusText);
   wxLogMessage("UpdateReleaseStatusInfo: SetLabel completed");
-  
+
   // Show buttons when there's an active release status
   bool showButtons = !status.Contains(_("Standby")) && !status.Contains(_("Ready"));
   wxLogMessage("UpdateReleaseStatusInfo: About to call ShowReleaseStatusButtons(%s)", showButtons ? "true" : "false");
   ShowReleaseStatusButtons(showButtons);
   wxLogMessage("UpdateReleaseStatusInfo: ShowReleaseStatusButtons completed");
+}
+
+// Trawl methods implementation
+
+void RopelessDialog::RefreshTrawlChoice() {
+  if (!m_trawlChoice) return;
+
+  m_trawlChoice->Clear();
+  m_trawlChoice->Append(_("None Selected"));
+
+  // Get global trawl list from plugin
+  extern std::vector<trawl_tracker *> trawlList;
+
+  for (auto* trawl : trawlList) {
+    if (trawl && trawl->traps_in_set() > 0) {
+      wxString trawlLabel = wxString::Format("Trawl %d (%d traps)",
+                                           trawl->trawl_id,
+                                           trawl->traps_in_set());
+      m_trawlChoice->Append(trawlLabel);
+    }
+  }
+
+  m_trawlChoice->SetSelection(0);
+
+  // Update trawl info for default selection
+  UpdateTrawlInfo(nullptr);
+}
+
+void RopelessDialog::OnTrawlChoice(wxCommandEvent &event) {
+  int selection = m_trawlChoice->GetSelection();
+
+  if (selection <= 0) {
+    // "None Selected"
+    UpdateTrawlInfo(nullptr);
+    return;
+  }
+
+  // Get trawl from global list (selection-1 because 0 is "None Selected")
+  extern std::vector<trawl_tracker *> trawlList;
+
+  int trawlIndex = selection - 1;
+  if (trawlIndex >= 0 && trawlIndex < (int)trawlList.size()) {
+    trawl_tracker* selectedTrawl = trawlList[trawlIndex];
+    UpdateTrawlInfo(selectedTrawl);
+  }
+}
+
+double RopelessDialog::CalculateTrawlLength(trawl_tracker* trawl) {
+  if (!trawl) return 0.0;
+
+  std::vector<transponder_state*> orderedTransponders = trawl->getOrderedTransponders();
+
+  if (orderedTransponders.size() < 2) {
+    return 0.0;  // Need at least 2 transponders to calculate length
+  }
+
+  double totalLength = 0.0;
+
+  for (size_t i = 1; i < orderedTransponders.size(); i++) {
+    transponder_state* prev = orderedTransponders[i-1];
+    transponder_state* curr = orderedTransponders[i];
+
+    if (!prev || !curr) continue;
+
+    // Calculate distance between consecutive transponders using great circle distance
+    double lat1 = prev->predicted_lat * M_PI / 180.0;
+    double lon1 = prev->predicted_lon * M_PI / 180.0;
+    double lat2 = curr->predicted_lat * M_PI / 180.0;
+    double lon2 = curr->predicted_lon * M_PI / 180.0;
+
+    double dlat = lat2 - lat1;
+    double dlon = lon2 - lon1;
+
+    double a = sin(dlat/2) * sin(dlat/2) +
+               cos(lat1) * cos(lat2) * sin(dlon/2) * sin(dlon/2);
+    double c = 2 * atan2(sqrt(a), sqrt(1-a));
+    double distance = 6371000 * c;  // Earth radius in meters
+
+    totalLength += distance;
+  }
+
+  return totalLength;
+}
+
+void RopelessDialog::UpdateTrawlInfo(trawl_tracker* trawl) {
+  if (!m_trawlInfoText) return;
+
+  if (!trawl) {
+    m_trawlInfoText->SetLabel(_("Trawl Info: ---"));
+    return;
+  }
+
+  double length = CalculateTrawlLength(trawl);
+  int numTraps = trawl->traps_in_set();
+
+  wxString infoText;
+  if (length > 0) {
+    if (length > 1000) {
+      infoText = wxString::Format(_("Length: %.2f km, Traps: %d"),
+                                length / 1000.0, numTraps);
+    } else {
+      infoText = wxString::Format(_("Length: %.0f m, Traps: %d"),
+                                length, numTraps);
+    }
+  } else {
+    infoText = wxString::Format(_("Length: ---, Traps: %d"), numTraps);
+  }
+
+  m_trawlInfoText->SetLabel(infoText);
 }

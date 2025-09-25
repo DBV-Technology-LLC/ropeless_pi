@@ -47,8 +47,8 @@
 
 class ropeless_pi;
 class OCPNListCtrl;
-struct transponder_state;
-
+class transponder_state;
+class trawl_tracker;
 
 class RopelessDialog : public wxDialog {
 private:
@@ -194,7 +194,12 @@ public:
   void UpdateCloudStatus(const wxString &cloudStatus);
   void ShowReleaseStatusButtons(bool show);
   void UpdateReleaseStatusInfo(int transponder_id, const wxString &status);
-  
+
+  // Trawl methods
+  void RefreshTrawlChoice();
+  void OnTrawlChoice(wxCommandEvent &event);
+  double CalculateTrawlLength(trawl_tracker* trawl);
+  void UpdateTrawlInfo(trawl_tracker* trawl);
 
   wxArrayInt GetSelectedItems();
   transponder_state *getXpdrFromIndex(int index);

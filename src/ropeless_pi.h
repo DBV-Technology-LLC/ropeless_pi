@@ -612,6 +612,7 @@ private:
                                transponder_state *state);
   void LoadTransponderStatus();
   void RegenerateTrawlListFromTransponders();
+  void UpdateTrawlStartEndMarkers();
   bool parseTransponderNode(pugi::xml_node &transponderNode,
                             transponder_state *state);
 

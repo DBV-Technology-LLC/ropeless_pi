@@ -23,29 +23,37 @@ This is a plugin for OpenCPN to support the integration of Ropeless Fishing equi
 
 ## TODO:
 
-4. Keep track of ends of trawls
-8. User trawls assigned trawl_ids descending from 65k
-9. Verify Cloud pos
-10. Cloud trawl_id 
-16. Show trawl pos in status
-18. Move manual release to bottom near OK. Remove mute?
-19. Set TCP connection default / enable
-20. Fix trawl rendering order by enforcing trawl positions 
-21. Trawl view? Show all trawls as sub table?
-23. Limit trawl length to 32?
-25. Delete trawl by id?
+[x] - Fix Sorting Issues
+[] - Add separate shape to distinguish USER positions for now
+[] - Trawl ID adding / removing / modifying fix
+[] - Split trawl_id address space for USER defined so it doesn't clash with Deckbox assigned IDs
+[] - Show trawl pos in status
+[] - Move manual release to bottom near OK. Remove mute
+[] - Trawl View show all transponders in trawl
+[] - Trawl View Delete Trawl
+[] - Set Preference defaults properly
 
 Bugs:
-[] - Fix sorting in LIst
+[] - When sorting the list with a selected item it doesn't get "deselected" and color stays GOLDEN
 [] - List scrolls back up every refresh
 
 Maybe Later:
 [] - Support trawl_path lat/lon list
 [] - Add update flag to transponder obj to make rendering faster for non changing transponders ?
+[] - Create separate log file for NMEA only messages
 
 Maybe Never:
 [] - Fix text cutoff in "Transponder Status" Tab? -- commented out for now
 [] - Trawl creation time tag -- Can just use creation of earliest transponder. plus would have to save to xml?
+
+Before Release
+- Remove position field from manual placement
+- Remove unused commands "Mute"
+- Update defaults in preferences
+
+Things to Test
+- Scrolling in table list 
+- colorblind mode
 
 Preferences / Defaults
 - Accessibility
@@ -67,19 +75,6 @@ Preferences / Defaults
 	- Cloud radius
 	- Circle size
 	- Text size
-
-Nice to Have
-- support trawl path. add preference to enable / disable
-- save NMEA messages to separate file
-
-Before Release
-- Remove position field from manual placement
-- Remove unused commands "Mute"
-- Update defaults in preferences
-
-Things to Test
-- Scrolling in table list 
-- colorblind mode
 
 ## Users
 

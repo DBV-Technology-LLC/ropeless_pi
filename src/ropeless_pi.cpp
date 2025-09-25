@@ -309,6 +309,10 @@ int ropeless_pi::Init(void) {
   AddLocaleCatalog(_T("opencpn-ropeless_pi"));
   m_config_version = -1;
 
+  // Initialize sorting variables
+  g_RopelessTargetList_sortColumn = -1;
+  g_bRopelessTargetList_sortReverse = false;
+
   m_oDC = NULL;
 
   //  Configure the NMEA processor
@@ -719,10 +723,19 @@ void ropeless_pi::OnContextMenuItemCallback(int id) {
               newTransponder->is_trawl_start_end = false;  // Clear start/end flag when removing from trawl
               newTransponder->trawl_num = -1;  // Reset position when removing from trawl
             } else {
-              newTransponder->is_trawl_start_end = false;  // Reset start/end flag when assigning to trawl
+              // Set trawl position from dialog
+              newTransponder->trawl_num = mPl.trawlPosition;
+
+              // Initially clear the start/end flag - we'll set it properly after regenerating trawl list
+              newTransponder->is_trawl_start_end = false;
             }
-            wxLogMessage("Assigned transponder %d to trawl %d", mPl.markID, mPl.selectedTrawlId);
+            wxLogMessage("Assigned transponder %d to trawl %d at position %d",
+                        mPl.markID, mPl.selectedTrawlId, mPl.trawlPosition);
           }
+
+          // Regenerate trawl list to update the trawl tracker
+          RegenerateTrawlListFromTransponders();
+          UpdateTrawlStartEndMarkers();
         }
       }
     }
@@ -764,10 +777,19 @@ void ropeless_pi::OnContextMenuItemCallback(int id) {
               newTransponder->is_trawl_start_end = false;  // Clear start/end flag when removing from trawl
               newTransponder->trawl_num = -1;  // Reset position when removing from trawl
             } else {
-              newTransponder->is_trawl_start_end = false;  // Reset start/end flag when assigning to trawl
+              // Set trawl position from dialog
+              newTransponder->trawl_num = mPl.trawlPosition;
+
+              // Initially clear the start/end flag - we'll set it properly after regenerating trawl list
+              newTransponder->is_trawl_start_end = false;
             }
-            wxLogMessage("Assigned transponder %d to trawl %d", mPl.markID, mPl.selectedTrawlId);
+            wxLogMessage("Assigned transponder %d to trawl %d at position %d",
+                        mPl.markID, mPl.selectedTrawlId, mPl.trawlPosition);
           }
+
+          // Regenerate trawl list to update the trawl tracker
+          RegenerateTrawlListFromTransponders();
+          UpdateTrawlStartEndMarkers();
         }
       }
     }
@@ -1583,6 +1605,7 @@ void ropeless_pi::LoadTransponderStatus() {
 
   // Re-generate the trawl list from the loaded transponder info
   RegenerateTrawlListFromTransponders();
+  UpdateTrawlStartEndMarkers();
 }
 
 void ropeless_pi::RegenerateTrawlListFromTransponders() {
@@ -1628,6 +1651,35 @@ void ropeless_pi::RegenerateTrawlListFromTransponders() {
   }
 
   wxLogMessage("Regenerated trawl list: %zu trawls from transponder data", trawlList.size());
+}
+
+void ropeless_pi::UpdateTrawlStartEndMarkers() {
+  // For each trawl, identify and mark the start and end transponders
+  for (auto* trawl : trawlList) {
+    if (!trawl) continue;
+
+    auto orderedTransponders = trawl->getOrderedTransponders();
+    if (orderedTransponders.size() < 2) continue; // Need at least 2 transponders
+
+    // Clear all start/end flags for this trawl first
+    for (auto* transponder : orderedTransponders) {
+      if (transponder) {
+        transponder->is_trawl_start_end = false;
+      }
+    }
+
+    // Mark the first transponder (position 0) as start/end
+    if (orderedTransponders.front()) {
+      orderedTransponders.front()->is_trawl_start_end = true;
+    }
+
+    // Mark the last transponder as start/end
+    if (orderedTransponders.back()) {
+      orderedTransponders.back()->is_trawl_start_end = true;
+    }
+  }
+
+  wxLogMessage("Updated start/end markers for all trawls");
 }
 
 wxString ropeless_pi::GetColorName(int color_index)
