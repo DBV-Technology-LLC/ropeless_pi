@@ -264,11 +264,17 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
       wxLC_REPORT | wxLC_SINGLE_SEL | wxLC_HRULES | wxLC_VRULES | wxBORDER_SUNKEN);
 
   // Add columns for trawl transponders
-  wxSize trawlTxs = GetTextExtent("Serial Number");
-  m_trawlTranspondersListCtrl->InsertColumn(0, _("Serial Number"), wxLIST_FORMAT_CENTER, trawlTxs.x + dx * 2);
+  wxSize trawlTxs = GetTextExtent("Pos");
+  m_trawlTranspondersListCtrl->InsertColumn(0, _("Pos"), wxLIST_FORMAT_CENTER, trawlTxs.x + dx);
 
-  trawlTxs = GetTextExtent("Status");
-  m_trawlTranspondersListCtrl->InsertColumn(1, _("Status"), wxLIST_FORMAT_CENTER, trawlTxs.x + dx * 2);
+  trawlTxs = GetTextExtent("Serial Number");
+  m_trawlTranspondersListCtrl->InsertColumn(1, _("SN"), wxLIST_FORMAT_CENTER, trawlTxs.x + dx);
+
+  trawlTxs = GetTextExtent("Manufacturer");
+  m_trawlTranspondersListCtrl->InsertColumn(2, _("Manuf"), wxLIST_FORMAT_CENTER, trawlTxs.x + dx);
+
+  trawlTxs = GetTextExtent("Acoustic Release");
+  m_trawlTranspondersListCtrl->InsertColumn(3, _("Type"), wxLIST_FORMAT_CENTER, trawlTxs.x + dx);
 
   trawlContentSizer->Add(m_trawlTranspondersListCtrl, 1, wxEXPAND | wxALL, 5);
 
@@ -479,6 +485,9 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
   m_markRecoveredButton = NULL;
   m_retryReleaseButton = NULL;
   
+  m_selectedTransponder = NULL;
+  m_selectedTrawl = NULL;
+
   sidebarSizer->Add(m_releaseStatusSizer, 0, wxEXPAND | wxALL, 5);
   
   bSizer2->Add(sidebarSizer, 0, wxEXPAND | wxALL, 5);
@@ -601,8 +610,6 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
   if (pParentPi && !pParentPi->m_debug_enabled) {
     m_debugSizer->ShowItems(false);
   }
-
-  m_selectedTransponder = NULL;
 
 }
 
@@ -1483,10 +1490,7 @@ void RopelessDialog::OnAdvancedClick(wxCommandEvent &event) {
 }
 
 void RopelessDialog::OnDeleteAllButton(wxCommandEvent &event) {
-  // Stub function - Delete All functionality not implemented yet
-  wxMessageDialog stubDialog(this, _("Delete All functionality not yet implemented."),
-                            _("Not Implemented"), wxOK | wxICON_INFORMATION);
-  stubDialog.ShowModal();
+  pParentPi->DeleteAll();
 }
 
 void RopelessDialog::OnOKClick(wxCommandEvent &event) {
@@ -1675,6 +1679,12 @@ void RopelessDialog::UpdateReleaseStatusInfo(int transponder_id, const wxString 
 void RopelessDialog::RefreshTrawlChoice() {
   if (!m_trawlChoice) return;
 
+  // Clear the is_selected flag on the previously selected trawl
+  if (m_selectedTrawl) {
+    m_selectedTrawl->is_selected = 0;
+    m_selectedTrawl = NULL;
+  }
+
   m_trawlChoice->Clear();
   m_trawlChoice->Append(_("None Selected"));
 
@@ -1690,16 +1700,24 @@ void RopelessDialog::RefreshTrawlChoice() {
 
   m_trawlChoice->SetSelection(0);
 
-  // Update trawl info for default selection
+  // Update trawl info and transponders list for default selection
   UpdateTrawlInfo(nullptr);
+  UpdateTrawlTranspondersList(nullptr);
 }
 
 void RopelessDialog::OnTrawlChoice(wxCommandEvent &event) {
   int selection = m_trawlChoice->GetSelection();
 
+  // Clear the is_selected flag on the previously selected trawl
+  if (m_selectedTrawl) {
+    m_selectedTrawl->is_selected = 0;
+    m_selectedTrawl = NULL;
+  }
+
   if (selection <= 0) {
     // "None Selected"
     UpdateTrawlInfo(nullptr);
+    UpdateTrawlTranspondersList(nullptr);
     return;
   }
 
@@ -1709,7 +1727,14 @@ void RopelessDialog::OnTrawlChoice(wxCommandEvent &event) {
   int trawlIndex = selection - 1;
   if (trawlIndex >= 0 && trawlIndex < (int)trawlList.size()) {
     trawl_tracker* selectedTrawl = trawlList[trawlIndex];
+
+    // Set the is_selected flag on the newly selected trawl
+    selectedTrawl->is_selected = 1;
+    m_selectedTrawl = selectedTrawl;
+
+    // Update both info and transponders list
     UpdateTrawlInfo(selectedTrawl);
+    UpdateTrawlTranspondersList(selectedTrawl);
   }
 }
 
@@ -1775,4 +1800,57 @@ void RopelessDialog::UpdateTrawlInfo(trawl_tracker* trawl) {
   wxString infoText = wxString::Format(_("Num Traps: %d\nLength: %s"),
                                       numTraps, lengthStr);
   m_trawlInfoText->SetLabel(infoText);
+}
+
+void RopelessDialog::UpdateTrawlTranspondersList(trawl_tracker* trawl) {
+  if (!m_trawlTranspondersListCtrl) return;
+
+  // Clear existing items
+  m_trawlTranspondersListCtrl->DeleteAllItems();
+
+  if (!trawl) {
+    return; // Nothing to populate
+  }
+
+  // Get ordered transponders from the trawl
+  std::vector<transponder_state*> transponders = trawl->getOrderedTransponders();
+
+  // Populate the list with transponder data
+  for (size_t i = 0; i < transponders.size(); i++) {
+    transponder_state* state = transponders[i];
+    if (!state) continue;
+
+    // Insert new item
+    long index = m_trawlTranspondersListCtrl->GetItemCount();
+    wxListItem item;
+    item.SetId(index);
+    long result = m_trawlTranspondersListCtrl->InsertItem(item);
+
+    // Column 0: Position (trawl_num)
+    wxString posStr = (state->trawl_num >= 0) ? wxString::Format("%d", state->trawl_num) : "---";
+    m_trawlTranspondersListCtrl->SetItem(result, 0, posStr);
+
+    // Column 1: Serial Number
+    wxString serialStr = wxString::Format("%u", getSerialNumber(state->markID));
+    m_trawlTranspondersListCtrl->SetItem(result, 1, serialStr);
+
+    // Column 2: Manufacturer
+    wxString manufStr = state->mfg_str.IsEmpty() ? "---" : state->mfg_str;
+    m_trawlTranspondersListCtrl->SetItem(result, 2, manufStr);
+
+    // Column 3: Type
+    wxString typeStr = (state->mark_type >= 0 && state->mark_type < 6) ?
+                      markTypeNames[state->mark_type] : "---";
+    m_trawlTranspondersListCtrl->SetItem(result, 3, typeStr);
+  }
+
+  // Set columns to expand proportionally to fill available space
+  int totalWidth = m_trawlTranspondersListCtrl->GetClientSize().GetWidth();
+  if (totalWidth > 0) {
+    // Allocate space proportionally: Pos(15%), SN(25%), Manuf(35%), Type(25%)
+    m_trawlTranspondersListCtrl->SetColumnWidth(0, totalWidth * 0.15);
+    m_trawlTranspondersListCtrl->SetColumnWidth(1, totalWidth * 0.25);
+    m_trawlTranspondersListCtrl->SetColumnWidth(2, totalWidth * 0.35);
+    m_trawlTranspondersListCtrl->SetColumnWidth(3, totalWidth * 0.25);
+  }
 }

@@ -594,6 +594,7 @@ public:
   bool ConfirmAndReleaseTransponder(transponder_state* state);
   int getNextCloudId();
   transponder_state *GetStateByMarkID(uint32_t markID);
+  void DeleteAll();
 
 private:
   bool LoadConfig(void);
@@ -606,7 +607,7 @@ private:
   void RenderTrawlConnectors();
   void RenderTransponderTexts();
   void RenderTrawlConnector(transponder_state *state1,
-                            transponder_state *state2);
+                            transponder_state *state2, bool isSelected = false);
   void RenderVesselRangeCircle();
 
   void ProcessRFACapture(void);

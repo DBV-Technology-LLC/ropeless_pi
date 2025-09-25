@@ -121,6 +121,7 @@ public:
   wxButton *m_deleteTrawlButton;
   OCPNListCtrl *m_trawlTranspondersListCtrl;
   wxStaticBoxSizer *m_trawlListSizer;
+  trawl_tracker *m_selectedTrawl;
 
   // Selected transponder tracking
   transponder_state *m_selectedTransponder;
@@ -204,6 +205,7 @@ public:
   void OnTrawlChoice(wxCommandEvent &event);
   double CalculateTrawlLength(trawl_tracker* trawl);
   void UpdateTrawlInfo(trawl_tracker* trawl);
+  void UpdateTrawlTranspondersList(trawl_tracker* trawl);
 
   wxArrayInt GetSelectedItems();
   transponder_state *getXpdrFromIndex(int index);

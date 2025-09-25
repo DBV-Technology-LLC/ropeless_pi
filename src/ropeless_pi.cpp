@@ -1894,20 +1894,33 @@ void ropeless_pi::RenderTransponder(transponder_state *state) {
 }
 
 void ropeless_pi::RenderTrawlConnector(transponder_state *state1,
-                                       transponder_state *state2) {
+                                       transponder_state *state2, bool isSelected) {
 
   // Don't render the trawl connector if either of the transponders are hidden (cloud)
   if (state1->hide_pos == true || state2->hide_pos == true) return;
-  
+
   wxPoint P1, P2;
   GetCanvasPixLL(g_vp, &P1, state1->predicted_lat, state1->predicted_lon);
   GetCanvasPixLL(g_vp, &P2, state2->predicted_lat, state2->predicted_lon);
 
   // TODO: Check if both transponders are recovered. Set trawl connector opacity too
 
-  // Set black pen for trawl connectors
-  wxPen blackPen(wxColour(0, 0, 0), 2);  // Black pen with 2 pixel width
-  m_oDC->SetPen(blackPen);
+  // Set pen color based on selection status
+  wxColour lineColor;
+  if (isSelected) {
+    // Use golden color for selected trawl
+    wxString colorName = GetColorName(COLOR_INDEX_GOLDEN);
+    lineColor = wxTheColourDatabase->Find(colorName);
+    if (!lineColor.IsOk()) {
+      lineColor = wxColour(255, 215, 0); // Fallback to gold RGB if color name fails
+    }
+  } else {
+    // Use black for unselected trawls
+    lineColor = wxColour(0, 0, 0);
+  }
+
+  wxPen trawlPen(lineColor, 2);  // 2 pixel width
+  m_oDC->SetPen(trawlPen);
 
   m_oDC->DrawLine(P1.x, P1.y, P2.x, P2.y, true);
 }
@@ -2091,8 +2104,43 @@ bool ropeless_pi::ConfirmAndDeleteTransponder(uint32_t markID)
       return true;
     }
   }
-  
+
   return false;
+}
+
+void ropeless_pi::DeleteAll()
+{
+  // Show confirmation dialog
+  wxString msg(_("Are you sure you want to delete ALL transponders and trawls?\n\nThis action cannot be undone."));
+
+  int result = wxMessageBox(msg, _("Confirm Delete All"), wxYES_NO | wxICON_QUESTION | wxCENTRE);
+
+  if (result != wxYES) {
+    return;
+  }
+
+  // Delete all transponders
+  // We iterate backwards to avoid index issues when erasing from vector
+  for (int i = transponderStatus.size() - 1; i >= 0; i--) {
+    if (transponderStatus[i]) {
+      uint32_t markID = transponderStatus[i]->markID;
+      DeleteTransponder(markID);
+    }
+  }
+
+  // Delete all trawls
+  for (auto* trawl : trawlList) {
+    delete trawl;
+  }
+  trawlList.clear();
+
+  // Refresh the UI
+  if (m_pRLDialog) {
+    m_pRLDialog->RefreshTransponderList();
+    m_pRLDialog->RefreshTrawlChoice();
+  }
+
+  wxLogMessage("Deleted all transponders and trawls");
 }
 
 bool ropeless_pi::ConfirmAndReleaseTransponder(transponder_state* state)
@@ -2169,6 +2217,9 @@ void ropeless_pi::RenderTrawlConnectors() {
 
     if (trawl && trawl->traps_in_set() > 1) {
 
+      // Check if this trawl is selected
+      bool trawlSelected = (trawl->is_selected == 1);
+
       // Get list of transponders in trawl order
       auto transponders = trawl->getOrderedTransponders();
 
@@ -2177,7 +2228,7 @@ void ropeless_pi::RenderTrawlConnectors() {
 
         // make sure they exist -- then render
         if (transponders[i] && transponders[i+1]) {
-          RenderTrawlConnector(transponders[i], transponders[i+1]);
+          RenderTrawlConnector(transponders[i], transponders[i+1], trawlSelected);
         }
       }
     }
