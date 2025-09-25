@@ -39,7 +39,16 @@ Last Updated: 9/25/2025 CTV
 - [x] Showing Transonders in trawl view now
 - [x] Highlighting Trawl line when trawl is selected
 
+9/25/2025
+- [x] Show "None" if trawl pos is 0 to avoid confusion 
+- [x] Draw dashed grey line between non-sequential traps in a trawl
+- [x] Only draw solid black line between consecutive traps in a trawl
+- [x] Fix manual placement trawl pos
+
+
 ## TODO:
+
+- [ ] Fix Recover command button to execute same as "Mark Recovered"
 
 Trawl Creation Test...
 
@@ -48,27 +57,27 @@ Trawl Creation Test...
 3. Add transponder to trawl at position 1
 4. Add transponder to trawl at position 5
 
-- [] Allow inserting transponder into Trawl list at specific Position
-- [] Do not draw line unless transponders are consecutive in trawl
+- [ ] Allow inserting transponder into Trawl list at specific Position
+- [ ] Do not draw line unless transponders are consecutive in trawl
 
-- [] Split trawl_id address space for USER defined
-- [] Show trawl pos in status
-- [] Trawl View show all transponders in trawl
-- [] Trawl View Delete Trawl
+- [ ] Split trawl_id address space for USER defined
+- [ ] Show trawl pos in status
+- [ ] Trawl View show all transponders in trawl
+- [ ] Trawl View Delete Trawl
 
 ### Bugs:
-- [] When sorting the list with a selected item it doesn't get "deselected" and color stays GOLDEN
-- [] List scrolls back up every refresh
-- [] Trawl gets un selected when transponder list is sorted?
+- [ ] When sorting the list with a selected item it doesn't get "deselected" and color stays GOLDEN
+- [ ] List scrolls back up every refresh
+- [ ] Trawl gets un selected when transponder list is sorted?
 
 ### Maybe Later:
-- [] Support trawl_path lat/lon list
-- [] Add update flag to transponder obj to make rendering faster for non changing transponders ?
-- [] Create separate log file for NMEA only messages
+- [ ] Support trawl_path lat/lon list
+- [ ] Add update flag to transponder obj to make rendering faster for non changing transponders ?
+- [ ] Create separate log file for NMEA only messages
 
 ### Maybe Never:
-- [] Fix text cutoff in "Transponder Status" Tab? -- commented out for now
-- [] Trawl creation time tag -- Can just use creation of earliest transponder. plus would have to save to xml?
+- [ ] Fix text cutoff in "Transponder Status" Tab? -- commented out for now
+- [ ] Trawl creation time tag -- Can just use creation of earliest transponder. plus would have to save to xml?
 
 ### Before Release
 - Remove position field from manual placement
@@ -120,6 +129,14 @@ Import released plugins via Settings->Plugins->Import Plugin
 - (gdb) run
 - .... wait for crash / segfault...
 - (gdb) backtrace
+
+Inspecting Variables:
+(gdb) frame 1
+(gdb) print some_variable
+
+Inspecting Core Dump
+gdb ./your_program core
+(gdb) bt
 
 Note: make sure to build RelWithDebInfo..
 

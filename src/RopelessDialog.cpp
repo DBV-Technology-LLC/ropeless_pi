@@ -352,6 +352,7 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
   m_statusPingsText = new wxStaticText(m_statusPanel, wxID_ANY, _("Pings: ---"));
   m_statusLastReportText = new wxStaticText(m_statusPanel, wxID_ANY, _("Last Report: ---"));
   m_statusPositionSourceText = new wxStaticText(m_statusPanel, wxID_ANY, _("Position Source: ---"));
+  m_statusTrawlPosText = new wxStaticText(m_statusPanel, wxID_ANY, _("Trawl Pos: ---"));
 
   // Add controls with EXPAND flag to use full width and prevent cutoff
   statusSizer->Add(m_statusReleaseText, 0, wxEXPAND | wxALL, 5);
@@ -360,7 +361,8 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
   statusSizer->Add(m_statusPingsText, 0, wxEXPAND | wxALL, 5);
   statusSizer->Add(m_statusLastReportText, 0, wxEXPAND | wxALL, 5);
   statusSizer->Add(m_statusPositionSourceText, 0, wxEXPAND | wxALL, 5);
-  
+  statusSizer->Add(m_statusTrawlPosText, 0, wxEXPAND | wxALL, 5);
+
   m_statusPanel->SetSizer(statusSizer);
   m_transponderInfoNotebook->AddPage(m_statusPanel, _("Status"), false);
   
@@ -1201,7 +1203,8 @@ void RopelessDialog::UpdateTransponderInfo(transponder_state *state) {
     m_statusPingsText->SetLabel(_("Pings: ---"));
     m_statusLastReportText->SetLabel(_("Last Report: ---"));
     m_statusPositionSourceText->SetLabel(_("Position Source: ---"));
-    
+    m_statusTrawlPosText->SetLabel(_("Trawl Pos: ---"));
+
     m_positionLatText->SetLabel(_("Latitude: ---"));
     m_positionLonText->SetLabel(_("Longitude: ---"));
     m_positionRangeText->SetLabel(_("Range: --- m"));
@@ -1246,7 +1249,14 @@ void RopelessDialog::UpdateTransponderInfo(transponder_state *state) {
     ts.MakeUTC();
     m_statusLastReportText->SetLabel(wxString::Format(_("Last Report: %s"), ts.FormatISOCombined(' ')));
     m_statusPositionSourceText->SetLabel(wxString::Format(_("Position Source: %s"), positionSourceNames[state->position_source]));
-    
+
+    // Update trawl position display
+    if (state->trawl_id == 0) {
+      m_statusTrawlPosText->SetLabel(_("Trawl Pos: None"));
+    } else {
+      m_statusTrawlPosText->SetLabel(wxString::Format(_("Trawl Pos: %d"), state->trawl_num));
+    }
+
     // Update Position tab
     m_positionLatText->SetLabel(wxString::Format(_("Latitude: %.6f"), state->predicted_lat));
     m_positionLonText->SetLabel(wxString::Format(_("Longitude: %.6f"), state->predicted_lon));

@@ -142,6 +142,7 @@ public:
   wxStaticText *m_statusPingsText;
   wxStaticText *m_statusLastReportText;
   wxStaticText *m_statusPositionSourceText;
+  wxStaticText *m_statusTrawlPosText;
   
   // Position tab controls
   wxStaticText *m_positionLatText;

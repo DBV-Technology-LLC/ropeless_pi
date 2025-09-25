@@ -1651,12 +1651,12 @@ void ropeless_pi::RegenerateTrawlListFromTransponders() {
 }
 
 void ropeless_pi::UpdateTrawlStartEndMarkers() {
-  // For each trawl, identify and mark the start and end transponders
+  // For each trawl, mark position 1 as start and highest position as end
   for (auto* trawl : trawlList) {
     if (!trawl) continue;
 
     auto orderedTransponders = trawl->getOrderedTransponders();
-    if (orderedTransponders.size() < 2) continue; // Need at least 2 transponders
+    if (orderedTransponders.empty()) continue;
 
     // Clear all start/end flags for this trawl first
     for (auto* transponder : orderedTransponders) {
@@ -1665,18 +1665,29 @@ void ropeless_pi::UpdateTrawlStartEndMarkers() {
       }
     }
 
-    // Mark the first transponder (position 0) as start/end
-    if (orderedTransponders.front()) {
-      orderedTransponders.front()->is_trawl_start_end = true;
+    // Find and mark position 1 as start/end
+    for (auto* transponder : orderedTransponders) {
+      if (transponder && transponder->trawl_num == 1) {
+        transponder->is_trawl_start_end = true;
+        break;
+      }
     }
 
-    // Mark the last transponder as start/end
-    if (orderedTransponders.back()) {
-      orderedTransponders.back()->is_trawl_start_end = true;
+    // Find highest position number and mark as end
+    int highestPos = -1;
+    transponder_state* highestTransponder = nullptr;
+    for (auto* transponder : orderedTransponders) {
+      if (transponder && transponder->trawl_num > highestPos) {
+        highestPos = transponder->trawl_num;
+        highestTransponder = transponder;
+      }
+    }
+    if (highestTransponder) {
+      highestTransponder->is_trawl_start_end = true;
     }
   }
 
-  wxLogMessage("Updated start/end markers for all trawls");
+  wxLogMessage("Updated start/end markers: pos 1 as start, highest pos as end");
 }
 
 wxString ropeless_pi::GetColorName(int color_index)
@@ -1894,7 +1905,7 @@ void ropeless_pi::RenderTransponder(transponder_state *state) {
 }
 
 void ropeless_pi::RenderTrawlConnector(transponder_state *state1,
-                                       transponder_state *state2, bool isSelected) {
+                                       transponder_state *state2, bool isSelected, bool isConsecutive) {
 
   // Don't render the trawl connector if either of the transponders are hidden (cloud)
   if (state1->hide_pos == true || state2->hide_pos == true) return;
@@ -1905,21 +1916,27 @@ void ropeless_pi::RenderTrawlConnector(transponder_state *state1,
 
   // TODO: Check if both transponders are recovered. Set trawl connector opacity too
 
-  // Set pen color based on selection status
+  // Set pen color and style based on selection status and position consecutiveness
   wxColour lineColor;
-  if (isSelected) {
-    // Use golden color for selected trawl
+  wxPenStyle penStyle = wxPENSTYLE_SOLID;
+
+  if (!isConsecutive) {
+    // Non-consecutive positions: use grey dotted line
+    lineColor = wxColour(128, 128, 128); // Grey
+    penStyle = wxPENSTYLE_DOT;
+  } else if (isSelected) {
+    // Consecutive and selected: use golden color
     wxString colorName = GetColorName(COLOR_INDEX_GOLDEN);
     lineColor = wxTheColourDatabase->Find(colorName);
     if (!lineColor.IsOk()) {
       lineColor = wxColour(255, 215, 0); // Fallback to gold RGB if color name fails
     }
   } else {
-    // Use black for unselected trawls
+    // Consecutive and unselected: use black
     lineColor = wxColour(0, 0, 0);
   }
 
-  wxPen trawlPen(lineColor, 2);  // 2 pixel width
+  wxPen trawlPen(lineColor, 2, penStyle);  // 2 pixel width with appropriate style
   m_oDC->SetPen(trawlPen);
 
   m_oDC->DrawLine(P1.x, P1.y, P2.x, P2.y, true);
@@ -2228,7 +2245,13 @@ void ropeless_pi::RenderTrawlConnectors() {
 
         // make sure they exist -- then render
         if (transponders[i] && transponders[i+1]) {
-          RenderTrawlConnector(transponders[i], transponders[i+1], trawlSelected);
+
+          // Check if the positions are consecutive (differ by exactly 1)
+          int pos1 = transponders[i]->trawl_num;
+          int pos2 = transponders[i+1]->trawl_num;
+          bool isConsecutive = (abs(pos2 - pos1) == 1);
+
+          RenderTrawlConnector(transponders[i], transponders[i+1], trawlSelected, isConsecutive);
         }
       }
     }
@@ -3654,17 +3677,13 @@ void trawl_tracker::setStartEnd(uint32_t transponder_id) {
 }
 
 void trawl_tracker::reorderTransponders() {
-  auto transponders = getTransponders();
-  
-  // Sort by current position, then reassign consecutive positions
-  std::sort(transponders.begin(), transponders.end(), 
-           [](const transponder_state* a, const transponder_state* b) {
-             return a->trawl_num < b->trawl_num;
-           });
-  
-  for (size_t i = 0; i < transponders.size(); ++i) {
-    transponders[i]->trawl_num = static_cast<int>(i);
-  }
+  // This method is preserved for compatibility but no longer reassigns positions
+  // Manual trawl positions are now preserved as set by the user
+
+  // Note: getOrderedTransponders() already provides sorted transponders by trawl_num
+  // No automatic position reassignment - user's manual positions are preserved
+
+  wxLogMessage("reorderTransponders() called but positions preserved (no auto-reassignment)");
 }
 
 int trawl_tracker::traps_in_set() const {

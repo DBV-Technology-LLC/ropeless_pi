@@ -607,7 +607,7 @@ private:
   void RenderTrawlConnectors();
   void RenderTransponderTexts();
   void RenderTrawlConnector(transponder_state *state1,
-                            transponder_state *state2, bool isSelected = false);
+                            transponder_state *state2, bool isSelected = false, bool isConsecutive = true);
   void RenderVesselRangeCircle();
 
   void ProcessRFACapture(void);

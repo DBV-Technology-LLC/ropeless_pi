@@ -440,10 +440,10 @@ void manualPlacementDlgImpl::AddTrawlSelectionControl() {
                                                   wxDefaultPosition, wxSize(100, -1), 0);
     trawlPosSizer->Add(trawlPosLabel, 0, wxALL | wxALIGN_CENTER_VERTICAL, 5);
 
-    // Create spin control for trawl position (min 1, max 999, initial 0 - will be set later)
+    // Create spin control for trawl position (min 0, max 999, initial 0)
     m_spinCtrlTrawlPos = new wxSpinCtrl(this, wxID_ANY, wxEmptyString,
                                        wxDefaultPosition, wxSize(120, -1),
-                                       wxSP_ARROW_KEYS, 1, 999, 0);
+                                       wxSP_ARROW_KEYS, 0, 999, 0);
     m_spinCtrlTrawlPos->Enable(false); // Initially disabled since "None" is selected by default
     trawlPosSizer->Add(m_spinCtrlTrawlPos, 0, wxALL, 5);
 
@@ -523,7 +523,7 @@ void manualPlacementDlgImpl::UpdateTrawlPosControl() {
     if (!m_spinCtrlTrawlPos) return;
 
     if (selectedTrawlId == 0) {
-        // "None" selected - grey out the control
+        // "None" selected - grey out the control and set to 0
         m_spinCtrlTrawlPos->Enable(false);
         m_spinCtrlTrawlPos->SetValue(0);
     } else if (selectedTrawlId == -1) {
