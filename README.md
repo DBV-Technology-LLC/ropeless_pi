@@ -15,17 +15,28 @@ This is a plugin for OpenCPN to support the integration of Ropeless Fishing equi
 [x] - Mark Type enum strings
 [x] - Added trawl pos field to manual placement
 
-9/25/2025
+9/24/2025
 [x] - Right click to edit transponder on map. ONLY if USER marking
 [x] - Right click on transponder show manuf/sn/trawl_id
 [x] - Ownership: "Owned" / "Non-Owned" in info tab
 [x] - Fixed trawl loading after startup from xml transponders
+[x] - Fix Sorting Issues
+
+[x] - Draw Square for USER positions -- X needs to be drawn bigger due to shape change
+[x] - Fix defaults
+
+
+[x] - Advanced Button. Delete All Transponders / Delete All Trawls
+
+9/25/2025
+
+
 
 ## TODO:
 
-[x] - Fix Sorting Issues
-[] - Add separate shape to distinguish USER positions for now
-[] - Trawl ID adding / removing / modifying fix
+[] - Allow inserting transponder into Trawl list at specific Position
+[] - Do not draw line unless transponders are consecutive in trawl
+
 [] - Split trawl_id address space for USER defined so it doesn't clash with Deckbox assigned IDs
 [] - Show trawl pos in status
 [] - Move manual release to bottom near OK. Remove mute
@@ -50,6 +61,9 @@ Before Release
 - Remove position field from manual placement
 - Remove unused commands "Mute"
 - Update defaults in preferences
+- Hide trawl view
+- Don't allow manual placement
+- Hide Debug window by default
 
 Things to Test
 - Scrolling in table list 

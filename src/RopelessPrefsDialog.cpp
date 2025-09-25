@@ -143,15 +143,27 @@ void RopelessPrefsDialog::CreateControls() {
     wxStaticBoxSizer *displaySizer = new wxStaticBoxSizer(displayBox, wxVERTICAL);
     
     m_cbShowNonOwned = new wxCheckBox(this, wxID_ANY, _("Show non-owned in list"));
+    if (m_parent_pi) {
+        m_cbShowNonOwned->SetValue(m_parent_pi->m_show_non_owned);
+    }
     displaySizer->Add(m_cbShowNonOwned, 0, wxALL, 5);
-    
+
     m_cbShowCloud = new wxCheckBox(this, wxID_ANY, _("Show cloud in list"));
+    if (m_parent_pi) {
+        m_cbShowCloud->SetValue(m_parent_pi->m_show_cloud);
+    }
     displaySizer->Add(m_cbShowCloud, 0, wxALL, 5);
-    
+
     m_cbHideRecovered = new wxCheckBox(this, wxID_ANY, _("Hide recovered units"));
+    if (m_parent_pi) {
+        m_cbHideRecovered->SetValue(m_parent_pi->m_hide_recovered);
+    }
     displaySizer->Add(m_cbHideRecovered, 0, wxALL, 5);
-    
+
     m_cbTimeoutCloud = new wxCheckBox(this, wxID_ANY, _("Timeout cloud positions"));
+    if (m_parent_pi) {
+        m_cbTimeoutCloud->SetValue(m_parent_pi->m_timeout_cloud);
+    }
     displaySizer->Add(m_cbTimeoutCloud, 0, wxALL, 5);
 
     m_cbHideTransponderText = new wxCheckBox(this, wxID_ANY, _("Hide transponder IDs"));
@@ -163,7 +175,10 @@ void RopelessPrefsDialog::CreateControls() {
     // Cloud radius text input
     wxBoxSizer *radiusSizer = new wxBoxSizer(wxHORIZONTAL);
     radiusSizer->Add(new wxStaticText(this, wxID_ANY, _("Cloud radius (nmi):")), 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 5);
-    m_tcCloudRadius = new wxTextCtrl(this, wxID_ANY, _("2"), wxDefaultPosition, wxSize(100, -1));
+    m_tcCloudRadius = new wxTextCtrl(this, wxID_ANY, wxEmptyString, wxDefaultPosition, wxSize(100, -1));
+    if (m_parent_pi) {
+        m_tcCloudRadius->SetValue(wxString::Format("%d", m_parent_pi->m_cloud_radius));
+    }
     radiusSizer->Add(m_tcCloudRadius, 0);
     displaySizer->Add(radiusSizer, 0, wxEXPAND | wxALL, 5);
     
@@ -246,6 +261,26 @@ void RopelessPrefsDialog::OnOKClick(wxCommandEvent &event) {
                 m_parent_pi->m_debug_enabled = m_cbDebugEnabled->GetValue();
             }
             
+            // Save display settings
+            if (m_cbShowNonOwned) {
+                m_parent_pi->m_show_non_owned = m_cbShowNonOwned->GetValue();
+            }
+            if (m_cbShowCloud) {
+                m_parent_pi->m_show_cloud = m_cbShowCloud->GetValue();
+            }
+            if (m_cbHideRecovered) {
+                m_parent_pi->m_hide_recovered = m_cbHideRecovered->GetValue();
+            }
+            if (m_cbTimeoutCloud) {
+                m_parent_pi->m_timeout_cloud = m_cbTimeoutCloud->GetValue();
+            }
+            if (m_tcCloudRadius) {
+                long cloud_radius;
+                if (m_tcCloudRadius->GetValue().ToLong(&cloud_radius) && cloud_radius >= 1 && cloud_radius <= 10) {
+                    m_parent_pi->m_cloud_radius = (int)cloud_radius;
+                }
+            }
+
             // Save visual settings
             if (m_tcCircleSize) {
                 long circle_size;
@@ -293,21 +328,21 @@ void RopelessPrefsDialog::UpdateTCPControls() {
 void RopelessPrefsDialog::OnDefaultSettingsClick(wxCommandEvent &event) {
     // Set all controls to their default values
     if (m_cbColorblind) m_cbColorblind->SetValue(false);
-    if (m_cbTCPEnabled) m_cbTCPEnabled->SetValue(false);
+    if (m_cbTCPEnabled) m_cbTCPEnabled->SetValue(true);
     if (m_cbTCPAutoReconnect) m_cbTCPAutoReconnect->SetValue(true);
-    if (m_tcTCPHost) m_tcTCPHost->SetValue(_("localhost"));
-    if (m_tcTCPPort) m_tcTCPPort->SetValue(_("10110"));
+    if (m_tcTCPHost) m_tcTCPHost->SetValue(_("192.168.88.50"));
+    if (m_tcTCPPort) m_tcTCPPort->SetValue(_("4098"));
     if (m_cbDebugEnabled) m_cbDebugEnabled->SetValue(false);
     if (m_cbSimulationEnabled) m_cbSimulationEnabled->SetValue(false);
     if (m_cbShowNonOwned) m_cbShowNonOwned->SetValue(true);
-    if (m_cbShowCloud) m_cbShowCloud->SetValue(true);
+    if (m_cbShowCloud) m_cbShowCloud->SetValue(false);
     if (m_cbHideRecovered) m_cbHideRecovered->SetValue(false);
-    if (m_cbTimeoutCloud) m_cbTimeoutCloud->SetValue(true);
+    if (m_cbTimeoutCloud) m_cbTimeoutCloud->SetValue(false);
     if (m_cbHideTransponderText) m_cbHideTransponderText->SetValue(false);
     if (m_tcCloudRadius) m_tcCloudRadius->SetValue(_("2"));
     if (m_tcCircleSize) m_tcCircleSize->SetValue(_("10"));
     if (m_tcTextSize) m_tcTextSize->SetValue(_("12"));
-    
+
     // Update control states
     UpdateTCPControls();
     UpdateDebugControls();

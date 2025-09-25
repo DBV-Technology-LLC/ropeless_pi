@@ -366,8 +366,8 @@ int ropeless_pi::Init(void) {
   // Initialize configuration variables to default values before loading config
   m_tcp_enabled = true;
   m_tcp_auto_reconnect = true;
-  m_tcp_host = "127.0.0.1";
-  m_tcp_port = 4001;
+  m_tcp_host = "192.168.88.50";
+  m_tcp_port = 4098;
   m_colorblind_mode = false;
   m_hide_transponder_text = false;
   m_transponder_circle_size = 10;
@@ -1802,9 +1802,21 @@ void ropeless_pi::RenderTransponder(transponder_state *state) {
     m_oDC->SetPen(greyPen);
     m_oDC->SetBrush(greyBrush);
     m_oDC->DrawCircle(ab.x, ab.y, circle_size);
+  } else if (state->position_source == ePOS_SOURCE_USER) {
+
+    // Draw square for USER transponders
+    wxPen dpen(rcolour);
+    wxBrush dbrush(rcolour);
+    m_oDC->SetPen(dpen);
+    m_oDC->SetBrush(dbrush);
+
+    // Calculate square coordinates (centered at ab.x, ab.y)
+    int half_size = circle_size;
+    int square_size = half_size * 2;
+    m_oDC->DrawRectangle(ab.x - half_size, ab.y - half_size, square_size, square_size);
   } else {
 
-    // Draw regular circle for other position sources
+    // Draw regular circle for other position sources (CLOUD, ACOUSTIC, GPS)
     wxPen dpen(rcolour);
     wxBrush dbrush(rcolour);
     m_oDC->SetPen(dpen);
@@ -1819,10 +1831,22 @@ void ropeless_pi::RenderTransponder(transponder_state *state) {
     if (state->is_trawl_start_end)
     {
       // Draw X marker for start/end transponders
-      wxPoint x1(ab.x - circle_size * .707, ab.y - circle_size * .707);
-      wxPoint x2(ab.x + circle_size * .707, ab.y + circle_size * .707);
-      wxPoint x3(ab.x - circle_size * .707, ab.y + circle_size * .707);
-      wxPoint x4(ab.x + circle_size * .707, ab.y - circle_size * .707);
+      wxPoint x1, x2, x3, x4;
+
+      if (state->position_source == ePOS_SOURCE_USER) {
+        // For squares: X goes to the corners of the square
+        int half_size = circle_size;
+        x1 = wxPoint(ab.x - half_size, ab.y - half_size); // Top-left corner
+        x2 = wxPoint(ab.x + half_size, ab.y + half_size); // Bottom-right corner
+        x3 = wxPoint(ab.x - half_size, ab.y + half_size); // Bottom-left corner
+        x4 = wxPoint(ab.x + half_size, ab.y - half_size); // Top-right corner
+      } else {
+        // For circles: X follows the circular shape (original logic)
+        x1 = wxPoint(ab.x - circle_size * .707, ab.y - circle_size * .707);
+        x2 = wxPoint(ab.x + circle_size * .707, ab.y + circle_size * .707);
+        x3 = wxPoint(ab.x - circle_size * .707, ab.y + circle_size * .707);
+        x4 = wxPoint(ab.x + circle_size * .707, ab.y - circle_size * .707);
+      }
 
       wxColour pColour = wxColour(0, 0, 0, opacity);
       wxPen xpen(pColour, 3);
@@ -2757,6 +2781,13 @@ bool ropeless_pi::LoadConfig(void) {
     pConf->Read(_T( "Debug_Enabled" ), &m_debug_enabled, false);
     pConf->Read(_T( "Debug_ShowNMEA" ), &m_debug_show_nmea, false);
     pConf->Read(_T( "Debug_ShowLog" ), &m_debug_show_log, false);
+
+    // List Display Configuration
+    pConf->Read(_T( "Show_Non_Owned" ), &m_show_non_owned, true);
+    pConf->Read(_T( "Show_Cloud" ), &m_show_cloud, false);
+    pConf->Read(_T( "Hide_Recovered" ), &m_hide_recovered, false);
+    pConf->Read(_T( "Timeout_Cloud" ), &m_timeout_cloud, false);
+    pConf->Read(_T( "Cloud_Radius" ), &m_cloud_radius, 2);
     
     // Debug logging to see what was loaded
     wxLogMessage("TCP Config loaded - Host: %s, Port: %d, Enabled: %s, AutoReconnect: %s", 
@@ -2811,6 +2842,13 @@ bool ropeless_pi::SaveConfig(void) {
     pConf->Write(_T( "Debug_Enabled" ), m_debug_enabled);
     pConf->Write(_T( "Debug_ShowNMEA" ), m_debug_show_nmea);
     pConf->Write(_T( "Debug_ShowLog" ), m_debug_show_log);
+
+    // List Display Configuration
+    pConf->Write(_T( "Show_Non_Owned" ), m_show_non_owned);
+    pConf->Write(_T( "Show_Cloud" ), m_show_cloud);
+    pConf->Write(_T( "Hide_Recovered" ), m_hide_recovered);
+    pConf->Write(_T( "Timeout_Cloud" ), m_timeout_cloud);
+    pConf->Write(_T( "Cloud_Radius" ), m_cloud_radius);
 
     // Communication mode (UDP only) - no need to save
 

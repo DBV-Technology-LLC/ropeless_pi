@@ -533,6 +533,11 @@ public:
   bool m_hide_transponder_text;
   int m_transponder_circle_size;
   int m_transponder_text_size;
+  bool m_show_non_owned;
+  bool m_show_cloud;
+  bool m_hide_recovered;
+  bool m_timeout_cloud;
+  int m_cloud_radius;
   
   // Debug settings
   bool m_debug_enabled;
