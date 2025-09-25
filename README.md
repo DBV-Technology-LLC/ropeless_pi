@@ -21,28 +21,40 @@ This is a plugin for OpenCPN to support the integration of Ropeless Fishing equi
 [x] - Ownership: "Owned" / "Non-Owned" in info tab
 [x] - Fixed trawl loading after startup from xml transponders
 [x] - Fix Sorting Issues
-
 [x] - Draw Square for USER positions -- X needs to be drawn bigger due to shape change
-[x] - Fix defaults
-
-
-[x] - Advanced Button. Delete All Transponders / Delete All Trawls
+[x] - Set Preference defaults properly
 
 9/25/2025
 
-
+commit
+- commented out "Mute" button command in GUI / Event
+- commented out CTRL+M commadn for "Mute" in accelerator table
+- spacer next to command buttons to center
+- added is_selected field to trawl_tracker object (for highlighting)
+- Advanced button added next to Help
+- Added Delete All button w/ stub to Advanced pop-up
+- Tweaked trawl list GUI
+- Hide / show the Trawl List and Debug sizers
 
 ## TODO:
 
+** remove extra debug stuff from sorting .... ***
+
+TEST
+1. Add transponder to trawl at position 3
+1. Add transponder to trawl at position 2
+1. Add transponder to trawl at position 1
+1. Add transponder to trawl at position 5
+
+[] - Move Manual Release button back to Bottom. Hide Mute button
+[] - Advanced Button. Delete All Transponders / Delete All Trawls
 [] - Allow inserting transponder into Trawl list at specific Position
 [] - Do not draw line unless transponders are consecutive in trawl
 
 [] - Split trawl_id address space for USER defined so it doesn't clash with Deckbox assigned IDs
 [] - Show trawl pos in status
-[] - Move manual release to bottom near OK. Remove mute
 [] - Trawl View show all transponders in trawl
 [] - Trawl View Delete Trawl
-[] - Set Preference defaults properly
 
 Bugs:
 [] - When sorting the list with a selected item it doesn't get "deselected" and color stays GOLDEN

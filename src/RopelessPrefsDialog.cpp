@@ -172,6 +172,12 @@ void RopelessPrefsDialog::CreateControls() {
     }
     displaySizer->Add(m_cbHideTransponderText, 0, wxALL, 5);
 
+    m_cbShowTrawlList = new wxCheckBox(this, wxID_ANY, _("Show trawl list"));
+    if (m_parent_pi) {
+        m_cbShowTrawlList->SetValue(m_parent_pi->m_show_trawl_list);
+    }
+    displaySizer->Add(m_cbShowTrawlList, 0, wxALL, 5);
+
     // Cloud radius text input
     wxBoxSizer *radiusSizer = new wxBoxSizer(wxHORIZONTAL);
     radiusSizer->Add(new wxStaticText(this, wxID_ANY, _("Cloud radius (nmi):")), 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 5);
@@ -241,6 +247,11 @@ void RopelessPrefsDialog::OnOKClick(wxCommandEvent &event) {
             // Save hide transponder text setting
             if (m_cbHideTransponderText) {
                 m_parent_pi->m_hide_transponder_text = m_cbHideTransponderText->GetValue();
+            }
+
+            // Save trawl list visibility setting
+            if (m_cbShowTrawlList) {
+                m_parent_pi->m_show_trawl_list = m_cbShowTrawlList->GetValue();
             }
 
             // Save TCP settings

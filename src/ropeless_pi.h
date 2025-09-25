@@ -171,7 +171,7 @@ enum {
 const wxString releaseStatusNames[] = {"TIMEOUT", "SENDING...", "RELEASED", "NOT VERIFIED", "FAILED", "---", "NETWORK ERROR", "CONNECTING..."};
 const wxString recoveredStrList[] = {"DEPLOYED","RECOVERED"};
 const wxString positionSourceNames[] = {"USER", "CLOUD", "ACOUSTIC", "GPS"};
-const wxString markTypeNames[] = {"Acoustic", "Timer", "Galvanic", "Other", "Surface Fixed", "Surface Drift"};
+const wxString markTypeNames[] = {"Acoustic Release", "Timer Release", "Galvanic Release", "Other", "Surface Fixed", "Surface Drift"};
 const wxString ownershipStrList[] = {"Non-Owned","Owned"};
 
 // Manufacturer lookup table structure
@@ -375,6 +375,9 @@ public:
   int devices_in_set;                                  // Number of devices in this trawl set (for reference)
   std::vector<trawl_coordinate> trawl_path;           // Array of lat/lon coordinates defining trawl path
   
+  // GUI fields
+  int is_selected;      // used to highlight trawl line
+
   // ID-based transponder tracking methods
   std::vector<transponder_state*> getTransponders() const;
   std::vector<uint32_t> getTransponderIds() const;
@@ -538,6 +541,7 @@ public:
   bool m_hide_recovered;
   bool m_timeout_cloud;
   int m_cloud_radius;
+  bool m_show_trawl_list;
   
   // Debug settings
   bool m_debug_enabled;

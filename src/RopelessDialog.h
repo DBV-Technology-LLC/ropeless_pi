@@ -53,10 +53,10 @@ class trawl_tracker;
 class RopelessDialog : public wxDialog {
 private:
 protected:
-  wxStdDialogButtonSizer *m_sdbSizer1;
   wxButton *m_sdbSizer1OK;
   wxButton *m_sdbSizer1Cancel;
   wxButton *m_sdbSizer1Help;
+  wxButton *m_sdbSizer1Advanced;
 
 public:
   wxComboBox *m_comboPort;
@@ -88,12 +88,13 @@ public:
   wxButton *m_clearDebugButton;
   wxCheckBox *m_showNmeaCheckbox;
   wxCheckBox *m_showDebugCheckbox;
+  wxStaticBoxSizer *m_debugSizer;
   
   // Command buttons
   wxButton *m_releaseButton;
   wxButton *m_recoverButton;
   wxButton *m_deleteButton;
-  wxButton *m_muteButton;
+  // wxButton *m_muteButton;
   wxButton *m_sidebarSyncButton;
   wxButton *m_showOnMapButton;
   
@@ -119,6 +120,7 @@ public:
   wxStaticText *m_trawlInfoText;
   wxButton *m_deleteTrawlButton;
   OCPNListCtrl *m_trawlTranspondersListCtrl;
+  wxStaticBoxSizer *m_trawlListSizer;
 
   // Selected transponder tracking
   transponder_state *m_selectedTransponder;
@@ -158,6 +160,8 @@ public:
 
   void OnOKClick(wxCommandEvent &event);
   void OnHelpClick(wxCommandEvent &event);
+  void OnAdvancedClick(wxCommandEvent &event);
+  void OnDeleteAllButton(wxCommandEvent &event);
   void OnClose(wxCloseEvent &event);
   void OnChooseFileButton(wxCommandEvent &event);
   void OnStopSimButton(wxCommandEvent &event);

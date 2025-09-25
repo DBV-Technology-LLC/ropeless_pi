@@ -90,6 +90,7 @@ double ScaleToPPM(int chart_scale, const PlugIn_ViewPort &vp)
 BEGIN_EVENT_TABLE(RopelessDialog, wxDialog)
 EVT_BUTTON(wxID_OK, RopelessDialog::OnOKClick)
 EVT_BUTTON(wxID_HELP, RopelessDialog::OnHelpClick)
+EVT_BUTTON(wxID_HIGHEST + 100, RopelessDialog::OnAdvancedClick)
 EVT_CLOSE(RopelessDialog::OnClose)
 EVT_KEY_DOWN(RopelessDialog::OnKeyDown)
 EVT_CHOICE(wxID_ANY, RopelessDialog::OnTrawlChoice)
@@ -226,7 +227,7 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
   m_pListCtrlTranponders->AssignImageList(imglist, wxIMAGE_LIST_SMALL);
 
   // Create Trawl List box below the Transponder List
-  wxStaticBoxSizer *trawlListSizer = new wxStaticBoxSizer(
+  m_trawlListSizer = new wxStaticBoxSizer(
       new wxStaticBox(this, wxID_ANY, _("Trawl List")), wxVERTICAL);
 
   // Create horizontal sizer for trawl content
@@ -239,7 +240,7 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
   wxStaticText *trawlSelectLabel = new wxStaticText(this, wxID_ANY, _("Select Trawl:"));
   trawlLeftSizer->Add(trawlSelectLabel, 0, wxALL, 2);
 
-  m_trawlChoice = new wxChoice(this, wxID_ANY);
+  m_trawlChoice = new wxChoice(this, wxID_ANY, wxDefaultPosition, wxSize(150, -1));
   m_trawlChoice->Append(_("None Selected"));
   m_trawlChoice->SetSelection(0);
   trawlLeftSizer->Add(m_trawlChoice, 0, wxEXPAND | wxALL, 2);
@@ -247,6 +248,9 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
   // Trawl info display
   m_trawlInfoText = new wxStaticText(this, wxID_ANY, _("Trawl Info: ---"));
   trawlLeftSizer->Add(m_trawlInfoText, 0, wxALL, 2);
+
+  // Add spacer to push Delete Trawl button to bottom
+  trawlLeftSizer->AddStretchSpacer(1);
 
   // Delete Trawl button
   m_deleteTrawlButton = new wxButton(this, wxID_ANY, _("Delete Trawl"), wxDefaultPosition, wxDefaultSize, 0);
@@ -268,12 +272,12 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
 
   trawlContentSizer->Add(m_trawlTranspondersListCtrl, 1, wxEXPAND | wxALL, 5);
 
-  trawlListSizer->Add(trawlContentSizer, 1, wxEXPAND, 0);
+  m_trawlListSizer->Add(trawlContentSizer, 1, wxEXPAND, 0);
 
   // Create a vertical sizer to hold both transponder and trawl lists
   wxBoxSizer *leftColumnSizer = new wxBoxSizer(wxVERTICAL);
   leftColumnSizer->Add(mainContentSizer, 1, wxEXPAND | wxALL, 0);
-  leftColumnSizer->Add(trawlListSizer, 0, wxEXPAND | wxALL, 5);
+  leftColumnSizer->Add(m_trawlListSizer, 0, wxEXPAND | wxALL, 5);
 
   // Add left column to horizontal sizer - let sidebar drive the height
   bSizer2->Add(leftColumnSizer, 1, wxEXPAND | wxALL, 5);
@@ -400,22 +404,26 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
   buttonRow1->Add(m_deleteButton, 0, wxALL, 2);
   
   wxBoxSizer *buttonRow2 = new wxBoxSizer(wxHORIZONTAL);
-  m_muteButton = new wxButton(this, wxID_ANY, _("Mute"), wxDefaultPosition, wxDefaultSize, 0);
+  // m_muteButton = new wxButton(this, wxID_ANY, _("Mute"), wxDefaultPosition, wxDefaultSize, 0);
   m_sidebarSyncButton = new wxButton(this, wxID_ANY, _("Sync"), wxDefaultPosition, wxDefaultSize, 0);
-  buttonRow2->Add(m_muteButton, 0, wxALL, 2);
-  buttonRow2->Add(m_sidebarSyncButton, 0, wxALL, 2);
-  
-  wxBoxSizer *buttonRow3 = new wxBoxSizer(wxHORIZONTAL);
   m_showOnMapButton = new wxButton(this, wxID_ANY, _("Show On Map"), wxDefaultPosition, wxDefaultSize, 0);
+  // buttonRow2->Add(m_muteButton, 0, wxALL, 2);
+  buttonRow2->AddStretchSpacer(1);
+  buttonRow2->Add(m_sidebarSyncButton, 0, wxALL, 2);
+  buttonRow2->Add(m_showOnMapButton, 0, wxALL, 2);
+  buttonRow2->AddStretchSpacer(1);
+
+  wxBoxSizer *buttonRow3 = new wxBoxSizer(wxHORIZONTAL);
   m_ManualReleaseButton = new wxButton(this, wxID_ANY, _("Manual Release"), wxDefaultPosition, wxDefaultSize, 0);
-  buttonRow3->Add(m_showOnMapButton, 0, wxALL, 2);
+  buttonRow3->AddStretchSpacer(1);
   buttonRow3->Add(m_ManualReleaseButton, 0, wxALL, 2);
+  buttonRow3->AddStretchSpacer(1);
   
   // Bind command buttons to send GMR commands for selected transponder
   m_releaseButton->Bind(wxEVT_COMMAND_BUTTON_CLICKED, &RopelessDialog::OnReleaseButton, this);
   m_recoverButton->Bind(wxEVT_COMMAND_BUTTON_CLICKED, &RopelessDialog::OnRecoverButton, this);
   m_deleteButton->Bind(wxEVT_COMMAND_BUTTON_CLICKED, &RopelessDialog::OnDeleteButton, this);
-  m_muteButton->Bind(wxEVT_COMMAND_BUTTON_CLICKED, &RopelessDialog::OnMuteButton, this);
+  // m_muteButton->Bind(wxEVT_COMMAND_BUTTON_CLICKED, &RopelessDialog::OnMuteButton, this);
   
   m_sidebarSyncButton->Bind(wxEVT_COMMAND_BUTTON_CLICKED, &RopelessDialog::OnSyncButton, this);
   m_showOnMapButton->Bind(wxEVT_COMMAND_BUTTON_CLICKED, &RopelessDialog::OnShowOnMapButton, this);
@@ -479,14 +487,14 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
   overallSizer->Add(bSizer2, 1, wxEXPAND, 0);
 
   // Add debug box with proper sizing
-  wxStaticBoxSizer *debugSizer = new wxStaticBoxSizer(
+  m_debugSizer = new wxStaticBoxSizer(
       new wxStaticBox(this, wxID_ANY, _("Debug Messages")), wxVERTICAL);
-  overallSizer->Add(debugSizer, 0, wxALL | wxEXPAND, 5);
+  overallSizer->Add(m_debugSizer, 0, wxALL | wxEXPAND, 5);
   
   m_debugTextCtrl = new wxTextCtrl(this, wxID_ANY, wxEmptyString, 
                                    wxDefaultPosition, wxSize(-1, 100), 
                                    wxTE_MULTILINE | wxTE_READONLY | wxTE_WORDWRAP);
-  debugSizer->Add(m_debugTextCtrl, 0, wxEXPAND | wxALL, 5);
+  m_debugSizer->Add(m_debugTextCtrl, 0, wxEXPAND | wxALL, 5);
   
   // Add controls for debug messages in a horizontal sizer
   wxBoxSizer *debugControlsSizer = new wxBoxSizer(wxHORIZONTAL);
@@ -504,16 +512,21 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
   debugControlsSizer->Add(m_showDebugCheckbox, 0, wxALL | wxALIGN_CENTER_VERTICAL, 5);
   
   // Left align the controls
-  debugSizer->Add(debugControlsSizer, 0, wxALL | wxALIGN_LEFT, 5);
+  m_debugSizer->Add(debugControlsSizer, 0, wxALL | wxALIGN_LEFT, 5);
 
-  m_sdbSizer1 = new wxStdDialogButtonSizer();
+  // Create custom button sizer for better control over placement
+  wxBoxSizer* buttonSizer = new wxBoxSizer(wxHORIZONTAL);
+
   m_sdbSizer1OK = new wxButton(this, wxID_OK);
   m_sdbSizer1Help = new wxButton(this, wxID_HELP, _("Help"));
-  m_sdbSizer1->AddButton(m_sdbSizer1OK);
-  m_sdbSizer1->AddButton(m_sdbSizer1Help);
-  m_sdbSizer1->Realize();
+  m_sdbSizer1Advanced = new wxButton(this, wxID_HIGHEST + 100, _("Advanced"));
 
-  overallSizer->Add(m_sdbSizer1, 0, wxBOTTOM | wxEXPAND | wxTOP, 5);
+  buttonSizer->Add(m_sdbSizer1Help, 0, wxRIGHT, 5);
+  buttonSizer->Add(m_sdbSizer1Advanced, 0, wxRIGHT, 5);
+  buttonSizer->AddStretchSpacer(1);
+  buttonSizer->Add(m_sdbSizer1OK, 0, 0, 0);
+
+  overallSizer->Add(buttonSizer, 0, wxBOTTOM | wxEXPAND | wxTOP | wxLEFT | wxRIGHT, 5);
 
   this->SetSizer(overallSizer);
   
@@ -560,8 +573,8 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
   entries[3].Set(wxACCEL_CTRL, (int)'O', wxID_HIGHEST + 4);  // Recover
   entries[4].Set(wxACCEL_CTRL, (int)'A', wxID_HIGHEST + 5);  // Manual Release
   entries[5].Set(wxACCEL_CTRL, (int)'Y', wxID_HIGHEST + 6);  // Sync
-  entries[6].Set(wxACCEL_CTRL, (int)'M', wxID_HIGHEST + 7);  // Mute
-  wxAcceleratorTable accel(7, entries);
+  // entries[6].Set(wxACCEL_CTRL, (int)'M', wxID_HIGHEST + 7);  // Mute
+  wxAcceleratorTable accel(6, entries);
   this->SetAcceleratorTable(accel);
   
   // Bind the accelerator events
@@ -571,13 +584,23 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
   this->Bind(wxEVT_MENU, &RopelessDialog::OnRecoverAccelerator, this, wxID_HIGHEST + 4);
   this->Bind(wxEVT_MENU, &RopelessDialog::OnManualReleaseAccelerator, this, wxID_HIGHEST + 5);
   this->Bind(wxEVT_MENU, &RopelessDialog::OnSyncAccelerator, this, wxID_HIGHEST + 6);
-  this->Bind(wxEVT_MENU, &RopelessDialog::OnMuteAccelerator, this, wxID_HIGHEST + 7);
+  // this->Bind(wxEVT_MENU, &RopelessDialog::OnMuteAccelerator, this, wxID_HIGHEST + 7);
   
   // Update initial TCP connection status
   UpdateTCPConnectionStatus();
 
   // Initialize trawl dropdown
   RefreshTrawlChoice();
+
+  // Show/hide trawl list based on preference
+  if (pParentPi && !pParentPi->m_show_trawl_list) {
+    m_trawlListSizer->ShowItems(false);
+  }
+
+  // Show/hide debug section based on preference
+  if (pParentPi && !pParentPi->m_debug_enabled) {
+    m_debugSizer->ShowItems(false);
+  }
 
   m_selectedTransponder = NULL;
 
@@ -626,9 +649,9 @@ RopelessDialog::~RopelessDialog() {
     if (m_deleteButton) {
       m_deleteButton->Unbind(wxEVT_COMMAND_BUTTON_CLICKED, &RopelessDialog::OnDeleteButton, this);
     }
-    if (m_muteButton) {
-      m_muteButton->Unbind(wxEVT_COMMAND_BUTTON_CLICKED, &RopelessDialog::OnMuteButton, this);
-    }
+    // if (m_muteButton) {
+    //   m_muteButton->Unbind(wxEVT_COMMAND_BUTTON_CLICKED, &RopelessDialog::OnMuteButton, this);
+    // }
     
     // Unbind accelerator events
     this->Unbind(wxEVT_MENU, &RopelessDialog::OnShowOnMapAccelerator, this, wxID_HIGHEST + 1);
@@ -637,7 +660,7 @@ RopelessDialog::~RopelessDialog() {
     this->Unbind(wxEVT_MENU, &RopelessDialog::OnRecoverAccelerator, this, wxID_HIGHEST + 4);
     this->Unbind(wxEVT_MENU, &RopelessDialog::OnManualReleaseAccelerator, this, wxID_HIGHEST + 5);
     this->Unbind(wxEVT_MENU, &RopelessDialog::OnSyncAccelerator, this, wxID_HIGHEST + 6);
-    this->Unbind(wxEVT_MENU, &RopelessDialog::OnMuteAccelerator, this, wxID_HIGHEST + 7);
+    // this->Unbind(wxEVT_MENU, &RopelessDialog::OnMuteAccelerator, this, wxID_HIGHEST + 7);
   } catch (...) {
     // Ignore any exceptions during cleanup - dialog may already be destroyed
   }
@@ -877,30 +900,22 @@ void RopelessDialog::OnTargetListSelected(wxListEvent &event) {
 void RopelessDialog::OnTargetListColumnClicked(wxListEvent &event) {
   int key = event.GetColumn();
   wxListItem item;
-  // item.SetMask(wxLIST_MASK_IMAGE);
 
-  wxLogMessage("Column clicked: %d (current sort column: %d)", key, g_RopelessTargetList_sortColumn);
+  // wxLogMessage("Column clicked: %d (current sort column: %d)", key, g_RopelessTargetList_sortColumn);
 
-  if (key == g_RopelessTargetList_sortColumn)
+  if (key == g_RopelessTargetList_sortColumn) {
     g_bRopelessTargetList_sortReverse = !g_bRopelessTargetList_sortReverse;
+  }
   else {
-    // item.SetImage(-1);
-    // m_pListCtrlAISTargets->SetColumn(g_AisTargetList_sortColumn, item);
     g_bRopelessTargetList_sortReverse = false;
     g_RopelessTargetList_sortColumn = key;
   }
 
-  wxLogMessage("Sort column now: %d, reverse: %s", g_RopelessTargetList_sortColumn,
-               g_bRopelessTargetList_sortReverse ? "true" : "false");
-  // item.SetImage(g_bAisTargetList_sortReverse ? 1 : 0);
+  // wxLogMessage("Sort column now: %d, reverse: %s", g_RopelessTargetList_sortColumn,
+  //              g_bRopelessTargetList_sortReverse ? "true" : "false");
 
-  // if (!g_bAisTargetList_autosort) g_bsort_once = true;
-
-  //  if (g_RopelessTargetList_sortColumn >= 0) {
-  // m_pListCtrlAISTargets->SetColumn(g_AisTargetList_sortColumn, item);
   RefreshTransponderList();
   RefreshTrawlChoice();
-  //  }
 }
 
 void RopelessDialog::RefreshTransponderList() {
@@ -1414,7 +1429,7 @@ void RopelessDialog::OnMuteAccelerator(wxCommandEvent &event) {
 }
 
 void RopelessDialog::OnHelpClick(wxCommandEvent &event) {
-  wxString helpText = 
+  wxString helpText =
     _("Ropeless Plugin - Keyboard Shortcuts\n\n") +
     _("The following keyboard shortcuts are available:\n\n") +
     _("Ctrl+S  -  Show On Map\n") +
@@ -1434,9 +1449,44 @@ void RopelessDialog::OnHelpClick(wxCommandEvent &event) {
     _("Note: Most commands require a transponder to be selected\n") +
     _("from the list first, except for Sync and Manual Release.");
 
-  wxMessageDialog helpDialog(this, helpText, _("Ropeless Plugin Help"), 
+  wxMessageDialog helpDialog(this, helpText, _("Ropeless Plugin Help"),
                            wxOK | wxICON_INFORMATION);
   helpDialog.ShowModal();
+}
+
+void RopelessDialog::OnAdvancedClick(wxCommandEvent &event) {
+  // Create and show the advanced dialog
+  wxDialog* advancedDialog = new wxDialog(this, wxID_ANY, _("Advanced Options"),
+                                         wxDefaultPosition, wxDefaultSize,
+                                         wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER);
+
+  // Create the main sizer
+  wxBoxSizer* mainSizer = new wxBoxSizer(wxVERTICAL);
+
+  // Add some info text
+  wxStaticText* infoText = new wxStaticText(advancedDialog, wxID_ANY,
+                                           _("Advanced operations:"));
+  mainSizer->Add(infoText, 0, wxALL, 10);
+
+  // Create Delete All button
+  wxButton* deleteAllButton = new wxButton(advancedDialog, wxID_ANY, _("Delete All"));
+  mainSizer->Add(deleteAllButton, 0, wxALL | wxCENTER, 10);
+
+  // Bind Delete All button to stub function
+  deleteAllButton->Bind(wxEVT_COMMAND_BUTTON_CLICKED, &RopelessDialog::OnDeleteAllButton, this);
+
+  advancedDialog->SetSizer(mainSizer);
+  mainSizer->Fit(advancedDialog);
+
+  advancedDialog->ShowModal();
+  advancedDialog->Destroy();
+}
+
+void RopelessDialog::OnDeleteAllButton(wxCommandEvent &event) {
+  // Stub function - Delete All functionality not implemented yet
+  wxMessageDialog stubDialog(this, _("Delete All functionality not yet implemented."),
+                            _("Not Implemented"), wxOK | wxICON_INFORMATION);
+  stubDialog.ShowModal();
 }
 
 void RopelessDialog::OnOKClick(wxCommandEvent &event) {
@@ -1633,9 +1683,7 @@ void RopelessDialog::RefreshTrawlChoice() {
 
   for (auto* trawl : trawlList) {
     if (trawl && trawl->traps_in_set() > 0) {
-      wxString trawlLabel = wxString::Format("Trawl %d (%d traps)",
-                                           trawl->trawl_id,
-                                           trawl->traps_in_set());
+      wxString trawlLabel = wxString::Format("Trawl %d", trawl->trawl_id);
       m_trawlChoice->Append(trawlLabel);
     }
   }
@@ -1706,25 +1754,25 @@ void RopelessDialog::UpdateTrawlInfo(trawl_tracker* trawl) {
   if (!m_trawlInfoText) return;
 
   if (!trawl) {
-    m_trawlInfoText->SetLabel(_("Trawl Info: ---"));
+    m_trawlInfoText->SetLabel(_("Num Traps: ---\nLength: ---"));
     return;
   }
 
   double length = CalculateTrawlLength(trawl);
   int numTraps = trawl->traps_in_set();
 
-  wxString infoText;
+  wxString lengthStr;
   if (length > 0) {
     if (length > 1000) {
-      infoText = wxString::Format(_("Length: %.2f km, Traps: %d"),
-                                length / 1000.0, numTraps);
+      lengthStr = wxString::Format("%.2f km", length / 1000.0);
     } else {
-      infoText = wxString::Format(_("Length: %.0f m, Traps: %d"),
-                                length, numTraps);
+      lengthStr = wxString::Format("%.0f m", length);
     }
   } else {
-    infoText = wxString::Format(_("Length: ---, Traps: %d"), numTraps);
+    lengthStr = "---";
   }
 
+  wxString infoText = wxString::Format(_("Num Traps: %d\nLength: %s"),
+                                      numTraps, lengthStr);
   m_trawlInfoText->SetLabel(infoText);
 }

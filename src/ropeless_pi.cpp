@@ -972,7 +972,7 @@ bool ropeless_pi::SendCommandMessage(transponder_state *state, long code) {
 
   if (state == NULL) 
   {
-    wxLogMessage("Error: SendCommandMessage state = NULL");
+    wxLogMessage("Error: SendCommandMessage transponder state = NULL");
     return false;
   }
 
@@ -989,9 +989,6 @@ bool ropeless_pi::SendCommandMessage(transponder_state *state, long code) {
 
   gmr_msg.SetContainer(&m_NMEA0183_tx);
 
-  // wxLogMessage("GMR Message created: CmdUID=%d, MarkID=%d, CmdType=%ld", 
-  //              gmr_msg.CmdUID, gmr_msg.MarkID, gmr_msg.CmdType);
-  
   // Send NMEA message via TCP!
   SendNMEAMessageTCP(&gmr_msg);
 
@@ -2788,6 +2785,7 @@ bool ropeless_pi::LoadConfig(void) {
     pConf->Read(_T( "Hide_Recovered" ), &m_hide_recovered, false);
     pConf->Read(_T( "Timeout_Cloud" ), &m_timeout_cloud, false);
     pConf->Read(_T( "Cloud_Radius" ), &m_cloud_radius, 2);
+    pConf->Read(_T( "Show_Trawl_List" ), &m_show_trawl_list, false);
     
     // Debug logging to see what was loaded
     wxLogMessage("TCP Config loaded - Host: %s, Port: %d, Enabled: %s, AutoReconnect: %s", 
@@ -2849,6 +2847,7 @@ bool ropeless_pi::SaveConfig(void) {
     pConf->Write(_T( "Hide_Recovered" ), m_hide_recovered);
     pConf->Write(_T( "Timeout_Cloud" ), m_timeout_cloud);
     pConf->Write(_T( "Cloud_Radius" ), m_cloud_radius);
+    pConf->Write(_T( "Show_Trawl_List" ), m_show_trawl_list);
 
     // Communication mode (UDP only) - no need to save
 
