@@ -44,36 +44,44 @@ Last Updated: 9/25/2025 CTV
 - [x] Draw dashed grey line between non-sequential traps in a trawl
 - [x] Only draw solid black line between consecutive traps in a trawl
 - [x] Fix manual placement trawl pos
+- [x] Allow inserting transponder into Trawl list at specific Position
 
+- [x] Fix Recover command button to execute same as "Mark Recovered"
+- [x] Add Delete Trawl button
+- [x] Mark trawl_ids as not selected anymore when dialog is closed
 
 ## TODO:
-
-- [ ] Fix Recover command button to execute same as "Mark Recovered"
-
-Trawl Creation Test...
-
-1. Add transponder to trawl at position 3
-2. Add transponder to trawl at position 2
-3. Add transponder to trawl at position 1
-4. Add transponder to trawl at position 5
-
-- [ ] Allow inserting transponder into Trawl list at specific Position
-- [ ] Do not draw line unless transponders are consecutive in trawl
-
-- [ ] Split trawl_id address space for USER defined
-- [ ] Show trawl pos in status
-- [ ] Trawl View show all transponders in trawl
-- [ ] Trawl View Delete Trawl
+- [ ] Fix manual placement edit not changing trawl pos
+- [ ] Fix Deleting end point of Trawl not setting next largest point as end of trawl
+- [ ] Split trawl_id address space for USER defined. Enforce range on Trawl id creation
+- [ ] Split trawl_id address space for CLOUD
+- [ ] Make sure Trawl is deleted when CLOUD units are out of scope / deleted
+- [ ] Edit Trawl not working to change trawl num
+- [ ] Make dotted grey also Yellow on select
+- [ ] Hide info on right click for CLOUD positions -- No SN / Manuf
+- [ ] Cloud positions don't delete at the same time when moving boat?
+- [ ] Cloud radius not updating from preferences
+- [ ] Fix crash after laptop wakes from sleep
+- [ ] Update trawl list on timer / new trawls only show up when dialog re opened
+- [ ] Optionally allow "Recover" pop-up when Release status gets set to "Verified / Not Verified"
+- [ ] Cloud positions have red / green ring for ownership?
+- [ ] Distance round to M, add comma?
+- [ ] Fix manual release to ask for MarkID?
 
 ### Bugs:
+- [ ] Opacity doesn't work for rectangles -- Remove entirely?
 - [ ] When sorting the list with a selected item it doesn't get "deselected" and color stays GOLDEN
 - [ ] List scrolls back up every refresh
 - [ ] Trawl gets un selected when transponder list is sorted?
+- [ ] Right clicking on table popup far to the right
 
 ### Maybe Later:
+- [ ] Add Initial Timestamp UTC to Transponder when it was first created // parse from GML
+- [ ] Add drop down to Filter transponder list by Trawl ID instead of Trawl Table
 - [ ] Support trawl_path lat/lon list
 - [ ] Add update flag to transponder obj to make rendering faster for non changing transponders ?
 - [ ] Create separate log file for NMEA only messages
+- [ ] Show trawl pos in status
 
 ### Maybe Never:
 - [ ] Fix text cutoff in "Transponder Status" Tab? -- commented out for now
@@ -81,11 +89,11 @@ Trawl Creation Test...
 
 ### Before Release
 - Remove position field from manual placement
-- Remove unused commands "Mute"
-- Update defaults in preferences
-- Hide trawl view
+- ~~Remove unused commands "Mute"~~
+- ~~Update defaults in preferences~~
+- ~~Hide trawl view by default~~
 - Don't allow manual placement
-- Hide Debug window by default
+- ~~Hide Debug window by default~~
 
 ### Things to Test
 - Scrolling in table list 

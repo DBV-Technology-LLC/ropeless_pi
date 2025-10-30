@@ -1751,6 +1751,10 @@ void ropeless_pi::RenderTransponder(transponder_state *state) {
   {
     opacity = 64;
   }
+  else
+  {
+    opacity = 255;
+  }
 
 #ifdef SET_RECOVERED_OPACITY
   rcolour.Set(rcolour.Red(), rcolour.Green(), rcolour.Blue(), opacity);
@@ -1812,9 +1816,10 @@ void ropeless_pi::RenderTransponder(transponder_state *state) {
     m_oDC->DrawCircle(ab.x, ab.y, circle_size);
   } else if (state->position_source == ePOS_SOURCE_USER) {
 
-    // Draw square for USER transponders
-    wxPen dpen(rcolour);
-    wxBrush dbrush(rcolour);
+    // Draw square for USER transponders - use DrawRectangle with modified approach
+    wxColour userColour(rcolour.Red(), rcolour.Green(), rcolour.Blue(), opacity);
+    wxPen dpen(userColour);
+    wxBrush dbrush(userColour);
     m_oDC->SetPen(dpen);
     m_oDC->SetBrush(dbrush);
 
@@ -1824,9 +1829,10 @@ void ropeless_pi::RenderTransponder(transponder_state *state) {
     m_oDC->DrawRectangle(ab.x - half_size, ab.y - half_size, square_size, square_size);
   } else {
 
-    // Draw regular circle for other position sources (CLOUD, ACOUSTIC, GPS)
-    wxPen dpen(rcolour);
-    wxBrush dbrush(rcolour);
+    // Draw regular circle for other position sources (ACOUSTIC, GPS) with opacity support
+    wxColour circleColour(rcolour.Red(), rcolour.Green(), rcolour.Blue(), opacity);
+    wxPen dpen(circleColour);
+    wxBrush dbrush(circleColour);
     m_oDC->SetPen(dpen);
     m_oDC->SetBrush(dbrush);
     m_oDC->DrawCircle(ab.x, ab.y, circle_size);

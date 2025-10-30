@@ -67,6 +67,7 @@ class manualPlacementDlgImpl : public manualPlacementDlg {
         bool valid;
         int positionSource;
         int deviceType;
+        bool isEditingExisting; // True when editing existing transponder, false when adding new
         
         // Position source dropdown control
         wxChoice* m_choicePositionSource;

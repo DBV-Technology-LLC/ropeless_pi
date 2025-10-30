@@ -254,6 +254,7 @@ RopelessDialog::RopelessDialog(wxWindow *parent, ropeless_pi *parent_pi,
 
   // Delete Trawl button
   m_deleteTrawlButton = new wxButton(this, wxID_ANY, _("Delete Trawl"), wxDefaultPosition, wxDefaultSize, 0);
+  m_deleteTrawlButton->Bind(wxEVT_COMMAND_BUTTON_CLICKED, &RopelessDialog::OnDeleteTrawlButton, this);
   trawlLeftSizer->Add(m_deleteTrawlButton, 0, wxEXPAND | wxALL, 2);
 
   trawlContentSizer->Add(trawlLeftSizer, 0, wxEXPAND | wxALL, 5);
@@ -1369,6 +1370,7 @@ long RopelessDialog::FindItemByName(wxListCtrl* listCtrl, const wxString& name) 
 
 void RopelessDialog::OnClose(wxCloseEvent &event) {
   
+  ClearTrawlSelection();
   clearHighlighted();
 
 #ifndef __ANDROID__
@@ -1505,6 +1507,7 @@ void RopelessDialog::OnDeleteAllButton(wxCommandEvent &event) {
 
 void RopelessDialog::OnOKClick(wxCommandEvent &event) {
   clearHighlighted();
+  ClearTrawlSelection();
 
   Close();
 }
@@ -1596,10 +1599,19 @@ void RopelessDialog::OnRecoverButton(wxCommandEvent &event) {
     DebugMessage("No transponder selected for Recover command");
     return;
   }
-  
+
   if (pParentPi) {
+    // Update the transponder's recovery state locally (same as Mark Recovered)
+    m_selectedTransponder->recovered_state = eREC_RECOVERED;
+
+    // Send the recover command message
     pParentPi->SendCommandMessage(m_selectedTransponder, eCMD_RECOVER);
-    //DebugMessage(wxString::Format("Sent RECOVER command for transponder %d", m_selectedTransponder->markID));
+
+    // Refresh the UI to show updated recovery status
+    UpdateTransponderInfo(m_selectedTransponder);
+    RefreshTransponderList();
+
+    DebugMessage(wxString::Format("Marked transponder %d as recovered", m_selectedTransponder->markID));
   }
 }
 
@@ -1745,6 +1757,58 @@ void RopelessDialog::OnTrawlChoice(wxCommandEvent &event) {
     // Update both info and transponders list
     UpdateTrawlInfo(selectedTrawl);
     UpdateTrawlTranspondersList(selectedTrawl);
+  }
+}
+
+void RopelessDialog::OnDeleteTrawlButton(wxCommandEvent &event) {
+  if (!m_selectedTrawl) {
+    wxMessageBox(_("No trawl selected to delete."), _("Delete Trawl"), wxOK | wxICON_INFORMATION);
+    return;
+  }
+
+  // Show confirmation dialog
+  wxString msg = wxString::Format(_("Are you sure you want to delete trawl '%d'?\n\nThis will remove all transponders from this trawl but not delete the transponders themselves.\n\nThis action cannot be undone."), (int)m_selectedTrawl->trawl_id);
+
+  int result = wxMessageBox(msg, _("Confirm Delete Trawl"), wxYES_NO | wxICON_QUESTION | wxCENTRE);
+
+  if (result != wxYES) {
+    return;
+  }
+
+  // Remove trawl_id from all associated transponders
+  extern std::vector<transponder_state*> transponderStatus;
+  for (auto* state : transponderStatus) {
+    if (state && state->trawl_id == m_selectedTrawl->trawl_id) {
+      state->trawl_id = 0;
+      state->trawl_num = 0;
+    }
+  }
+
+  // Remove trawl from global list
+  extern std::vector<trawl_tracker *> trawlList;
+  auto it = std::find(trawlList.begin(), trawlList.end(), m_selectedTrawl);
+  if (it != trawlList.end()) {
+    delete *it;
+    trawlList.erase(it);
+  }
+
+  // Clear selected trawl
+  m_selectedTrawl = nullptr;
+
+  // Refresh UI
+  RefreshTrawlChoice();
+  RefreshTransponderList();
+  UpdateTrawlInfo(nullptr);
+  UpdateTrawlTranspondersList(nullptr);
+
+  wxLogMessage("Deleted trawl");
+}
+
+void RopelessDialog::ClearTrawlSelection() {
+  // Clear trawl selection (same pattern as OnTrawlChoice)
+  if (m_selectedTrawl) {
+    m_selectedTrawl->is_selected = 0;
+    m_selectedTrawl = nullptr;
   }
 }
 

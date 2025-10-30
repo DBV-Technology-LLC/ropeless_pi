@@ -43,6 +43,7 @@ manualPlacementDlgImpl::manualPlacementDlgImpl(wxWindow* parent, int id, const w
 	deviceType = 0; // Default to Ropeless Systems Inc. (0x00)
 	selectedTrawlId = 0; // Default to "None"
 	trawlPosition = 0; // Default to 0
+	isEditingExisting = (existingState != nullptr); // Track if editing vs adding
 
 	wxLogMessage("Creating Manual Placement Dialog! @ %s",utcStr);
 
@@ -531,31 +532,39 @@ void manualPlacementDlgImpl::UpdateTrawlPosControl() {
         m_spinCtrlTrawlPos->Enable(true);
         m_spinCtrlTrawlPos->SetValue(1);
     } else {
-        // Existing trawl selected - enable and set to length + 1
+        // Existing trawl selected - enable the control
         m_spinCtrlTrawlPos->Enable(true);
 
-        // Find the trawl and get its current length (count of transponders)
-        extern std::vector<trawl_tracker *> trawlList;
-        int trawlLength = 0;
+        // If we're editing an existing transponder, preserve its current position
+        // If we're adding a new transponder, set to next available position
+        if (isEditingExisting) {
+            // Keep the current trawlPosition value that was set from existingState
+            m_spinCtrlTrawlPos->SetValue(trawlPosition);
+            wxLogMessage("Updated trawl pos control: Editing existing transponder, preserving position %d", trawlPosition);
+        } else {
+            // Find the trawl and get its current length (count of transponders)
+            extern std::vector<trawl_tracker *> trawlList;
+            int trawlLength = 0;
 
-        for (auto* trawl : trawlList) {
-            if (trawl && trawl->trawl_id == selectedTrawlId) {
-                // Count transponders in this trawl
-                extern std::vector<transponder_state *> transponderStatus;
-                for (auto* state : transponderStatus) {
-                    if (state && state->trawl_id == selectedTrawlId) {
-                        trawlLength++;
+            for (auto* trawl : trawlList) {
+                if (trawl && trawl->trawl_id == selectedTrawlId) {
+                    // Count transponders in this trawl
+                    extern std::vector<transponder_state *> transponderStatus;
+                    for (auto* state : transponderStatus) {
+                        if (state && state->trawl_id == selectedTrawlId) {
+                            trawlLength++;
+                        }
                     }
+                    break;
                 }
-                break;
             }
+
+            // Set value to length + 1 (next position in trawl)
+            m_spinCtrlTrawlPos->SetValue(trawlLength + 1);
+
+            wxLogMessage("Updated trawl pos control: Adding to trawl %d with %d transponders, setting pos to %d",
+                         selectedTrawlId, trawlLength, trawlLength + 1);
         }
-
-        // Set value to length + 1 (next position in trawl)
-        m_spinCtrlTrawlPos->SetValue(trawlLength + 1);
-
-        wxLogMessage("Updated trawl pos control: Trawl %d has %d transponders, setting pos to %d",
-                     selectedTrawlId, trawlLength, trawlLength + 1);
     }
 }
 

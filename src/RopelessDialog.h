@@ -204,6 +204,8 @@ public:
   // Trawl methods
   void RefreshTrawlChoice();
   void OnTrawlChoice(wxCommandEvent &event);
+  void OnDeleteTrawlButton(wxCommandEvent &event);
+  void ClearTrawlSelection();
   double CalculateTrawlLength(trawl_tracker* trawl);
   void UpdateTrawlInfo(trawl_tracker* trawl);
   void UpdateTrawlTranspondersList(trawl_tracker* trawl);
